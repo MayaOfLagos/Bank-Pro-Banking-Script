@@ -13,7 +13,7 @@ const error         = ref('')
 const transactions  = ref([])
 const activeTab     = ref('All')
 
-const TABS = ['All', 'Credits', 'Debits', 'Wire Transfers', 'Domestic', 'Withdrawals']
+const TABS = ['All', 'Credits', 'Debits']
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const formatMoney = (currency, amount) =>
@@ -54,21 +54,8 @@ const statusBadgeClass = (statusLabel = '') => {
 // ─── Filtered rows ────────────────────────────────────────────────────────────
 const filteredRows = computed(() => {
   const tab = activeTab.value
-  if (tab === 'All')            return transactions.value
-  if (tab === 'Credits')        return transactions.value.filter((t) => Number(t.trans_type) === 1)
-  if (tab === 'Debits')         return transactions.value.filter((t) => Number(t.trans_type) === 2)
-  if (tab === 'Wire Transfers')
-    return transactions.value.filter((t) =>
-      String(t.type_label || '').toLowerCase().includes('wire')
-    )
-  if (tab === 'Domestic')
-    return transactions.value.filter((t) =>
-      String(t.type_label || '').toLowerCase().includes('domestic')
-    )
-  if (tab === 'Withdrawals')
-    return transactions.value.filter((t) =>
-      String(t.type_label || '').toLowerCase().includes('withdraw')
-    )
+  if (tab === 'Credits') return transactions.value.filter((t) => Number(t.trans_type) === 1)
+  if (tab === 'Debits')  return transactions.value.filter((t) => Number(t.trans_type) === 2)
   return transactions.value
 })
 

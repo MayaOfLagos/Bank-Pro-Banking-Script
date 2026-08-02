@@ -33,10 +33,7 @@ const saveSuccess = ref(false)
 // Logout state
 const loggingOut = ref(false)
 
-const avatarSrc = computed(() => {
-  if (profile.value.image) return `/assets/profile/${profile.value.image}`
-  return null
-})
+const avatarSrc = computed(() => profile.value.image || null)
 
 const initials = computed(() => {
   const f = String(profile.value.firstname || '').charAt(0).toUpperCase()

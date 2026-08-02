@@ -35,7 +35,7 @@
         <!-- Reference -->
         <div class="px-4 py-3.5 flex justify-between items-center">
           <span class="text-slate-400 text-sm">Reference</span>
-          <span class="text-white text-xs font-mono">{{ transfer.refrence_id }}</span>
+          <span class="text-white text-xs font-mono">{{ transfer.reference_id }}</span>
         </div>
 
         <!-- Beneficiary -->
@@ -77,7 +77,7 @@
           View activity
         </button>
         <button
-          @click="router.push('/wire-transfer')"
+          @click="router.push(transfer.type === 'domestic' ? '/domestic-transfer' : '/wire-transfer')"
           class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl py-4 transition text-sm"
         >
           New transfer

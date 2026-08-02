@@ -42,7 +42,7 @@ api_json(200, [
     'firstname' => $user['firstname'] ?? '',
     'lastname' => $user['lastname'] ?? '',
     'full_name' => trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')),
-    'image' => $user['image'] ?? '',
+    'image' => '/assets/profile/' . ($user['image'] ?? 'user.png'),
     'account_number' => (string)($user['acct_no'] ?? ''),
     // acct_no remains until the login flow migrates off it as the credential field.
     'acct_no' => $user['acct_no'] ?? '',

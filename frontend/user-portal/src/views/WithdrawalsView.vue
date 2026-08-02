@@ -38,12 +38,7 @@ const statusBadgeClass = (row) => {
   return 'bg-amber-500/20 text-amber-400'
 }
 
-const descriptionLabel = (row) =>
-  row.description ||
-  row.bankname ||
-  row.withdraw_method ||
-  row.method ||
-  'Withdrawal'
+const descriptionLabel = (row) => row.description || 'Withdrawal'
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
 const stats = computed(() => {
@@ -177,12 +172,12 @@ onMounted(loadWithdrawals)
             </span>
           </div>
 
-          <!-- Detail line (account / method / wallet) -->
+          <!-- Detail line (masked destination) -->
           <p
-            v-if="row.account_number || row.wallet_address || row.acctname"
+            v-if="row.destination"
             class="text-xs text-slate-600 mt-1.5 truncate"
           >
-            {{ row.account_number || row.acctname || row.wallet_address || '' }}
+            {{ row.destination }}
           </p>
         </div>
       </div>
