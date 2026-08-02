@@ -2,14 +2,135 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens.
+ *
+ * Every component reads from these variables — never hardcode hex values in
+ * component styles. Palettes swap via [data-theme="dark"] on <html>.
+ * Brand tokens (accent, card gradients, floating nav) stay largely stable
+ * across themes so the app feels consistent.
+ */
+
 :root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --bg: #eef1fb;
+  --bg-gradient: linear-gradient(180deg, #e6ebff 0%, #eef1fb 60%, #ede2ff 100%);
+  --surface: #ffffff;
+  --surface-muted: #f4f5fb;
+  --border: rgba(15, 15, 30, 0.08);
+  --divider: rgba(15, 15, 30, 0.06);
+  --shadow-card: 0 12px 40px rgba(15, 15, 60, 0.08);
+  --shadow-lift: 0 24px 60px rgba(15, 15, 60, 0.16);
+
+  /* Text */
+  --text-primary: #0a0a14;
+  --text-secondary: #6b6f83;
+  --text-muted: #9aa0b4;
+  --text-on-accent: #ffffff;
+  --text-on-dark: #ffffff;
+
+  /* Brand */
+  --accent: #7b5cff;
+  --accent-soft: rgba(123, 92, 255, 0.14);
+  --accent-strong: #5a3ee0;
+
+  /* Money semantic colors — positives use the brand accent, expenses stay
+     the primary text color with a leading minus. Never red per the spec. */
+  --money-positive: var(--accent);
+  --money-negative: var(--text-primary);
+
+  /* Payment card gradients — kept nearly-identical between themes for brand
+     consistency; the credit card wave texture is a repeating radial. */
+  --card-gradient-debit: linear-gradient(135deg, #a68bff 0%, #7b5cff 55%, #5a3ee0 100%);
+  --card-gradient-debit-overlay: radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.18) 0%, transparent 50%);
+  --card-gradient-credit: linear-gradient(135deg, #3060ff 0%, #1e40e5 55%, #172db3 100%);
+  --card-gradient-credit-overlay: radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.22) 0%, transparent 60%);
+
+  /* Floating nav — same dark treatment in both themes per spec */
+  --floating-bar-bg: rgba(20, 20, 32, 0.92);
+  --floating-bar-active-bg: #d8ccff;
+  --floating-bar-active-fg: #3a1fb0;
+  --floating-bar-idle-fg: #ffffff;
+
+  /* Buttons */
+  --btn-primary-bg: #0a0a14;
+  --btn-primary-fg: #ffffff;
+  --btn-outline-bg: transparent;
+  --btn-outline-fg: var(--text-primary);
+  --btn-outline-border: rgba(15, 15, 30, 0.12);
+
+  /* Status / message colors reused from earlier primitives */
+  --danger-bg: rgba(220, 38, 38, 0.1);
+  --danger-fg: #dc2626;
+  --danger-border: rgba(220, 38, 38, 0.3);
+  --warning-fg: #b45309;
+  --success-fg: #059669;
+
+  /* Radii + spacing */
+  --radius-sm: 0.75rem;   /* 12px */
+  --radius-md: 1rem;      /* 16px */
+  --radius-lg: 1.5rem;    /* 24px */
+  --radius-pill: 999px;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+}
+
+[data-theme="dark"] {
   color-scheme: dark;
+
+  --bg: #0f0f14;
+  --bg-gradient: linear-gradient(180deg, #0f0f14 0%, #14141c 60%, #1a1a22 100%);
+  --surface: #1e1e26;
+  --surface-muted: #24242e;
+  --border: rgba(255, 255, 255, 0.08);
+  --divider: rgba(255, 255, 255, 0.06);
+  --shadow-card: 0 12px 40px rgba(0, 0, 0, 0.4);
+  --shadow-lift: 0 24px 60px rgba(0, 0, 0, 0.55);
+
+  --text-primary: #f5f5fa;
+  --text-secondary: #a4a8bd;
+  --text-muted: #6b6f83;
+
+  --accent: #8f74ff;
+  --accent-soft: rgba(143, 116, 255, 0.18);
+  --accent-strong: #7051ff;
+
+  --money-positive: var(--accent);
+  --money-negative: var(--text-primary);
+
+  --card-gradient-debit: linear-gradient(135deg, #9c82ff 0%, #7b5cff 55%, #4a2fc9 100%);
+  --card-gradient-credit: linear-gradient(135deg, #4a75ff 0%, #2445d9 55%, #10218a 100%);
+
+  --floating-bar-bg: rgba(30, 30, 40, 0.95);
+  --floating-bar-active-bg: #b8a8ff;
+  --floating-bar-active-fg: #2c1a9a;
+
+  --btn-primary-bg: #f5f5fa;
+  --btn-primary-fg: #0a0a14;
+  --btn-outline-bg: transparent;
+  --btn-outline-fg: var(--text-primary);
+  --btn-outline-border: rgba(255, 255, 255, 0.14);
+
+  --danger-bg: rgba(248, 113, 113, 0.15);
+  --danger-fg: #f87171;
+  --danger-border: rgba(248, 113, 113, 0.3);
+  --warning-fg: #fbbf24;
+  --success-fg: #34d399;
 }
 
 html,
 body {
-  background-color: #080d18;
-  color: #ffffff;
+  background: var(--bg-gradient);
+  color: var(--text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 body {
@@ -20,33 +141,39 @@ body {
 
 #app {
   @apply min-h-screen;
+  background: var(--bg-gradient);
 }
 
-/* Custom scrollbar */
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #1e2d44;
-  border-radius: 99px;
+  background: var(--border);
+  border-radius: var(--radius-pill);
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: #2d4166;
+  background: var(--text-muted);
 }
 
-/* Smooth page transitions */
+/* Horizontal scroller helpers (used by card carousel) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Page transitions */
 .page-enter-active,
 .page-leave-active {
   transition: opacity 0.15s ease;
 }
-
 .page-enter-from,
 .page-leave-to {
   opacity: 0;

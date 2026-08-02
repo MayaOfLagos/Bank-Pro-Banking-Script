@@ -1,332 +1,141 @@
 <script setup>
-import { onMounted, ref, computed } from 'vue'
-import { RouterLink, useRouter } from 'vue-router'
-import {
-  PlusIcon,
-  ArrowsRightLeftIcon,
-  ListBulletIcon,
-  EllipsisHorizontalIcon,
-  BanknotesIcon,
-  WalletIcon
-} from '@heroicons/vue/24/outline'
-import client from '../api/client'
+import { computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { PlusIcon, ArrowUpRightIcon } from '@heroicons/vue/24/outline'
+import BalanceHeader from '../components/dashboard/BalanceHeader.vue'
+import ActionButtons from '../components/dashboard/ActionButtons.vue'
+import CardCarousel from '../components/dashboard/CardCarousel.vue'
+import BudgetWidget from '../components/dashboard/BudgetWidget.vue'
+import TransactionList from '../components/dashboard/TransactionList.vue'
+import ErrorState from '../components/ui/ErrorState.vue'
+import { useProfileStore } from '../stores/profile'
+import { useCards } from '../composables/useCards'
+import { useBudget } from '../composables/useBudget'
+import { formatMoney } from '../utils/format'
 
 const router = useRouter()
 
-// ─── State ────────────────────────────────────────────────────────────────────
-const loading = ref(true)
-const error   = ref('')
-const dashboard = ref({
-  currency: '$',
-  acct_balance: '0.00',
-  avail_balance: '0.00',
-  limit_remain: '0.00',
-  loan_balance: '0.00',
-  profile: { full_name: '', acct_type: '', acct_no: '', image: '' },
-  recent_transactions: [],
-  counters: { wire_transfers: 0, domestic_transfers: 0, withdrawals: 0, loans: 0 },
-  volume: { credit: 0, debit: 0, net: 0 }
+const profileStore = useProfileStore()
+const cardsBundle = useCards()
+const budget = useBudget()
+
+onMounted(() => {
+  profileStore.loadDashboard().catch(() => {})
+  cardsBundle.load()
+  budget.load()
 })
 
-// ─── Derived ──────────────────────────────────────────────────────────────────
-const profile = computed(() => dashboard.value.profile || {})
+const balances = computed(() => profileStore.balances ?? {})
+const profile = computed(() => profileStore.profile ?? balances.value.profile ?? {})
+const currency = computed(() => balances.value.currency || profile.value.currency || '$')
 
-const avatarSrc = computed(() => {
-  const img = profile.value?.image || profile.value?.profile_image || ''
-  if (!img) return null
-  return img.startsWith('/') ? img : `/assets/profile/${img}`
+const balanceParts = computed(() => formatMoney(balances.value.acct_balance ?? 0))
+
+const firstName = computed(() => {
+  const full = profile.value.full_name || `${profile.value.firstname || ''} ${profile.value.lastname || ''}`.trim()
+  return String(full).split(' ')[0] || ''
 })
 
-const initials = computed(() => {
-  const name = profile.value?.full_name || ''
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join('')
-})
+const avatar = computed(() => profile.value.image || '')
 
-const balanceParts = computed(() => {
-  const raw = String(dashboard.value.acct_balance || '0.00')
-  const [whole, cents = '00'] = raw.replace(/,/g, '').split('.')
-  const wholeFormatted = Number(whole).toLocaleString()
-  return { whole: wholeFormatted, cents: cents.slice(0, 2).padEnd(2, '0') }
-})
-
-const accountLabel = computed(() => {
-  const type = profile.value?.acct_type || 'Personal'
-  const currency = dashboard.value.currency === '$' ? 'USD' : dashboard.value.currency
-  return `${type} · ${currency}`
-})
-
-const recentTransactions = computed(() =>
-  (dashboard.value.recent_transactions || []).slice(0, 5)
-)
-
-const formatMoney = (value) =>
-  Number(value || 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })
-
-const txInitials = (tx) => {
-  const name = tx.description || tx.sender_name || '??'
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join('')
-}
-
-const txDate = (tx) => {
-  const raw = tx.created_at || tx.date || ''
-  if (!raw) return ''
-  const d = new Date(raw.replace(' ', 'T'))
-  if (isNaN(d.getTime())) return raw
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
-// ─── Quick actions ────────────────────────────────────────────────────────────
-const quickActions = [
-  { icon: PlusIcon,               label: 'Add money',  to: '/wire-transfer' },
-  { icon: ArrowsRightLeftIcon,    label: 'Move',       to: '/domestic-transfer' },
-  { icon: ListBulletIcon,         label: 'Activity',   to: '/transactions' },
-  { icon: EllipsisHorizontalIcon, label: 'More',       to: '/profile' }
+const dashboardActions = [
+  { label: 'Deposit', icon: PlusIcon, variant: 'filled', to: '/withdrawals' },
+  { label: 'Transfer', icon: ArrowUpRightIcon, variant: 'outlined', to: '/wire-transfer' },
 ]
 
-// ─── Data fetch ───────────────────────────────────────────────────────────────
-const loadDashboard = async () => {
-  loading.value = true
-  error.value   = ''
-  try {
-    const { data } = await client.get('/api/user/dashboard.php')
-    if (!data?.ok) throw new Error(data?.message || 'Failed to load dashboard')
-    dashboard.value = { ...dashboard.value, ...data.data }
-  } catch (err) {
-    error.value = err?.response?.data?.message || err.message || 'An error occurred'
-  } finally {
-    loading.value = false
-  }
-}
+const recentTransactions = computed(() => {
+  const rows = balances.value.recent_transactions
+  return Array.isArray(rows) ? rows.slice(0, 4) : []
+})
 
-onMounted(loadDashboard)
+function onAddCard() {
+  router.push('/cards')
+}
 </script>
 
 <template>
-  <!-- Root: full-bleed dark page, overrides any shell padding via negative margins -->
-  <div class="min-h-screen bg-[#080d18] -mx-4 -mt-6 sm:-mx-6 lg:-mx-8 lg:-mt-8 pb-6">
+  <div class="page">
+    <div class="content">
+      <BalanceHeader
+        :first-name="firstName"
+        :avatar-url="avatar"
+        :has-unread="false"
+      />
 
-    <!-- ── SKELETON ─────────────────────────────────────────────────────────── -->
-    <template v-if="loading">
-      <!-- Hero skeleton -->
-      <div class="bg-gradient-to-b from-[#0d1b38] via-[#090e1c] to-[#080d18] px-5 pt-12 pb-6">
-        <div class="flex items-center justify-between">
-          <div class="h-10 w-10 rounded-full bg-[#1a2436] animate-pulse" />
-          <div class="h-4 w-24 rounded-full bg-[#1a2436] animate-pulse" />
-        </div>
-        <div class="mt-6 mx-auto h-4 w-28 rounded-full bg-[#1a2436] animate-pulse" />
-        <div class="mt-3 mx-auto h-14 w-48 rounded-xl bg-[#1a2436] animate-pulse" />
-        <div class="mt-5 mx-auto h-9 w-32 rounded-full bg-[#1a2436] animate-pulse" />
-        <div class="mt-4 flex justify-center gap-2">
-          <div class="h-1.5 w-4 rounded-full bg-white/20 animate-pulse" />
-          <div v-for="i in 4" :key="i" class="h-1.5 w-1.5 rounded-full bg-white/10 animate-pulse" />
-        </div>
-      </div>
-      <!-- Actions skeleton -->
-      <div class="flex justify-around px-6 py-5">
-        <div v-for="i in 4" :key="i" class="flex flex-col items-center gap-2">
-          <div class="h-14 w-14 rounded-full bg-[#1a2436] animate-pulse" />
-          <div class="h-3 w-12 rounded bg-[#1a2436] animate-pulse" />
-        </div>
-      </div>
-      <!-- Transactions skeleton -->
-      <div class="px-4 mt-2 space-y-2">
-        <div v-for="i in 5" :key="i" class="h-16 rounded-2xl bg-[#111827] animate-pulse" />
-      </div>
-    </template>
+      <section class="balance-block" aria-live="polite">
+        <p class="label">Your Balance</p>
+        <p class="amount">
+          <span class="int">{{ currency }}{{ balanceParts.integer }}</span>
+          <span class="frac">.{{ balanceParts.fraction }}</span>
+        </p>
+        <ActionButtons :actions="dashboardActions" />
+      </section>
 
-    <!-- ── ERROR ─────────────────────────────────────────────────────────────── -->
-    <div
-      v-else-if="error"
-      class="mx-4 mt-12 rounded-2xl bg-red-500/10 border border-red-500/30 p-5 text-red-400 text-sm"
-    >
-      {{ error }}
+      <CardCarousel
+        :cards="cardsBundle.cards.value"
+        :currency="currency"
+        @add-card="onAddCard"
+        @select-card="router.push('/cards')"
+      />
+
+      <BudgetWidget
+        v-if="budget.limit.value !== null"
+        :spent="budget.spent.value"
+        :limit="budget.limit.value"
+        :currency="budget.currency.value"
+        :week-start="budget.weekStart.value"
+        :week-end="budget.weekEnd.value"
+      />
+
+      <TransactionList
+        :transactions="recentTransactions"
+        :currency="currency"
+        see-all-to="/transactions"
+      />
+
+      <ErrorState v-if="cardsBundle.error.value" :message="cardsBundle.error.value" compact />
     </div>
-
-    <!-- ── CONTENT ────────────────────────────────────────────────────────────── -->
-    <template v-else>
-
-      <!-- ── SECTION 1: Gradient hero header ─────────────────────────────────── -->
-      <div class="bg-gradient-to-b from-[#0d1b38] via-[#0c1628] to-[#080d18] px-5 pt-12 pb-6">
-
-        <!-- Top row: avatar left | greeting right -->
-        <div class="flex items-center justify-between">
-          <!-- Avatar -->
-          <div class="h-10 w-10 rounded-full bg-[#1a2436] border border-[#1e2d44] overflow-hidden flex items-center justify-center shrink-0">
-            <img
-              v-if="avatarSrc"
-              :src="avatarSrc"
-              :alt="profile.full_name"
-              class="h-full w-full object-cover"
-            />
-            <span v-else class="text-sm font-semibold text-white">{{ initials || 'U' }}</span>
-          </div>
-          <!-- Greeting -->
-          <span class="text-slate-400 text-sm">
-            Welcome back{{ profile.full_name ? ', ' + profile.full_name.split(' ')[0] : '' }}
-          </span>
-        </div>
-
-        <!-- Account type label -->
-        <p class="text-slate-400 text-sm text-center mt-6">{{ accountLabel }}</p>
-
-        <!-- Big balance -->
-        <div class="text-center mt-1">
-          <span class="text-5xl font-bold text-white">
-            {{ dashboard.currency }}{{ balanceParts.whole }}
-          </span>
-          <span class="text-3xl font-bold text-white">.{{ balanceParts.cents }}</span>
-        </div>
-
-        <!-- Accounts pill -->
-        <RouterLink
-          to="/transactions"
-          class="mt-5 mx-auto block w-fit bg-[#1a2436] text-white text-sm rounded-full px-5 py-2 border border-[#1e2d44] text-center"
-        >
-          Accounts
-        </RouterLink>
-
-        <!-- Pagination dots -->
-        <div class="flex justify-center items-center gap-1.5 mt-4">
-          <span class="w-4 h-1.5 rounded-full bg-white inline-block" />
-          <span v-for="i in 4" :key="i" class="w-1.5 h-1.5 rounded-full bg-white/25 inline-block" />
-        </div>
-      </div>
-
-      <!-- ── SECTION 2: Quick actions row ─────────────────────────────────────── -->
-      <div class="flex justify-around px-6 py-5 bg-[#080d18]">
-        <RouterLink
-          v-for="action in quickActions"
-          :key="action.label"
-          :to="action.to"
-          class="flex flex-col items-center gap-2"
-        >
-          <div class="h-14 w-14 rounded-full bg-[#1a2436] hover:bg-[#1e2d44] flex items-center justify-center transition">
-            <component :is="action.icon" class="h-6 w-6 text-white" />
-          </div>
-          <span class="text-xs text-slate-400">{{ action.label }}</span>
-        </RouterLink>
-      </div>
-
-      <!-- ── SECTION 3: Recent transactions ──────────────────────────────────── -->
-      <div class="px-4 mt-2">
-        <!-- Section header -->
-        <div class="flex justify-between items-center mb-3">
-          <span class="text-base font-semibold text-white">Recent</span>
-          <RouterLink to="/transactions" class="text-blue-400 text-sm">See all</RouterLink>
-        </div>
-
-        <!-- Transactions list -->
-        <div
-          v-if="recentTransactions.length"
-          class="bg-[#111827] rounded-2xl overflow-hidden divide-y divide-[#1e2d44]"
-        >
-          <div
-            v-for="tx in recentTransactions"
-            :key="tx.trans_id"
-            class="flex items-center gap-3 px-4 py-4"
-          >
-            <!-- Icon circle -->
-            <div class="h-10 w-10 rounded-full bg-[#1a2436] flex items-center justify-center shrink-0">
-              <span class="text-sm font-semibold text-white">{{ txInitials(tx) }}</span>
-            </div>
-            <!-- Description + date -->
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-semibold text-white truncate">
-                {{ tx.description || tx.sender_name || 'Account transaction' }}
-              </p>
-              <p class="text-xs text-slate-500 mt-0.5">{{ txDate(tx) }}</p>
-            </div>
-            <!-- Amount -->
-            <span
-              class="text-sm font-semibold"
-              :class="Number(tx.trans_type) === 1 ? 'text-emerald-400' : 'text-red-400'"
-            >
-              {{ Number(tx.trans_type) === 1 ? '+' : '-' }}{{ tx.currency || dashboard.currency }}{{ formatMoney(tx.amount) }}
-            </span>
-          </div>
-        </div>
-
-        <!-- Empty state -->
-        <div
-          v-else
-          class="bg-[#111827] rounded-2xl px-4 py-10 flex flex-col items-center gap-3"
-        >
-          <ListBulletIcon class="h-10 w-10 text-slate-600" />
-          <p class="text-slate-500 text-sm">No transactions yet</p>
-        </div>
-      </div>
-
-      <!-- ── SECTION 4: Widgets ──────────────────────────────────────────────── -->
-      <div class="px-4 mt-6 pb-4">
-        <!-- Header -->
-        <div class="flex justify-between items-center mb-3">
-          <span class="text-base font-semibold text-white">Widgets</span>
-        </div>
-
-        <!-- Widget card -->
-        <div class="bg-[#111827] rounded-2xl p-5">
-          <p class="text-slate-400 text-xs mb-1">Total assets</p>
-          <p class="text-3xl font-bold text-white mb-4">
-            {{ dashboard.currency }}{{ formatMoney(dashboard.acct_balance) }}
-          </p>
-
-          <!-- Asset rows -->
-          <div class="space-y-3">
-            <!-- Cash -->
-            <div class="flex items-center gap-3">
-              <div class="h-9 w-9 rounded-full bg-blue-600/20 flex items-center justify-center shrink-0">
-                <BanknotesIcon class="h-5 w-5 text-blue-400" />
-              </div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm text-white font-medium">Cash</p>
-              </div>
-              <span class="text-sm font-semibold text-white">
-                {{ dashboard.currency }}{{ formatMoney(dashboard.acct_balance) }}
-              </span>
-            </div>
-
-            <!-- Transfer limit -->
-            <div class="flex items-center gap-3">
-              <div class="h-9 w-9 rounded-full bg-purple-600/20 flex items-center justify-center shrink-0">
-                <ArrowsRightLeftIcon class="h-5 w-5 text-purple-400" />
-              </div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm text-white font-medium">Transfer limit</p>
-              </div>
-              <span class="text-sm font-semibold text-white">
-                {{ dashboard.currency }}{{ formatMoney(dashboard.limit_remain) }}
-              </span>
-            </div>
-
-            <!-- Loans -->
-            <div class="flex items-center gap-3">
-              <div class="h-9 w-9 rounded-full bg-orange-600/20 flex items-center justify-center shrink-0">
-                <WalletIcon class="h-5 w-5 text-orange-400" />
-              </div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm text-white font-medium">Loans</p>
-              </div>
-              <span class="text-sm font-semibold text-white">
-                {{ dashboard.currency }}{{ formatMoney(dashboard.loan_balance) }}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </template>
   </div>
 </template>
+
+<style scoped>
+.page {
+  min-height: 100vh;
+  background: var(--bg-gradient);
+  padding: var(--space-5) var(--space-4) 7rem;
+}
+.content {
+  max-width: 30rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.balance-block {
+  padding: var(--space-3) var(--space-1) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+.amount {
+  margin: 0;
+  color: var(--text-primary);
+  font-weight: 800;
+  line-height: 1;
+}
+.int {
+  font-size: 2.5rem;
+  letter-spacing: -0.01em;
+}
+.frac {
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  font-weight: 700;
+  margin-left: 0.15rem;
+}
+</style>

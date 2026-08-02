@@ -7,11 +7,13 @@ import { registerAuthHandlers, setCsrfToken } from './api/client'
 import { useAuthStore } from './stores/auth'
 import { useProfileStore } from './stores/profile'
 import { useSettingsStore } from './stores/settings'
+import { applyThemeAtBoot } from './composables/useTheme'
 import 'vue-toastification/dist/index.css'
 import './style.css'
 
-// Force dark mode permanently — no theme toggle, no localStorage read
-document.documentElement.classList.add('dark')
+// Resolve stored override or prefers-color-scheme before Vue mounts to
+// avoid a light→dark flash.
+applyThemeAtBoot()
 
 const app = createApp(App)
 const pinia = createPinia()
