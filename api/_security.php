@@ -11,6 +11,12 @@ function api_csrf_token(): string
     return $_SESSION['csrf_token'];
 }
 
+function api_csrf_regenerate(): string
+{
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    return $_SESSION['csrf_token'];
+}
+
 function api_request_requires_csrf(): bool
 {
     return !in_array(strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET'), ['GET', 'HEAD', 'OPTIONS'], true);

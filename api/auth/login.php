@@ -31,9 +31,18 @@ $stmt = $conn->prepare('SELECT * FROM users WHERE acct_no = :identifier OR acct_
 $stmt->execute(['identifier' => $acctNo]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-if (!$user || !password_verify($acctPassword, (string)$user['acct_password'])) {
+if (!$user) {
     auth_json(422, ['ok' => false, 'message' => 'Invalid login details']);
 }
+
+security_enforce_verify_lock($conn, (int)$user['id'], 'auth_json');
+
+if (!password_verify($acctPassword, (string)$user['acct_password'])) {
+    security_record_verify_failure($conn, (int)$user['id']);
+    auth_json(422, ['ok' => false, 'message' => 'Invalid login details']);
+}
+
+security_reset_verify_attempts($conn, (int)$user['id']);
 
 $device = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown device';
 $ipAddress = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
@@ -51,6 +60,7 @@ auth_send_login_email($user, $device, $ipAddress, $nowDate, $appName, $appUrl, $
 
 session_regenerate_id(true);
 $_SESSION['login'] = (string)$user['acct_no'];
+$_SESSION['pw_snapshot'] = time();
 unset($_SESSION['acct_no']);
 
 auth_json(200, [
@@ -58,5 +68,6 @@ auth_json(200, [
     'message' => 'Login successful. Enter your transaction PIN to continue.',
     'data' => [
         'next_route' => '/pin',
+        'csrf_token' => api_csrf_regenerate(),
     ],
 ]);

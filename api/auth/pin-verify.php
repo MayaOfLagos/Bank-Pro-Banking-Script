@@ -35,6 +35,7 @@ if ((string)$pin !== (string)$user['acct_pin']) {
 security_reset_verify_attempts($conn, (int)$user['id']);
 session_regenerate_id(true);
 $_SESSION['acct_no'] = (string)$user['acct_no'];
+$_SESSION['pw_snapshot'] = $_SESSION['pw_snapshot'] ?? time();
 unset($_SESSION['login']);
 
 auth_json(200, [
@@ -42,5 +43,6 @@ auth_json(200, [
     'message' => 'PIN verified. Welcome back.',
     'data' => [
         'next_route' => '/dashboard',
+        'csrf_token' => api_csrf_regenerate(),
     ],
 ]);

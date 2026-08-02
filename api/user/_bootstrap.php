@@ -28,6 +28,16 @@ if (!$user) {
     api_json(401, ['ok' => false, 'message' => 'Invalid session']);
 }
 
+// Kill sessions issued before the current password. Protects against a
+// leaked cookie surviving a password reset performed from another device.
+$pwChangedAt = !empty($user['password_changed_at']) ? (int)strtotime((string)$user['password_changed_at']) : 0;
+$pwSnapshot = (int)($_SESSION['pw_snapshot'] ?? 0);
+if ($pwChangedAt > 0 && $pwChangedAt > $pwSnapshot) {
+    session_unset();
+    session_destroy();
+    api_json(401, ['ok' => false, 'message' => 'Session invalidated. Sign in again.']);
+}
+
 $settingsStmt = $conn->prepare("SELECT * FROM settings WHERE id='1' LIMIT 1");
 $settingsStmt->execute();
 $settings = $settingsStmt->fetch(PDO::FETCH_ASSOC) ?: [];

@@ -13,16 +13,28 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     auth_json(422, ['ok' => false, 'message' => 'Invalid email address.']);
 }
 
+$genericResponse = [
+    'ok' => true,
+    'message' => 'If an account matches that email, a password reset link will be sent.',
+];
+
+// Log every attempt (registered or not) so rate limiting cannot be used to
+// probe account existence.
+$countStmt = $conn->prepare('SELECT COUNT(*) FROM password_reset_attempts WHERE email = :email AND attempted_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)');
+$countStmt->execute(['email' => $email]);
+if ((int)$countStmt->fetchColumn() >= 3) {
+    auth_json(200, $genericResponse);
+}
+
+$log = $conn->prepare('INSERT INTO password_reset_attempts (email) VALUES (:email)');
+$log->execute(['email' => $email]);
+
 $stmt = $conn->prepare('SELECT * FROM users WHERE acct_email = :email LIMIT 1');
 $stmt->execute(['email' => $email]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$user) {
-    // Do not disclose whether an account exists for the submitted email.
-    auth_json(200, [
-        'ok' => true,
-        'message' => 'If an account matches that email, a password reset link will be sent.',
-    ]);
+    auth_json(200, $genericResponse);
 }
 
 $token = bin2hex(random_bytes(16));
@@ -38,7 +50,4 @@ $update->execute([
 auth_send_sms_if_enabled($settings, (string)($user['acct_phone'] ?? ''), 'Alert: Password Reset');
 auth_send_reset_email($user, $token, $appName, $appUrl, $mailer);
 
-auth_json(200, [
-    'ok' => true,
-    'message' => 'Password reset link sent to your email.',
-]);
+auth_json(200, $genericResponse);

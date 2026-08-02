@@ -32,7 +32,7 @@ if (!$user) {
 }
 
 $hash = password_hash($newPassword, PASSWORD_BCRYPT);
-$update = $conn->prepare('UPDATE users SET acct_password = :password, resettoken = NULL, resettokenexp = NULL WHERE acct_email = :email AND resettoken = :token');
+$update = $conn->prepare('UPDATE users SET acct_password = :password, password_changed_at = NOW(), resettoken = NULL, resettokenexp = NULL WHERE acct_email = :email AND resettoken = :token');
 $update->execute([
     'password' => $hash,
     'email' => $email,
