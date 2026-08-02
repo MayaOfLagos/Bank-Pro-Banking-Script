@@ -1,0 +1,31 @@
+{
+  "name": "bankpro-user-portal-vue",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@heroicons/vue": "^2.2.0",
+    "@vueuse/core": "^14.3.0",
+    "axios": "^1.8.4",
+    "clsx": "^2.1.1",
+    "pinia": "^2.2.2",
+    "tailwind-merge": "^3.5.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.4.5",
+    "vue-toastification": "^2.0.0-rc.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/forms": "^0.5.11",
+    "@tailwindcss/typography": "^0.5.19",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.13",
+    "tailwindcss": "^3.4.17",
+    "vite": "^5.4.10"
+  }
+}

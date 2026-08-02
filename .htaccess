@@ -1,0 +1,39 @@
+ <IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Normalize trailing slashes for non-directories
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^(.*)/$ $1 [R,L]
+
+  # Canonical alias for update password page
+  RewriteRule ^update-password/?$ updatePassword.php [L,QSA]
+
+  # SPA fallback: Vue user portal — serve index.html for any unknown path under /assets/user-app/
+  RewriteCond %{REQUEST_URI} ^/assets/user-app/
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^ /assets/user-app/index.html [L]
+
+  # SPA fallback: transfer verification and success routes handled by Vue router
+  RewriteRule ^(transfer-cot|transfer-tax|transfer-imf|transfer-verify|transfer-success)/?$ /assets/user-app/index.html [L]
+
+  # Pretty user routes: /dashboard -> /user/dashboard.php, /wire-transfer -> /user/wire-transfer.php
+  RewriteCond %{REQUEST_URI} !^/(admin|user|p|front|assets|bootstrap|plugins|include|signup)(/|$) [NC]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{DOCUMENT_ROOT}/$1.php !-f
+  RewriteCond %{DOCUMENT_ROOT}/user/$1.php -f
+  RewriteRule ^([A-Za-z0-9-]+)/?$ user/$1.php [L,QSA]
+
+  # Root extensionless routing
+  RewriteCond %{REQUEST_FILENAME}.php -f
+  RewriteRule (.*) $1.php [L]
+  RewriteCond %{REQUEST_FILENAME}.html -f
+  RewriteRule (.*) $1.html [L]
+ </IfModule>
+
+<Files ~ "^\w+\.(gif|jpe?g|png)$">
+order deny,allow
+allow from all
+</Files>
+
+# php -- END cPanel-generated handler, do not edit

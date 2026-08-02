@@ -1,0 +1,31 @@
+# Operating-system, editor, and agent-local state
+.DS_Store
+Thumbs.db
+.vscode/
+.claude/
+.agents/
+.codex/
+
+# Environment and machine-local configuration
+.env
+.env.*
+!.env.example
+include/config.php
+
+# Frontend dependencies and local caches
+frontend/user-portal/node_modules/
+frontend/user-portal/.vite/
+npm-debug.log*
+*.log
+
+# Runtime uploads and customer data
+assets/deposit/*
+!assets/deposit/.gitkeep
+assets/idcard/*
+!assets/idcard/.gitkeep
+assets/profile/*
+!assets/profile/.gitkeep
+
+# Legacy data exports and backup archives
+SQL File/database.sql
+admin/admin.zip
