@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { authApi } from '../api/auth'
+import { useAuthStore } from '../stores/auth'
 
 const DashboardView = () => import('../views/DashboardView.vue')
 const WireTransferView = () => import('../views/WireTransferView.vue')
@@ -47,13 +47,16 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
-  let state = 'guest'
-  try {
-    const { data } = await authApi.status()
-    state = data?.data?.state || 'guest'
-  } catch {
-    state = 'guest'
+  const auth = useAuthStore()
+
+  // First navigation refreshes from the server; subsequent ones trust cached
+  // state. The 401 interceptor resets the store, so a stale-cached
+  // "authenticated" flag gets corrected on the next API call.
+  if (!auth.initialized) {
+    await auth.refresh()
   }
+
+  const state = auth.state
 
   if (to.meta.requiresAuth && state !== 'authenticated') {
     return state === 'pending_pin' ? '/pin' : '/login'
