@@ -6,7 +6,7 @@ require_once("../include/loginFunction.php");
 //require_once("../include/userFunction.php");
 require_once("../include/userClass.php");
 if(!$_SESSION['acct_no']) {
-    header("location:../login.php");
+    header('Location: /login');
     exit;
 }
 

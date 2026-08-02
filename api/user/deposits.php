@@ -11,7 +11,7 @@ if ((string)($user['acct_status'] ?? 'hold') !== 'active') {
 }
 
 $amount = (float)api_field($_POST, 'amount', '0');
-$cryptoId = api_field($_POST, 'crypto_name');
+$cryptoId = api_field($_POST, 'crypto_id', api_field($_POST, 'crypto_name'));
 $walletAddress = api_field($_POST, 'wallet_address');
 
 if ($amount <= 0 || $cryptoId === '' || $walletAddress === '') {
@@ -20,19 +20,24 @@ if ($amount <= 0 || $cryptoId === '' || $walletAddress === '') {
 
 $min = (float)($settings['trans_limit_min'] ?? 0);
 $max = (float)($settings['trans_limit_max'] ?? 0);
-if ($amount < $min) api_json(422, ['ok' => false, 'message' => 'Amount less than deposit limit']);
-if ($amount > $max) api_json(422, ['ok' => false, 'message' => 'Amount greater than deposit limit']);
+if ($min > 0 && $amount < $min) api_json(422, ['ok' => false, 'message' => 'Amount less than deposit limit']);
+if ($max > 0 && $amount > $max) api_json(422, ['ok' => false, 'message' => 'Amount greater than deposit limit']);
 
 if (!isset($_FILES['image']) || !is_uploaded_file($_FILES['image']['tmp_name'])) {
   api_json(422, ['ok' => false, 'message' => 'Upload payment screenshot']);
 }
 
-$ext = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
-if (!in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
+$file = $_FILES['image'];
+if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK || (int)($file['size'] ?? 0) > 10 * 1024 * 1024) {
+  api_json(422, ['ok' => false, 'message' => 'Image must be smaller than 10 MB']);
+}
+$mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
+$allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png'];
+if (!isset($allowed[$mime]) || @getimagesize($file['tmp_name']) === false) {
   api_json(422, ['ok' => false, 'message' => 'Invalid image format']);
 }
 
-$filename = time() . $_FILES['image']['name'];
+$filename = bin2hex(random_bytes(16)) . '.' . $allowed[$mime];
 $target = __DIR__ . '/../../assets/deposit/' . $filename;
 if (!move_uploaded_file($_FILES['image']['tmp_name'], $target)) {
   api_json(500, ['ok' => false, 'message' => 'Failed to upload image']);

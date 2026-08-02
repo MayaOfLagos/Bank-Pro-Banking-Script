@@ -9,14 +9,19 @@ if (!isset($_FILES['image']) || !is_uploaded_file($_FILES['image']['tmp_name']))
   api_json(422, ['ok' => false, 'message' => 'Image file is required']);
 }
 
-$ext = strtolower(pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION));
-if (!in_array($ext, ['jpg', 'jpeg', 'png'], true)) {
+$file = $_FILES['image'];
+if (($file['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK || (int)($file['size'] ?? 0) > 5 * 1024 * 1024) {
+  api_json(422, ['ok' => false, 'message' => 'Image must be smaller than 5 MB']);
+}
+$mime = (new finfo(FILEINFO_MIME_TYPE))->file($file['tmp_name']);
+$allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png'];
+if (!isset($allowed[$mime]) || @getimagesize($file['tmp_name']) === false) {
   api_json(422, ['ok' => false, 'message' => 'Invalid image format']);
 }
 
-$filename = ($user['firstname'] ?? 'user') . $_FILES['image']['name'];
+$filename = bin2hex(random_bytes(16)) . '.' . $allowed[$mime];
 $target = __DIR__ . '/../../assets/profile/' . $filename;
-if (!move_uploaded_file($_FILES['image']['tmp_name'], $target)) {
+if (!move_uploaded_file($file['tmp_name'], $target)) {
   api_json(500, ['ok' => false, 'message' => 'Failed to upload image']);
 }
 

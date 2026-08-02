@@ -15,8 +15,8 @@ $acctNumber = api_field($payload, 'acct_number');
 $acctType = api_field($payload, 'acct_type');
 $acctRemarks = api_field($payload, 'acct_remarks');
 
-if ((string)($user['acct_status'] ?? '') === 'hold') {
-  api_json(403, ['ok' => false, 'message' => 'Account on hold']);
+if ((string)($settings['transfer'] ?? '1') !== '1' || (string)($user['transfer'] ?? '1') !== '1' || (string)($user['acct_status'] ?? '') !== 'active') {
+  api_json(403, ['ok' => false, 'message' => 'Domestic transfer disabled for this account']);
 }
 if ($amount <= 0) {
   api_json(422, ['ok' => false, 'message' => 'Invalid amount']);
@@ -24,9 +24,12 @@ if ($amount <= 0) {
 if ($amount > (float)($user['acct_balance'] ?? 0)) {
   api_json(422, ['ok' => false, 'message' => 'Insufficient balance']);
 }
+if ($amount > (float)($user['limit_remain'] ?? 0)) {
+  api_json(422, ['ok' => false, 'message' => 'Amount exceeds your remaining transfer limit']);
+}
 
-$transId = uniqid();
-$transOtp = substr(number_format(time() * rand(), 0, '', ''), 0, 6);
+$transId = bin2hex(random_bytes(16));
+$transOtp = (string)random_int(100000, 999999);
 
 $conn->beginTransaction();
 try {
@@ -43,8 +46,9 @@ try {
     'trans_otp' => $transOtp,
     'trans_type' => 'domestic transfer'
   ]);
+  $pendingTransferId = (int)$conn->lastInsertId();
 
-  $otp = substr(number_format(time() * rand(), 0, '', ''), 0, 6);
+  $otp = $transOtp;
   $update = $conn->prepare('UPDATE users SET acct_otp=:acct_otp WHERE id=:id');
   $update->execute(['acct_otp' => $otp, 'id' => $user['id']]);
   $conn->commit();
@@ -56,9 +60,21 @@ try {
     $email_message->send_mail($user['acct_email'], $message, '[OTP CODE] - ' . ($settings['url_name'] ?? WEB_TITLE));
   }
 
-  $_SESSION['dom-transfer'] = $otp;
-  $hasBillingCodes = !empty($user['acct_cot']) || !empty($user['acct_tax']) || !empty($user['acct_imf']);
-  $nextRoute = $hasBillingCodes ? '/transfer-cot' : '/transfer-verify';
+  $_SESSION['pending_transfer_id'] = $pendingTransferId;
+  $_SESSION['pending_transfer_created_at'] = time();
+  $nextRoute = '/transfer-verify';
+  if (!empty($user['acct_cot'])) {
+    $_SESSION['transfer_verification_stage'] = 'cot';
+    $nextRoute = '/transfer-cot';
+  } elseif (!empty($user['acct_tax'])) {
+    $_SESSION['transfer_verification_stage'] = 'tax';
+    $nextRoute = '/transfer-tax';
+  } elseif (!empty($user['acct_imf'])) {
+    $_SESSION['transfer_verification_stage'] = 'imf';
+    $nextRoute = '/transfer-imf';
+  } else {
+    $_SESSION['transfer_verification_stage'] = 'otp';
+  }
   api_json(200, ['ok' => true, 'message' => 'Domestic transfer initialized', 'data' => ['next_route' => $nextRoute]]);
 } catch (Throwable $e) {
   $conn->rollBack();

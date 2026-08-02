@@ -8,7 +8,18 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $currency = user_currency_symbol($user);
 foreach ($rows as &$loan) {
   $loan['currency'] = $currency;
-  $loan['status_label'] = api_loan_status((string)($loan['status'] ?? '0'));
+  $loan['status_code'] = (int)($loan['loan_status'] ?? 0);
+  $loan['status'] = api_loan_status((string)$loan['status_code']);
+  $loan['status_label'] = $loan['status'];
 }
 
-api_json(200, ['ok' => true, 'data' => $rows]);
+$accountStatus = strtolower((string)($user['acct_status'] ?? ''));
+$canRequest = !in_array($accountStatus, ['hold', 'blocked', 'suspended'], true);
+
+api_json(200, [
+  'ok' => true,
+  'data' => [
+    'loans' => $rows,
+    'can_request' => $canRequest,
+  ],
+]);

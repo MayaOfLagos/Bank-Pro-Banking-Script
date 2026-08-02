@@ -55,8 +55,8 @@ const statusBadgeClass = (statusLabel = '') => {
 const filteredRows = computed(() => {
   const tab = activeTab.value
   if (tab === 'All')            return transactions.value
-  if (tab === 'Credits')        return transactions.value.filter((t) => t.trans_type === '1')
-  if (tab === 'Debits')         return transactions.value.filter((t) => t.trans_type === '2')
+  if (tab === 'Credits')        return transactions.value.filter((t) => Number(t.trans_type) === 1)
+  if (tab === 'Debits')         return transactions.value.filter((t) => Number(t.trans_type) === 2)
   if (tab === 'Wire Transfers')
     return transactions.value.filter((t) =>
       String(t.type_label || '').toLowerCase().includes('wire')
@@ -168,11 +168,11 @@ onMounted(loadTransactions)
           <!-- Icon circle -->
           <div
             class="h-10 w-10 rounded-full flex items-center justify-center shrink-0"
-            :class="tx.trans_type === '1' ? 'bg-emerald-500/20' : 'bg-red-500/20'"
+            :class="Number(tx.trans_type) === 1 ? 'bg-emerald-500/20' : 'bg-red-500/20'"
           >
             <span
               class="text-sm font-semibold"
-              :class="tx.trans_type === '1' ? 'text-emerald-400' : 'text-red-400'"
+              :class="Number(tx.trans_type) === 1 ? 'text-emerald-400' : 'text-red-400'"
             >
               {{ txInitials(tx) }}
             </span>
@@ -198,9 +198,9 @@ onMounted(loadTransactions)
           <!-- Amount -->
           <span
             class="text-sm font-semibold shrink-0"
-            :class="tx.trans_type === '1' ? 'text-emerald-400' : 'text-red-400'"
+            :class="Number(tx.trans_type) === 1 ? 'text-emerald-400' : 'text-red-400'"
           >
-            {{ tx.trans_type === '1' ? '+' : '-' }}{{ formatMoney(tx.currency, tx.amount) }}
+            {{ Number(tx.trans_type) === 1 ? '+' : '-' }}{{ formatMoney(tx.currency, tx.amount) }}
           </span>
         </div>
       </div>

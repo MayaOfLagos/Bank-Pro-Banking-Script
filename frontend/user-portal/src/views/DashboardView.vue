@@ -93,7 +93,7 @@ const quickActions = [
   { icon: PlusIcon,               label: 'Add money',  to: '/wire-transfer' },
   { icon: ArrowsRightLeftIcon,    label: 'Move',       to: '/domestic-transfer' },
   { icon: ListBulletIcon,         label: 'Activity',   to: '/transactions' },
-  { icon: EllipsisHorizontalIcon, label: 'More',       to: '/profile-center' }
+  { icon: EllipsisHorizontalIcon, label: 'More',       to: '/profile' }
 ]
 
 // ─── Data fetch ───────────────────────────────────────────────────────────────
@@ -252,9 +252,9 @@ onMounted(loadDashboard)
             <!-- Amount -->
             <span
               class="text-sm font-semibold"
-              :class="tx.trans_type === '1' ? 'text-emerald-400' : 'text-red-400'"
+              :class="Number(tx.trans_type) === 1 ? 'text-emerald-400' : 'text-red-400'"
             >
-              {{ tx.trans_type === '1' ? '+' : '-' }}{{ tx.currency || dashboard.currency }}{{ formatMoney(tx.amount) }}
+              {{ Number(tx.trans_type) === 1 ? '+' : '-' }}{{ tx.currency || dashboard.currency }}{{ formatMoney(tx.amount) }}
             </span>
           </div>
         </div>

@@ -2,7 +2,9 @@
 require_once __DIR__ . '/../../session.php';
 require_once __DIR__ . '/../../include/config.php';
 require_once __DIR__ . '/../../include/smtp.php';
+require_once __DIR__ . '/../_security.php';
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, private');
 
 function auth_json(int $code, array $payload): void {
     http_response_code($code);
@@ -23,7 +25,8 @@ function auth_payload(): array {
 }
 
 function auth_field(array $payload, string $key, string $default = ''): string {
-    return inputValidation((string)($payload[$key] ?? $default));
+    // Do not HTML-encode transport values; that mutates passwords before verification.
+    return trim((string)($payload[$key] ?? $default));
 }
 
 function auth_require(array $payload, array $fields): void {
@@ -33,6 +36,8 @@ function auth_require(array $payload, array $fields): void {
         }
     }
 }
+
+api_enforce_csrf('auth_json');
 
 $conn = dbConnect();
 $settingsStmt = $conn->prepare("SELECT * FROM settings WHERE id='1' LIMIT 1");
@@ -79,7 +84,7 @@ function auth_send_reset_email(array $user, string $token, string $appName, stri
 
     $fullName = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
     $acctNo = (string)($user['acct_no'] ?? '');
-    $resetUrl = rtrim($appUrl, '/') . '/updatePassword.php?email=' . urlencode($email) . '&reset_token=' . urlencode($token);
+    $resetUrl = rtrim($appUrl, '/') . '/update-password?email=' . urlencode($email) . '&reset_token=' . urlencode($token);
 
     $subject = "Password Reset - {$appName}";
     $body = "

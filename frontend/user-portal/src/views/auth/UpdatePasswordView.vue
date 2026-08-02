@@ -131,8 +131,7 @@ const submit = async () => {
     const { data } = await authApi.resetPassword({
       email: email.value,
       reset_token: resetToken.value,
-      password: form.password,
-      password_confirmation: form.password_confirmation
+      new_password: form.password
     })
     if (!data?.ok) throw new Error(data?.message || 'Failed to update password')
     await router.push(data.data?.next_route || '/login')

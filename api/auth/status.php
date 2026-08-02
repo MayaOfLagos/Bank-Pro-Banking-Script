@@ -20,5 +20,6 @@ auth_json(200, [
         'is_authenticated' => $authState === 'authenticated',
         'is_pending_pin' => $authState === 'pending_pin',
         'next_route' => $nextRoute,
+        'csrf_token' => api_csrf_token(),
     ],
 ]);

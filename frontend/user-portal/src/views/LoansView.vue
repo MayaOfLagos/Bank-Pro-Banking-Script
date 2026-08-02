@@ -21,7 +21,7 @@ function statusBadgeClass(status) {
   const s = String(status ?? '').toLowerCase()
   if (s.includes('approved')) return 'bg-emerald-500/20 text-emerald-400'
   if (s.includes('pending')) return 'bg-blue-500/20 text-blue-400'
-  if (s.includes('rejected') || s.includes('denied')) return 'bg-red-500/20 text-red-400'
+  if (s.includes('rejected') || s.includes('denied') || s.includes('declined')) return 'bg-red-500/20 text-red-400'
   return 'bg-slate-500/20 text-slate-400'
 }
 
@@ -50,10 +50,9 @@ async function submitLoanRequest() {
   submitError.value = ''
   submitSuccess.value = false
   try {
-    const { data } = await client.post('/api/user/loans.php', {
-      action: 'request',
+    const { data } = await client.post('/api/user/loans-submit.php', {
       amount: modalAmount.value,
-      description: modalDescription.value
+      loan_remarks: modalDescription.value
     })
     if (!data?.ok) throw new Error(data?.message || 'Loan request failed.')
     submitSuccess.value = true

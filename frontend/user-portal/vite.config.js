@@ -24,14 +24,15 @@ export default defineConfig({
   build: {
     outDir: '../../assets/user-app',
     emptyOutDir: true,
+    cssCodeSplit: false,
     sourcemap: false,
     rollupOptions: {
       output: {
         entryFileNames: 'app.js',
-        chunkFileNames: 'chunks/[name].js',
+        chunkFileNames: 'chunks/[name]-[hash].js',
         assetFileNames: (assetInfo) => {
           if (assetInfo.name && assetInfo.name.endsWith('.css')) return 'app.css'
-          return 'assets/[name][extname]'
+          return 'assets/[name]-[hash][extname]'
         }
       }
     }

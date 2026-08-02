@@ -15,20 +15,31 @@ $accountNumber = api_field($payload, 'account_number');
 $routeNo = api_field($payload, 'routineno');
 $acctname = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
 
+if ((string)($user['acct_status'] ?? '') !== 'active') {
+  api_json(403, ['ok' => false, 'message' => 'Withdrawals are unavailable for this account']);
+}
+
 if ($amount <= 0) api_json(422, ['ok' => false, 'message' => 'Invalid amount']);
 if ($amount > (float)($user['acct_balance'] ?? 0)) api_json(422, ['ok' => false, 'message' => 'Insufficient Balance']);
 
 $conn->beginTransaction();
 try {
   $newBalance = (float)$user['acct_balance'] - $amount;
+  $locked = $conn->prepare('SELECT acct_balance FROM users WHERE id=:id FOR UPDATE');
+  $locked->execute(['id' => $user['id']]);
+  $lockedBalance = (float)$locked->fetchColumn();
+  if ($amount > $lockedBalance) throw new RuntimeException('Insufficient balance');
+  $newBalance = $lockedBalance - $amount;
   $u = $conn->prepare('UPDATE users SET acct_balance=:bal WHERE id=:id');
   $u->execute(['bal' => $newBalance, 'id' => $user['id']]);
 
   $ref = uniqid();
-  $i = $conn->prepare('INSERT INTO withdrawal (user_id,amount,bankname,account_number,routineno,acctname,reference_id,trans_type) VALUES(:user_id,:amount,:bankname,:account_number,:routineno,:acctname,:reference_id,:trans_type)');
+  $i = $conn->prepare('INSERT INTO withdrawal (user_id,amount,withdraw_method,wallet_address,bankname,account_number,routineno,acctname,reference_id,trans_type) VALUES(:user_id,:amount,:withdraw_method,:wallet_address,:bankname,:account_number,:routineno,:acctname,:reference_id,:trans_type)');
   $i->execute([
     'user_id' => $user['id'],
     'amount' => $amount,
+    'withdraw_method' => 'bank',
+    'wallet_address' => '',
     'bankname' => $bankname,
     'account_number' => $accountNumber,
     'routineno' => $routeNo,

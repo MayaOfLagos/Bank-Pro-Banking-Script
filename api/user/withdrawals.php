@@ -9,7 +9,8 @@ foreach ($rows as &$rowW) {
   $currency = user_currency_symbol(['acct_currency' => $rowW['acct_currency'] ?? ($user['acct_currency'] ?? 'USD')]);
   $rowW['currency'] = $currency;
   $rowW['full_name'] = trim(($rowW['firstname'] ?? '') . ' ' . ($rowW['lastname'] ?? ''));
-  $rowW['status_label'] = api_wire_status((string)($rowW['status'] ?? '0'));
+  $rowW['status_code'] = (int)($rowW['status'] ?? 0);
+  $rowW['status_label'] = api_wire_status((string)$rowW['status_code']);
 }
 
 api_json(200, ['ok' => true, 'data' => $rows]);

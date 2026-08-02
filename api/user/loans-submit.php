@@ -6,6 +6,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
 }
 
+if (in_array(strtolower((string)($user['acct_status'] ?? '')), ['hold', 'blocked', 'suspended'], true)) {
+  api_json(403, ['ok' => false, 'message' => 'Loan requests are unavailable for this account']);
+}
+
 $payload = api_payload();
 api_require($payload, ['amount', 'loan_remarks']);
 
@@ -14,7 +18,7 @@ $remarks = api_field($payload, 'loan_remarks');
 if ($amount <= 0) api_json(422, ['ok' => false, 'message' => 'Invalid amount']);
 if ($remarks === '') api_json(422, ['ok' => false, 'message' => 'Loan description required']);
 
-$reference = uniqid();
+$reference = 'LOAN-' . strtoupper(bin2hex(random_bytes(6)));
 $stmt = $conn->prepare('INSERT INTO loan (loan_reference_id,acct_id,amount,loan_remarks) VALUES (:loan_reference_id,:acct_id,:amount,:loan_remarks)');
 $stmt->execute([
   'loan_reference_id' => $reference,

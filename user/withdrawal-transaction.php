@@ -9,7 +9,7 @@ $user_id = userDetails('id');
 
 
 if (!$_SESSION['acct_no']) {
-    header("location:../login.php");
+    header('Location: /login');
     die;
 }
 

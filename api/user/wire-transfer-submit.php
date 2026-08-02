@@ -17,15 +17,15 @@ if (!$globalEnabled || !$userEnabled || (string)($user['acct_status'] ?? 'hold')
     api_json(403, ['ok' => false, 'message' => 'Wire transfer disabled for this account']);
 }
 
-$amount = (float)inputValidation((string)($body['amount'] ?? '0'));
-$acct_name = inputValidation((string)($body['acct_name'] ?? ''));
-$bank_name = inputValidation((string)($body['bank_name'] ?? ''));
-$acct_number = inputValidation((string)($body['acct_number'] ?? ''));
-$acct_country = inputValidation((string)($body['acct_country'] ?? ''));
-$acct_swift = inputValidation((string)($body['acct_swift'] ?? ''));
-$acct_routing = inputValidation((string)($body['acct_routing'] ?? ''));
-$acct_type = inputValidation((string)($body['acct_type'] ?? ''));
-$acct_remarks = inputValidation((string)($body['acct_remarks'] ?? ''));
+$amount = (float)api_field($body, 'amount', '0');
+$acct_name = api_field($body, 'acct_name');
+$bank_name = api_field($body, 'bank_name');
+$acct_number = api_field($body, 'acct_number');
+$acct_country = api_field($body, 'acct_country');
+$acct_swift = api_field($body, 'acct_swift');
+$acct_routing = api_field($body, 'acct_routing');
+$acct_type = api_field($body, 'acct_type');
+$acct_remarks = api_field($body, 'acct_remarks');
 
 if ($amount <= 0) {
     api_json(422, ['ok' => false, 'message' => 'Invalid amount entered']);
@@ -35,6 +35,9 @@ $acct_balance = (float)($user['acct_balance'] ?? 0);
 if ($amount > $acct_balance) {
     api_json(422, ['ok' => false, 'message' => 'Insufficient Balance']);
 }
+if ($amount > (float)($user['limit_remain'] ?? 0)) {
+    api_json(422, ['ok' => false, 'message' => 'Amount exceeds your remaining transfer limit']);
+}
 
 $required = [$acct_name, $bank_name, $acct_number, $acct_country, $acct_type];
 foreach ($required as $field) {
@@ -43,9 +46,8 @@ foreach ($required as $field) {
     }
 }
 
-$trans_id = uniqid();
-$trans_opt = substr(number_format(time() * rand(), 0, '', ''), 0, 6);
-$acct_otp = substr(number_format(time() * rand(), 0, '', ''), 0, 6);
+$trans_id = bin2hex(random_bytes(16));
+$acct_otp = (string)random_int(100000, 999999);
 
 $conn->beginTransaction();
 
@@ -63,8 +65,9 @@ try {
         'acct_swift' => $acct_swift,
         'acct_routing' => $acct_routing,
         'acct_remarks' => $acct_remarks,
-        'trans_otp' => $trans_opt
+        'trans_otp' => $acct_otp
     ]);
+    $pendingTransferId = (int)$conn->lastInsertId();
 
     $update = $conn->prepare('UPDATE users SET acct_otp=:acct_otp WHERE id=:id');
     $update->execute([
@@ -89,10 +92,22 @@ if (!empty($user['acct_email'])) {
     $email_message->send_mail($user['acct_email'], $mailBody, '[OTP CODE] - ' . $appName);
 }
 
-$_SESSION['wire-transfer'] = $acct_otp;
+$_SESSION['pending_transfer_id'] = $pendingTransferId;
+$_SESSION['pending_transfer_created_at'] = time();
 
-$hasBillingCodes = !empty($user['acct_cot']) || !empty($user['acct_tax']) || !empty($user['acct_imf']);
-$nextRoute = $hasBillingCodes ? '/transfer-cot' : '/transfer-verify';
+$nextRoute = '/transfer-verify';
+if (!empty($user['acct_cot'])) {
+    $_SESSION['transfer_verification_stage'] = 'cot';
+    $nextRoute = '/transfer-cot';
+} elseif (!empty($user['acct_tax'])) {
+    $_SESSION['transfer_verification_stage'] = 'tax';
+    $nextRoute = '/transfer-tax';
+} elseif (!empty($user['acct_imf'])) {
+    $_SESSION['transfer_verification_stage'] = 'imf';
+    $nextRoute = '/transfer-imf';
+} else {
+    $_SESSION['transfer_verification_stage'] = 'otp';
+}
 
 api_json(200, [
     'ok' => true,

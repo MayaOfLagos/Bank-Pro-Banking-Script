@@ -56,9 +56,11 @@ $debitVolume = 0.0;
 
 foreach ($transactions as &$rowTx) {
     $amount = (float)($rowTx['amount'] ?? 0);
-    $isCredit = (string)($rowTx['trans_type'] ?? '0') === '1';
+    $rowTx['trans_type'] = (int)($rowTx['trans_type'] ?? 0);
+    $rowTx['trans_status'] = (int)($rowTx['trans_status'] ?? 0);
+    $isCredit = $rowTx['trans_type'] === 1;
     $rowTx['type_label'] = $isCredit ? 'Credit' : 'Debit';
-    $rowTx['status_label'] = ((string)($rowTx['trans_status'] ?? '0') === '1') ? 'Completed' : 'Pending';
+    $rowTx['status_label'] = [0 => 'Processing', 1 => 'Completed', 2 => 'Hold', 3 => 'Cancelled'][$rowTx['trans_status']] ?? 'Unknown';
     $rowTx['currency'] = $currency;
 
     if ($isCredit) {
@@ -114,7 +116,7 @@ $loanCountStmt = $conn->prepare('SELECT COUNT(*) FROM loan WHERE acct_id=:acct_i
 $loanCountStmt->execute(['acct_id' => $userId]);
 $loanCount = (int)$loanCountStmt->fetchColumn();
 
-$cardStmt = $conn->prepare('SELECT card_number, card_name, card_status FROM card WHERE user_id=:user_id LIMIT 1');
+$cardStmt = $conn->prepare('SELECT card_name, card_status FROM card WHERE user_id=:user_id LIMIT 1');
 $cardStmt->execute(['user_id' => $userId]);
 $card = $cardStmt->fetch(PDO::FETCH_ASSOC) ?: null;
 
@@ -122,11 +124,11 @@ api_json(200, [
     'ok' => true,
     'data' => [
         'currency' => $currency,
-        'acct_balance' => number_format((float)($user['acct_balance'] ?? 0), 2, '.', ','),
-        'avail_balance' => number_format((float)($user['avail_balance'] ?? 0), 2, '.', ','),
-        'limit_remain' => number_format((float)($user['limit_remain'] ?? 0), 2, '.', ','),
-        'acct_limit' => number_format((float)($user['acct_limit'] ?? 0), 2, '.', ','),
-        'loan_balance' => number_format((float)($user['loan_balance'] ?? 0), 2, '.', ','),
+        'acct_balance' => round((float)($user['acct_balance'] ?? 0), 2),
+        'avail_balance' => round((float)($user['avail_balance'] ?? 0), 2),
+        'limit_remain' => round((float)($user['limit_remain'] ?? 0), 2),
+        'acct_limit' => round((float)($user['acct_limit'] ?? 0), 2),
+        'loan_balance' => round((float)($user['loan_balance'] ?? 0), 2),
         'recent_transactions' => $recent,
         'profile' => [
             'full_name' => trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')),
@@ -160,7 +162,10 @@ api_json(200, [
             'loans' => $loanCount,
         ],
         'last_login' => $lastLogin,
-        'card' => $card,
+        'card' => $card ? [
+            'card_name' => $card['card_name'] ?? '',
+            'card_status' => (int)($card['card_status'] ?? 0),
+        ] : null,
         'quick_actions' => [
             'can_transfer' => (string)($user['transfer'] ?? '1') === '1' && (string)($user['acct_status'] ?? 'hold') === 'active',
             'has_card' => $card !== null,

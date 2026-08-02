@@ -378,9 +378,9 @@ class emailMessage{
                         <td bgcolor='#ffffff' align='center' style='padding: 20px 30px 40px 30px; color: #666666; font-family: 'Lato', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 400; line-height: 25px;'>
                              <h2>Hi $full_name,</h2>
                                     <p>we got a request on account with the account number: <strong>$user_acctno</strong> to reset Password! <br>Click the link below to get started: <br>
-                                    <a href='$APP_URL/updatePassword.php?email=$email&reset_token=$reset_token'>reset password.</a></p><br><br>
+                                    <a href='$APP_URL/update-password?email=$email&reset_token=$reset_token'>reset password.</a></p><br><br>
                                     <p>Copy to browser<br>
-                                    $APP_URL/updatePassword.php?email=$email&reset_token=$reset_token
+                                    $APP_URL/update-password?email=$email&reset_token=$reset_token
                                     <br></p>
                         </td>
                     </tr>

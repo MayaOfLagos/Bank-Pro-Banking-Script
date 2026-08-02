@@ -18,7 +18,9 @@ if (!$loan) {
 }
 
 $loan['currency'] = user_currency_symbol($user);
-$loan['status_label'] = api_loan_status((string)($loan['status'] ?? '0'));
+$loan['status_code'] = (int)($loan['loan_status'] ?? 0);
+$loan['status'] = api_loan_status((string)$loan['status_code']);
+$loan['status_label'] = $loan['status'];
 $loan['loan_message'] = $loan['loan_message'] ?? 'N/A';
 
 api_json(200, ['ok' => true, 'data' => $loan]);

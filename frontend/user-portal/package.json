@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run verify:routing && npm run verify:api && vite build && npm run verify:build",
+    "verify:routing": "node scripts/verify-routing.mjs",
+    "verify:api": "node scripts/verify-api-contracts.mjs",
+    "verify:build": "node scripts/verify-build.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

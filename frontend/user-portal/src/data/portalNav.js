@@ -15,7 +15,7 @@ export const bottomTabs = [
   { label: 'Cards',    to: '/cards',            icon: CreditCardIcon },
   { label: 'Transfer', to: null,                icon: ArrowsRightLeftIcon, isAction: true },
   { label: 'Activity', to: '/transactions',     icon: ClockIcon },
-  { label: 'Profile',  to: '/profile-center',   icon: UserCircleIcon }
+  { label: 'Profile',  to: '/profile',          icon: UserCircleIcon }
 ]
 
 export const transferSheetActions = [
@@ -45,7 +45,7 @@ export const sidebarNav = [
     items: [
       { label: 'Dashboard',    to: '/dashboard',      icon: HomeIcon },
       { label: 'Transactions', to: '/transactions',   icon: ClockIcon },
-      { label: 'Profile',      to: '/profile-center', icon: UserCircleIcon }
+      { label: 'Profile',      to: '/profile', icon: UserCircleIcon }
     ]
   },
   {
@@ -61,7 +61,7 @@ export const sidebarNav = [
   {
     section: 'Support',
     items: [
-      { label: 'Tickets', to: '/tickets', icon: ChatBubbleLeftRightIcon }
+      { label: 'Support', to: '/tickets', icon: ChatBubbleLeftRightIcon }
     ]
   }
 ]

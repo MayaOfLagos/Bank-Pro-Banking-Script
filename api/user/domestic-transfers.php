@@ -8,7 +8,9 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $currency = user_currency_symbol($user);
 foreach ($rows as &$rowDom) {
   $rowDom['currency'] = $currency;
-  $rowDom['status_label'] = api_domestic_status((string)($rowDom['status'] ?? '0'));
+  $rowDom['status_code'] = (int)($rowDom['dom_status'] ?? 0);
+  $rowDom['status'] = api_domestic_status((string)$rowDom['status_code']);
+  $rowDom['status_label'] = $rowDom['status'];
 }
 
 api_json(200, ['ok' => true, 'data' => $rows]);

@@ -15,6 +15,7 @@ include/config.php
 # Frontend dependencies and local caches
 frontend/user-portal/node_modules/
 frontend/user-portal/.vite/
+frontend/user-portal/dist/
 npm-debug.log*
 *.log
 

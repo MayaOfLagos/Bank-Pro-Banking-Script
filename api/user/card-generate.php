@@ -1,5 +1,9 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
+
+// Card issuance is an administrative operation. Customers may request a card
+// through card-request.php, but must never supply PAN/CVV data themselves.
+api_json(403, ['ok' => false, 'message' => 'Card issuance is managed by support']);
 require_once __DIR__ . '/../../include/userClass.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

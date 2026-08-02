@@ -112,7 +112,7 @@ $sendMail = new emailMessage();
                         <!-- Info List -->
                         <ul class="info-list">
                             <li>
-                                <a href="<?= $web_url ?>/login.php"><span class="icon icofont-bank"></span>Internet Banking</a>
+                                <a href="<?= $web_url ?>/login"><span class="icon icofont-bank"></span>Internet Banking</a>
                             </li>
                             <li class="share"><a href="<?= $web_url ?>/p/about.php"><span class="icon icofont-handshake-deal"></span> Why Trust <?=  $pageName  ?></a></li>
 
@@ -204,7 +204,7 @@ $sendMail = new emailMessage();
                     <div class="outer-box">
                         <!-- Search Btn -->
                         <div class="search-box-btn search-box-outer">
-                            <a href="<?= $web_url ?>/login.php" class="theme-btn btn-style-one" style="margin-top:0px;padding:10px 20px;"><span class="txt">Banking</span></a>
+                            <a href="<?= $web_url ?>/login" class="theme-btn btn-style-one" style="margin-top:0px;padding:10px 20px;"><span class="txt">Banking</span></a>
                         </div>
                         <!-- Mobile Navigation Toggler -->
                         <div class="mobile-nav-toggler">

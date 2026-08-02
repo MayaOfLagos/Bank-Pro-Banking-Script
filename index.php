@@ -23,7 +23,7 @@ require_once("include/loginFunction.php");
 									<h1> <span>Offering Financial Inclusion for all</span> </h1>
 									<div class="text" style="color:#1F1B44;"><?= $pageTitle ?> continues to offer diverse financial products <br>through our many product lines.</div>
 									<div class="btn-box">
-										<a href="./signup/verify-registration.php" class="theme-btn btn-style-one"><span class="txt">Open Account Now</span></a>
+										<a href="/login" class="theme-btn btn-style-one"><span class="txt">Online Banking Login</span></a>
 									</div>
 								</div>
 							</div>

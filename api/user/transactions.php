@@ -13,8 +13,11 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $currency = user_currency_symbol($user);
 foreach ($rows as &$rowTx) {
     $rowTx['currency'] = $currency;
-    $rowTx['type_label'] = ($rowTx['trans_type'] ?? '0') === '1' ? 'Credit' : 'Debit';
-    $rowTx['status_label'] = ((string)($rowTx['trans_status'] ?? '0') === '1') ? 'Completed' : 'Pending';
+    $rowTx['trans_type'] = (int)($rowTx['trans_type'] ?? 0);
+    $rowTx['trans_status'] = (int)($rowTx['trans_status'] ?? 0);
+    $rowTx['type_label'] = $rowTx['trans_type'] === 1 ? 'Credit' : 'Debit';
+    $statusMap = [0 => 'Processing', 1 => 'Completed', 2 => 'Hold', 3 => 'Cancelled'];
+    $rowTx['status_label'] = $statusMap[$rowTx['trans_status']] ?? 'Unknown';
 }
 
 api_json(200, ['ok' => true, 'data' => $rows]);

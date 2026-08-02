@@ -3,7 +3,7 @@ $pageName = "Dashboard";
 include_once("layouts/header.php");
 //include_once("../include/userFunction.php");
 if(!$_SESSION['acct_no']) {
-    header("location:../login.php");
+    header('Location: /login');
     die;
 }
 if(@!$_COOKIE['firstVisit']){

@@ -1,14 +1,18 @@
 <?php
 require_once __DIR__ . '/../../session.php';
 require_once __DIR__ . '/../../include/config.php';
+require_once __DIR__ . '/../_security.php';
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, private');
 
 function api_json(int $code, array $payload): void {
     http_response_code($code);
     echo json_encode($payload);
     exit;
 }
+
+api_enforce_csrf('api_json');
 
 if (!isset($_SESSION['acct_no']) || empty($_SESSION['acct_no'])) {
     api_json(401, ['ok' => false, 'message' => 'Unauthorized']);
@@ -50,7 +54,8 @@ function api_payload(): array {
 }
 
 function api_field(array $payload, string $key, string $default = ''): string {
-    return inputValidation((string)($payload[$key] ?? $default));
+    // JSON output is escaped at serialization time; preserve input values here.
+    return trim((string)($payload[$key] ?? $default));
 }
 
 function api_require(array $payload, array $fields): void {
@@ -62,23 +67,26 @@ function api_require(array $payload, array $fields): void {
 }
 
 function api_wire_status(string $status): string {
-    if ($status === '0') return 'Pending';
+    if ($status === '0') return 'Processing';
     if ($status === '1') return 'Completed';
     if ($status === '2') return 'Hold';
+    if ($status === '3') return 'Cancelled';
     return 'Unknown';
 }
 
 function api_domestic_status(string $status): string {
-    if ($status === '0') return 'Pending';
+    if ($status === '0') return 'Processing';
     if ($status === '1') return 'Completed';
     if ($status === '2') return 'Hold';
+    if ($status === '3') return 'Cancelled';
     return 'Unknown';
 }
 
 function api_loan_status(string $status): string {
-    if ($status === '0') return 'Pending';
+    if ($status === '0') return 'Processing';
     if ($status === '1') return 'Approved';
-    if ($status === '2') return 'Rejected';
+    if ($status === '2') return 'Hold';
+    if ($status === '3') return 'Declined';
     return 'Unknown';
 }
 

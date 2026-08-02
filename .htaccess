@@ -1,35 +1,50 @@
- <IfModule mod_rewrite.c>
+<IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # Normalize trailing slashes for non-directories
+  # Redirect retired customer entry files to their canonical Vue routes.
+  # These rules preserve old bookmarks and links without keeping PHP wrapper files.
+  RewriteRule ^(login|pin|reset-password|dashboard|transactions|wire-transfer|domestic-transfer|withdrawals|cards|loans|tickets)\.php$ /$1 [R=301,L,NE]
+  RewriteRule ^(?:updatePassword|update-password)\.php$ /update-password [R=301,L,NE]
+  RewriteRule ^(?:profile|profile-center)\.php$ /profile [R=301,L,NE]
+  RewriteRule ^portal-page\.php$ /dashboard [R=301,L,NE]
+  RewriteRule ^profile-center/?$ /profile [R=301,L,NE]
+  RewriteRule ^p/forgot-password(?:\.php)?/?$ /reset-password [R=301,L,NE]
+
+  # Registration and the old customer tree are retired from the web runtime.
+  RewriteRule ^signup(?:/.*)?$ /login [R=301,L,NE]
+  RewriteRule ^user/card(?:\.php)?/?$ /cards [R=301,L,NE]
+  RewriteRule ^user/(?:loan|loan-transaction|viewloantrans)(?:\.php)?/?$ /loans [R=301,L,NE]
+  RewriteRule ^user/(?:profile|edit-profile)(?:\.php)?/?$ /profile [R=301,L,NE]
+  RewriteRule ^user/wire-transfer(?:\.php)?/?$ /wire-transfer [R=301,L,NE]
+  RewriteRule ^user/domestic-transfer(?:\.php)?/?$ /domestic-transfer [R=301,L,NE]
+  RewriteRule ^user/(?:withdrawal|withdrawal-transaction|bank-withdraw)(?:\.php)?/?$ /withdrawals [R=301,L,NE]
+  RewriteRule ^user/(?:credit-debit_transaction|wire-transaction|domestic-transaction)(?:\.php)?/?$ /transactions [R=301,L,NE]
+  RewriteRule ^user/account-manager(?:\.php)?/?$ /tickets [R=301,L,NE]
+  RewriteRule ^user/pin(?:\.php)?/?$ /transfer-verify [R=301,L,NE]
+  RewriteRule ^user/cot(?:\.php)?/?$ /transfer-cot [R=301,L,NE]
+  RewriteRule ^user/tax(?:\.php)?/?$ /transfer-tax [R=301,L,NE]
+  RewriteRule ^user/imf-code(?:\.php)?/?$ /transfer-imf [R=301,L,NE]
+  RewriteRule ^user(?:/.*)?$ /dashboard [R=301,L,NE]
+
+  # Normalize trailing slashes for non-directories.
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule ^(.*)/$ $1 [R,L]
+  RewriteRule ^(.+)/$ /$1 [R=301,L,NE]
 
-  # Canonical alias for update password page
-  RewriteRule ^update-password/?$ updatePassword.php [L,QSA]
+  # Vue owns authentication and customer-facing routes through one PHP front controller.
+  # Admin and public marketing routes continue to use their existing PHP entry points.
+  RewriteRule ^(login|pin|reset-password|update-password|dashboard|transactions|wire-transfer|domestic-transfer|withdrawals|cards|loans|tickets|profile|transfer-verify|transfer-cot|transfer-tax|transfer-imf|transfer-success)$ user-app.php [L,QSA]
 
-  # SPA fallback: Vue user portal — serve index.html for any unknown path under /assets/user-app/
-  RewriteCond %{REQUEST_URI} ^/assets/user-app/
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteRule ^ /assets/user-app/index.html [L]
-
-  # SPA fallback: transfer verification and success routes handled by Vue router
-  RewriteRule ^(transfer-cot|transfer-tax|transfer-imf|transfer-verify|transfer-success)/?$ /assets/user-app/index.html [L]
-
-  # Pretty user routes: /dashboard -> /user/dashboard.php, /wire-transfer -> /user/wire-transfer.php
-  RewriteCond %{REQUEST_URI} !^/(admin|user|p|front|assets|bootstrap|plugins|include|signup)(/|$) [NC]
+  # Preserve extensionless URLs for existing public PHP and HTML pages.
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteCond %{DOCUMENT_ROOT}/$1.php !-f
-  RewriteCond %{DOCUMENT_ROOT}/user/$1.php -f
-  RewriteRule ^([A-Za-z0-9-]+)/?$ user/$1.php [L,QSA]
-
-  # Root extensionless routing
   RewriteCond %{REQUEST_FILENAME}.php -f
-  RewriteRule (.*) $1.php [L]
+  RewriteRule ^(.+)$ $1.php [L]
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
   RewriteCond %{REQUEST_FILENAME}.html -f
-  RewriteRule (.*) $1.html [L]
- </IfModule>
+  RewriteRule ^(.+)$ $1.html [L]
+</IfModule>
 
 <Files ~ "^\w+\.(gif|jpe?g|png)$">
 order deny,allow

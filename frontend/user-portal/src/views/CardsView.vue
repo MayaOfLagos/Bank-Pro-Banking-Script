@@ -7,28 +7,28 @@ const error = ref('')
 const requesting = ref(false)
 const requestError = ref('')
 const requestSuccess = ref(false)
+const requestType = ref('VISA')
+const requestReason = ref('Virtual card for online payments')
 
 const cardData = ref({ card: null, can_request: false })
 
 const card = computed(() => cardData.value.card)
 const canRequest = computed(() => cardData.value.can_request)
+const hasRequestInProgress = computed(() => cardData.value.has_request_in_progress)
 
 const last4 = computed(() => {
-  const num = String(card.value?.card_number ?? '').replace(/\s+/g, '')
-  return num.length >= 4 ? num.slice(-4) : '••••'
+  return card.value?.last4 || '••••'
 })
 
 const maskedNumber = computed(() => {
-  const num = String(card.value?.card_number ?? '').replace(/\s+/g, '')
-  if (!num) return '•••• •••• •••• ••••'
-  const visible = num.slice(-4)
-  return `•••• •••• •••• ${visible}`
+  return card.value?.masked_number || '•••• •••• •••• ••••'
 })
 
 const statusColor = computed(() => {
   const s = String(card.value?.card_status ?? '').toLowerCase()
   if (s === 'active') return 'text-emerald-400'
-  if (s === 'blocked' || s === 'suspended') return 'text-red-400'
+  if (s === 'hold' || s === 'paused') return 'text-red-400'
+  if (s === 'processing') return 'text-amber-400'
   return 'text-slate-400'
 })
 
@@ -36,7 +36,7 @@ async function loadCards() {
   loading.value = true
   error.value = ''
   try {
-    const { data } = await client.get('/api/user/cards.php')
+    const { data } = await client.get('/api/user/card.php')
     if (!data?.ok) throw new Error(data?.message || 'Unable to load card data')
     cardData.value = data.data
   } catch (err) {
@@ -51,7 +51,10 @@ async function requestCard() {
   requestError.value = ''
   requestSuccess.value = false
   try {
-    const { data } = await client.post('/api/user/cards.php', { action: 'request' })
+    const { data } = await client.post('/api/user/card-request.php', {
+      card_type: requestType.value,
+      card_reason: requestReason.value.trim()
+    })
     if (!data?.ok) throw new Error(data?.message || 'Card request failed.')
     requestSuccess.value = true
     await loadCards()
@@ -90,8 +93,8 @@ onMounted(loadCards)
         <!-- Visual card -->
         <div class="mx-4 mt-4 rounded-3xl bg-gradient-to-br from-blue-600 via-blue-700 to-[#0d1b38] p-6 shadow-2xl shadow-blue-900/50">
           <div class="flex justify-between items-start">
-            <span class="text-white/70 text-sm font-medium">{{ card.card_type }}</span>
-            <span class="text-white font-bold text-lg tracking-wide">VISA</span>
+            <span class="text-white/70 text-sm font-medium">{{ card.card_name || 'Virtual Card' }}</span>
+            <span class="text-white font-bold text-lg tracking-wide">{{ card.card_type }}</span>
           </div>
 
           <!-- Chip icon -->
@@ -168,17 +171,39 @@ onMounted(loadCards)
             {{ requestError }}
           </div>
 
+          <div v-if="canRequest && !requestSuccess" class="mt-5 space-y-3 text-left">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1.5">Preferred card type</label>
+              <select
+                v-model="requestType"
+                class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-blue-500 text-sm"
+              >
+                <option value="VISA">Visa</option>
+                <option value="MASTERCARD">Mastercard</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1.5">Reason</label>
+              <textarea
+                v-model="requestReason"
+                rows="3"
+                maxlength="500"
+                class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm resize-none"
+              ></textarea>
+            </div>
+          </div>
+
           <button
             v-if="canRequest && !requestSuccess"
             @click="requestCard"
-            :disabled="requesting"
+            :disabled="requesting || requestReason.trim().length < 5"
             class="mt-5 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl py-4 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {{ requesting ? 'Requesting...' : 'Request a card' }}
           </button>
 
           <p v-if="!canRequest && !requestSuccess" class="mt-4 text-slate-500 text-xs">
-            Card requests are not available for your account tier. Contact support for assistance.
+            {{ hasRequestInProgress ? 'Your card request is being reviewed.' : 'Card requests are unavailable for this account. Contact support for assistance.' }}
           </p>
         </div>
       </template>
