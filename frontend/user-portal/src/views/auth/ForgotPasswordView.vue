@@ -3,35 +3,37 @@
     <h2 class="text-xl font-bold text-white mb-1">Reset password</h2>
     <p class="text-slate-400 text-sm mb-6">Enter your email to receive a reset link</p>
 
-    <form v-if="!sent" @submit.prevent="submit" class="space-y-4">
-      <div>
-        <label class="block text-xs text-slate-400 mb-1.5">Email address</label>
-        <input
-          v-model="email"
-          type="email"
-          required
-          placeholder="example@email.com"
-          autocomplete="email"
-          class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
-        />
-      </div>
+    <form @submit.prevent="onSubmit" class="space-y-4">
+      <FormField label="Email address" :error="errors.email" required>
+        <template #default="{ id, describedBy }">
+          <input
+            :id="id"
+            v-bind="emailAttrs"
+            v-model="email"
+            type="email"
+            placeholder="example@email.com"
+            autocomplete="email"
+            :aria-describedby="describedBy"
+            :aria-invalid="!!errors.email || null"
+            class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
+          />
+        </template>
+      </FormField>
 
-      <div v-if="error" class="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl px-4 py-3">
-        {{ error }}
+      <ErrorState v-if="serverError" :message="serverError" compact />
+
+      <div v-if="sent" class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm rounded-xl px-4 py-3">
+        If an account matches that email, a password reset link has been sent. Check your inbox.
       </div>
 
       <button
         type="submit"
-        :disabled="loading"
-        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl py-4 transition disabled:opacity-50"
+        :disabled="isSubmitting || cooldown > 0"
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl py-4 transition disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {{ loading ? 'Sending...' : 'Send reset link' }}
+        {{ buttonLabel }}
       </button>
     </form>
-
-    <div v-else class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm rounded-xl px-4 py-3">
-      Reset link sent to your email. Check your inbox and follow the link to set a new password.
-    </div>
 
     <template #footer>
       <RouterLink to="/login" class="text-blue-400 text-sm hover:underline">
@@ -42,27 +44,58 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onBeforeUnmount } from 'vue'
 import { RouterLink } from 'vue-router'
 import AuthShell from '../../components/auth/AuthShell.vue'
+import FormField from '../../components/ui/FormField.vue'
+import ErrorState from '../../components/ui/ErrorState.vue'
 import { authApi } from '../../api/auth'
+import { useValidatedForm } from '../../composables/useValidatedForm'
+import { forgotPasswordSchema } from '../../validation/schemas'
 
-const email = ref('')
-const loading = ref(false)
-const error = ref('')
+const COOLDOWN_SECONDS = 60
+
 const sent = ref(false)
+const serverError = ref('')
+const cooldown = ref(0)
+let cooldownTimer = null
 
-const submit = async () => {
-  error.value = ''
-  loading.value = true
+const { defineField, handleSubmit, errors, isSubmitting } = useValidatedForm(forgotPasswordSchema, {
+  initialValues: { email: '' },
+})
+const [email, emailAttrs] = defineField('email')
+
+const buttonLabel = computed(() => {
+  if (isSubmitting.value) return 'Sending...'
+  if (cooldown.value > 0) return `Resend in ${cooldown.value}s`
+  return sent.value ? 'Resend link' : 'Send reset link'
+})
+
+const startCooldown = () => {
+  cooldown.value = COOLDOWN_SECONDS
+  if (cooldownTimer) clearInterval(cooldownTimer)
+  cooldownTimer = setInterval(() => {
+    cooldown.value -= 1
+    if (cooldown.value <= 0) {
+      clearInterval(cooldownTimer)
+      cooldownTimer = null
+    }
+  }, 1000)
+}
+
+onBeforeUnmount(() => {
+  if (cooldownTimer) clearInterval(cooldownTimer)
+})
+
+const onSubmit = handleSubmit(async (values) => {
+  serverError.value = ''
   try {
-    const { data } = await authApi.forgotPassword({ email: email.value.trim() })
+    const { data } = await authApi.forgotPassword({ email: values.email })
     if (!data?.ok) throw new Error(data?.message || 'Failed to send reset link')
     sent.value = true
+    startCooldown()
   } catch (err) {
-    error.value = err?.response?.data?.message || err.message || 'Unable to send reset link'
-  } finally {
-    loading.value = false
+    serverError.value = err?.response?.data?.message || err.message || 'Unable to send reset link'
   }
-}
+})
 </script>

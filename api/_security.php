@@ -50,11 +50,15 @@ function security_enforce_verify_lock(PDO $conn, int $userId, callable $respond)
         $respond(429, [
             'ok' => false,
             'message' => 'Too many failed attempts. Try again in ' . SECURITY_VERIFY_LOCK_MINUTES . ' minutes.',
+            'data' => [
+                'locked_until' => (string)$lockedUntil,
+                'attempts_remaining' => 0,
+            ],
         ]);
     }
 }
 
-function security_record_verify_failure(PDO $conn, int $userId): void
+function security_record_verify_failure(PDO $conn, int $userId): array
 {
     $lockClause = 'CASE WHEN verify_attempts + 1 >= :max THEN DATE_ADD(NOW(), INTERVAL :mins MINUTE) ELSE verify_locked_until END';
     $stmt = $conn->prepare(
@@ -66,6 +70,16 @@ function security_record_verify_failure(PDO $conn, int $userId): void
         'max' => SECURITY_VERIFY_MAX_ATTEMPTS,
         'mins' => SECURITY_VERIFY_LOCK_MINUTES,
     ]);
+
+    $read = $conn->prepare('SELECT verify_attempts, verify_locked_until FROM users WHERE id = :id LIMIT 1');
+    $read->execute(['id' => $userId]);
+    $row = $read->fetch(PDO::FETCH_ASSOC) ?: [];
+    $attempts = (int)($row['verify_attempts'] ?? 0);
+    return [
+        'attempts' => $attempts,
+        'attempts_remaining' => max(0, SECURITY_VERIFY_MAX_ATTEMPTS - $attempts),
+        'locked_until' => $row['verify_locked_until'] ?? null,
+    ];
 }
 
 function security_reset_verify_attempts(PDO $conn, int $userId): void

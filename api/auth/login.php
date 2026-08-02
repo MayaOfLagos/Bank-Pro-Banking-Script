@@ -38,8 +38,12 @@ if (!$user) {
 security_enforce_verify_lock($conn, (int)$user['id'], 'auth_json');
 
 if (!password_verify($acctPassword, (string)$user['acct_password'])) {
-    security_record_verify_failure($conn, (int)$user['id']);
-    auth_json(422, ['ok' => false, 'message' => 'Invalid login details']);
+    $result = security_record_verify_failure($conn, (int)$user['id']);
+    auth_json(422, [
+        'ok' => false,
+        'message' => 'Invalid login details',
+        'data' => ['attempts_remaining' => $result['attempts_remaining']],
+    ]);
 }
 
 security_reset_verify_attempts($conn, (int)$user['id']);

@@ -16,8 +16,11 @@ if (!$email || !preg_match('/^[a-zA-Z0-9_\-]{8,}$/', $token)) {
     auth_json(422, ['ok' => false, 'message' => 'Reset link is invalid or has expired.']);
 }
 
-if (strlen($newPassword) < 6) {
-    auth_json(422, ['ok' => false, 'message' => 'Password must be at least 6 characters.']);
+if (strlen($newPassword) < 8) {
+    auth_json(422, ['ok' => false, 'message' => 'Password must be at least 8 characters.']);
+}
+if (!preg_match('/[A-Za-z]/', $newPassword) || !preg_match('/\d/', $newPassword)) {
+    auth_json(422, ['ok' => false, 'message' => 'Password must contain at least one letter and one number.']);
 }
 
 $stmt = $conn->prepare('SELECT * FROM users WHERE acct_email = :email AND resettoken = :token AND resettokenexp >= NOW() LIMIT 1');

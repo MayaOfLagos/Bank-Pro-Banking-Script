@@ -3,51 +3,65 @@
     <h2 class="text-xl font-bold text-white mb-1">Welcome back</h2>
     <p class="text-slate-400 text-sm mb-6">Sign in to your account</p>
 
-    <form @submit.prevent="submit" class="space-y-4">
-      <div>
-        <label class="block text-xs text-slate-400 mb-1.5">Account number</label>
-        <input
-          v-model="form.acct_no"
-          type="text"
-          inputmode="numeric"
-          autocomplete="username"
-          required
-          placeholder="Enter account number"
-          class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
-        />
-      </div>
-
-      <div>
-        <label class="block text-xs text-slate-400 mb-1.5">Password</label>
-        <div class="relative">
+    <form @submit.prevent="onSubmit" class="space-y-4">
+      <FormField label="Account number" :error="errors.acct_no" required>
+        <template #default="{ id, describedBy }">
           <input
-            v-model="form.password"
-            :type="showPassword ? 'text' : 'password'"
-            required
-            placeholder="Enter password"
-            class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm pr-10"
+            :id="id"
+            v-bind="acctNoAttrs"
+            v-model="acctNo"
+            type="text"
+            inputmode="numeric"
+            autocomplete="username"
+            placeholder="Enter account number, username, or email"
+            :aria-describedby="describedBy"
+            :aria-invalid="!!errors.acct_no || null"
+            class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
           />
-          <button
-            type="button"
-            @click="showPassword = !showPassword"
-            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition"
-          >
-            <EyeIcon v-if="!showPassword" class="h-4 w-4" />
-            <EyeSlashIcon v-else class="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+        </template>
+      </FormField>
 
-      <div v-if="error" class="bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl px-4 py-3">
-        {{ error }}
-      </div>
+      <FormField label="Password" :error="errors.acct_password" required>
+        <template #default="{ id, describedBy }">
+          <div class="relative">
+            <input
+              :id="id"
+              v-bind="passwordAttrs"
+              v-model="password"
+              :type="showPassword ? 'text' : 'password'"
+              autocomplete="current-password"
+              placeholder="Enter password"
+              :aria-describedby="describedBy"
+              :aria-invalid="!!errors.acct_password || null"
+              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm pr-10"
+            />
+            <button
+              type="button"
+              @click="showPassword = !showPassword"
+              :aria-label="showPassword ? 'Hide password' : 'Show password'"
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition"
+            >
+              <EyeIcon v-if="!showPassword" class="h-4 w-4" />
+              <EyeSlashIcon v-else class="h-4 w-4" />
+            </button>
+          </div>
+        </template>
+      </FormField>
+
+      <ErrorState v-if="serverError" :message="serverError" compact />
+
+      <p v-if="attemptsRemaining !== null" class="text-xs text-amber-400 text-center">
+        {{ attemptsRemaining === 0
+          ? 'Account locked. Try again later.'
+          : `${attemptsRemaining} attempt${attemptsRemaining === 1 ? '' : 's'} remaining before the account is locked.` }}
+      </p>
 
       <button
         type="submit"
-        :disabled="loading"
-        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl py-4 transition disabled:opacity-50"
+        :disabled="isSubmitting"
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl py-4 transition disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {{ loading ? 'Signing in...' : 'Sign in' }}
+        {{ isSubmitting ? 'Signing in...' : 'Sign in' }}
       </button>
     </form>
 
@@ -60,34 +74,48 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
 import AuthShell from '../../components/auth/AuthShell.vue'
+import FormField from '../../components/ui/FormField.vue'
+import ErrorState from '../../components/ui/ErrorState.vue'
 import { authApi } from '../../api/auth'
+import { useAuthStore } from '../../stores/auth'
+import { useValidatedForm } from '../../composables/useValidatedForm'
+import { loginSchema } from '../../validation/schemas'
 
 const router = useRouter()
+const auth = useAuthStore()
 
-const loading = ref(false)
 const showPassword = ref(false)
-const error = ref('')
+const serverError = ref('')
+const attemptsRemaining = ref(null)
 
-const form = reactive({
-  acct_no: '',
-  password: ''
+const { defineField, handleSubmit, errors, isSubmitting } = useValidatedForm(loginSchema, {
+  initialValues: { acct_no: '', acct_password: '' },
 })
+const [acctNo, acctNoAttrs] = defineField('acct_no')
+const [password, passwordAttrs] = defineField('acct_password')
 
-const submit = async () => {
-  error.value = ''
-  loading.value = true
+const onSubmit = handleSubmit(async (values) => {
+  serverError.value = ''
+  attemptsRemaining.value = null
   try {
-    const { data } = await authApi.login({ acct_no: form.acct_no.trim(), password: form.password })
+    const { data } = await authApi.login({
+      acct_no: values.acct_no,
+      password: values.acct_password,
+    })
     if (!data?.ok) throw new Error(data?.message || 'Login failed')
+    auth.setState('pending_pin', '/pin')
+    auth.setCsrfToken(data.data?.csrf_token || '')
     await router.push(data.data?.next_route || '/pin')
   } catch (err) {
-    error.value = err?.response?.data?.message || err.message || 'Unable to sign in'
-  } finally {
-    loading.value = false
+    const payload = err?.response?.data
+    serverError.value = payload?.message || err.message || 'Unable to sign in'
+    if (typeof payload?.data?.attempts_remaining === 'number') {
+      attemptsRemaining.value = payload.data.attempts_remaining
+    }
   }
-}
+})
 </script>
