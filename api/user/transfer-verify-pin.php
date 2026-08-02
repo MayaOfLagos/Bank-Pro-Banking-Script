@@ -19,8 +19,12 @@ if ($pendingTransferId < 1 || (int)($_SESSION['pending_transfer_created_at'] ?? 
 security_enforce_verify_lock($conn, (int)$user['id'], 'api_json');
 
 if ($pin === '' || !hash_equals((string)($user['acct_otp'] ?? ''), $pin)) {
-  security_record_verify_failure($conn, (int)$user['id']);
-  api_json(422, ['ok' => false, 'message' => 'Incorrect OTP code']);
+  $result = security_record_verify_failure($conn, (int)$user['id']);
+  api_json(422, [
+    'ok' => false,
+    'message' => 'Incorrect OTP code',
+    'data' => ['attempts_remaining' => $result['attempts_remaining']],
+  ]);
 }
 
 security_reset_verify_attempts($conn, (int)$user['id']);

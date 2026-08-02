@@ -16,8 +16,12 @@ if ((int)($_SESSION['pending_transfer_id'] ?? 0) < 1 || ($_SESSION['transfer_ver
 security_enforce_verify_lock($conn, (int)$user['id'], 'api_json');
 
 if ($code !== (string)($user['acct_imf'] ?? '')) {
-  security_record_verify_failure($conn, (int)$user['id']);
-  api_json(422, ['ok' => false, 'message' => 'Invalid IMF code']);
+  $result = security_record_verify_failure($conn, (int)$user['id']);
+  api_json(422, [
+    'ok' => false,
+    'message' => 'Invalid IMF code',
+    'data' => ['attempts_remaining' => $result['attempts_remaining']],
+  ]);
 }
 
 security_reset_verify_attempts($conn, (int)$user['id']);
