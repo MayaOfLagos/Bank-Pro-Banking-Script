@@ -17,7 +17,7 @@ if ($pin === '') {
     auth_json(422, ['ok' => false, 'message' => 'Enter your PIN']);
 }
 
-$stmt = $conn->prepare('SELECT acct_no, acct_pin FROM users WHERE acct_no = :acct_no LIMIT 1');
+$stmt = $conn->prepare('SELECT id, acct_no, acct_pin FROM users WHERE acct_no = :acct_no LIMIT 1');
 $stmt->execute(['acct_no' => (string)$_SESSION['login']]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -25,10 +25,14 @@ if (!$user) {
     auth_json(404, ['ok' => false, 'message' => 'Account not found']);
 }
 
+security_enforce_verify_lock($conn, (int)$user['id'], 'auth_json');
+
 if ((string)$pin !== (string)$user['acct_pin']) {
+    security_record_verify_failure($conn, (int)$user['id']);
     auth_json(422, ['ok' => false, 'message' => 'Invalid PIN code']);
 }
 
+security_reset_verify_attempts($conn, (int)$user['id']);
 session_regenerate_id(true);
 $_SESSION['acct_no'] = (string)$user['acct_no'];
 unset($_SESSION['login']);

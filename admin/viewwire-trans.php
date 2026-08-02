@@ -26,30 +26,57 @@ $statusMap = [
 ];
 
 if (isset($_POST['accept'])) {
-    $stmt = $conn->prepare("UPDATE wire_transfer SET wire_status=:s WHERE refrence_id=:id");
-    $stmt->execute(['s' => 1, 'id' => $id]);
-    $message = $sendMail->wireMsg($currency, $row['amount'], $row['acct_balance'], 'Wire Transfer', $fullName, $APP_NAME, 'Approved', $row['refrence_id']);
-    $email_message->send_to_both($email, $message, "[WIRE TRANSFER APPROVED] - $APP_NAME");
-    toast_alert('success', 'Wire Transfer Approved', 'Approved');
+    // Approve only from Processing (0) or Hold (2). Idempotent: repeat clicks are no-ops.
+    $upd = $conn->prepare("UPDATE wire_transfer SET wire_status=1 WHERE refrence_id=:id AND wire_status IN (0, 2)");
+    $upd->execute(['id' => $id]);
+    if ($upd->rowCount() === 1) {
+        $message = $sendMail->wireMsg($currency, $row['amount'], $row['acct_balance'], 'Wire Transfer', $fullName, $APP_NAME, 'Approved', $row['refrence_id']);
+        $email_message->send_to_both($email, $message, "[WIRE TRANSFER APPROVED] - $APP_NAME");
+        toast_alert('success', 'Wire Transfer Approved', 'Approved');
+    } else {
+        toast_alert('info', 'Wire transfer already finalised', 'No change');
+    }
 }
 
 if (isset($_POST['decline'])) {
-    $stmt = $conn->prepare("UPDATE wire_transfer SET wire_status=:s WHERE refrence_id=:id");
-    $stmt->execute(['s' => 3, 'id' => $id]);
-    $amount_balance = $row['acct_balance'] + $row['amount'];
-    $upd = $conn->prepare("UPDATE users SET acct_balance=:b WHERE id=:id");
-    $upd->execute(['b' => $amount_balance, 'id' => $user_id]);
-    $message = $sendMail->wireMsg($currency, $row['amount'], $amount_balance, 'Wire Transfer', $fullName, $APP_NAME, 'Declined', $row['refrence_id']);
-    $email_message->send_to_both($email, $message, "[WIRE TRANSFER DECLINED] - $APP_NAME");
-    toast_alert('success', 'Wire Transfer Declined', 'Decline');
+    // Decline + refund only from Processing (0) or Hold (2). Refund runs at most once
+    // by combining the status transition with a locked balance read in one transaction.
+    try {
+        $conn->beginTransaction();
+        $stmt = $conn->prepare("UPDATE wire_transfer SET wire_status=3 WHERE refrence_id=:id AND wire_status IN (0, 2)");
+        $stmt->execute(['id' => $id]);
+        if ($stmt->rowCount() !== 1) {
+            $conn->rollBack();
+            toast_alert('info', 'Wire transfer already finalised', 'No change');
+        } else {
+            $lock = $conn->prepare('SELECT acct_balance FROM users WHERE id=:id FOR UPDATE');
+            $lock->execute(['id' => $user_id]);
+            $currentBalance = (float)$lock->fetchColumn();
+            $amount_balance = $currentBalance + (float)$row['amount'];
+            $upd = $conn->prepare('UPDATE users SET acct_balance=:b WHERE id=:id');
+            $upd->execute(['b' => $amount_balance, 'id' => $user_id]);
+            $conn->commit();
+            $message = $sendMail->wireMsg($currency, $row['amount'], $amount_balance, 'Wire Transfer', $fullName, $APP_NAME, 'Declined', $row['refrence_id']);
+            $email_message->send_to_both($email, $message, "[WIRE TRANSFER DECLINED] - $APP_NAME");
+            toast_alert('success', 'Wire Transfer Declined', 'Decline');
+        }
+    } catch (Throwable $e) {
+        if ($conn->inTransaction()) $conn->rollBack();
+        toast_alert('error', 'Unable to decline wire transfer', 'Error');
+    }
 }
 
 if (isset($_POST['hold'])) {
-    $stmt = $conn->prepare("UPDATE wire_transfer SET wire_status=:s WHERE refrence_id=:id");
-    $stmt->execute(['s' => 2, 'id' => $id]);
-    $message = $sendMail->wireMsg($currency, $row['amount'], $row['acct_balance'], 'Wire Transfer', $fullName, $APP_NAME, 'On Hold', $row['refrence_id']);
-    $email_message->send_to_both($email, $message, "[WIRE TRANSFER ON HOLD] - $APP_NAME");
-    toast_alert('success', 'Wire Transfer Placed on Hold', 'Hold');
+    // Hold only from Processing (0).
+    $upd = $conn->prepare("UPDATE wire_transfer SET wire_status=2 WHERE refrence_id=:id AND wire_status = 0");
+    $upd->execute(['id' => $id]);
+    if ($upd->rowCount() === 1) {
+        $message = $sendMail->wireMsg($currency, $row['amount'], $row['acct_balance'], 'Wire Transfer', $fullName, $APP_NAME, 'On Hold', $row['refrence_id']);
+        $email_message->send_to_both($email, $message, "[WIRE TRANSFER ON HOLD] - $APP_NAME");
+        toast_alert('success', 'Wire Transfer Placed on Hold', 'Hold');
+    } else {
+        toast_alert('info', 'Wire transfer already finalised', 'No change');
+    }
 }
 
 if (isset($_POST['trans_delete'])) {

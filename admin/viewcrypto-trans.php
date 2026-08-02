@@ -36,27 +36,52 @@ $mailDeposit = function ($status_label, $balance) use ($sendMail, $email_message
 };
 
 if (isset($_POST['accept'])) {
-    $amount_balance = $row['amount'] + $result['acct_balance'];
-    $stmt = $conn->prepare("UPDATE deposit SET crypto_status=:s WHERE refrence_id=:id");
-    $stmt->execute(['s' => 1, 'id' => $id]);
-    $upd = $conn->prepare("UPDATE users SET acct_balance=:b WHERE id=:id");
-    $upd->execute(['b' => $amount_balance, 'id' => $user_id]);
-    $mailDeposit('Approved', $amount_balance);
-    toast_alert('success', 'Deposit Approved', 'Approved');
+    // Approve + credit only from Processing (0) or Hold (2). Credit runs at most once
+    // by combining the status transition with a locked balance read in one transaction.
+    try {
+        $conn->beginTransaction();
+        $stmt = $conn->prepare("UPDATE deposit SET crypto_status=1 WHERE refrence_id=:id AND crypto_status IN (0, 2)");
+        $stmt->execute(['id' => $id]);
+        if ($stmt->rowCount() !== 1) {
+            $conn->rollBack();
+            toast_alert('info', 'Deposit already finalised', 'No change');
+        } else {
+            $lock = $conn->prepare('SELECT acct_balance FROM users WHERE id=:id FOR UPDATE');
+            $lock->execute(['id' => $user_id]);
+            $currentBalance = (float)$lock->fetchColumn();
+            $amount_balance = $currentBalance + (float)$row['amount'];
+            $upd = $conn->prepare('UPDATE users SET acct_balance=:b WHERE id=:id');
+            $upd->execute(['b' => $amount_balance, 'id' => $user_id]);
+            $conn->commit();
+            $mailDeposit('Approved', $amount_balance);
+            toast_alert('success', 'Deposit Approved', 'Approved');
+        }
+    } catch (Throwable $e) {
+        if ($conn->inTransaction()) $conn->rollBack();
+        toast_alert('error', 'Unable to approve deposit', 'Error');
+    }
 }
 
 if (isset($_POST['decline'])) {
-    $stmt = $conn->prepare("UPDATE deposit SET crypto_status=:s WHERE refrence_id=:id");
-    $stmt->execute(['s' => 3, 'id' => $id]);
-    $mailDeposit('Declined', $result['acct_balance']);
-    toast_alert('success', 'Deposit Declined', 'Decline');
+    $upd = $conn->prepare("UPDATE deposit SET crypto_status=3 WHERE refrence_id=:id AND crypto_status IN (0, 2)");
+    $upd->execute(['id' => $id]);
+    if ($upd->rowCount() === 1) {
+        $mailDeposit('Declined', $result['acct_balance']);
+        toast_alert('success', 'Deposit Declined', 'Decline');
+    } else {
+        toast_alert('info', 'Deposit already finalised', 'No change');
+    }
 }
 
 if (isset($_POST['hold'])) {
-    $stmt = $conn->prepare("UPDATE deposit SET crypto_status=:s WHERE refrence_id=:id");
-    $stmt->execute(['s' => 2, 'id' => $id]);
-    $mailDeposit('On Hold', $result['acct_balance']);
-    toast_alert('success', 'Deposit Placed on Hold', 'Hold');
+    $upd = $conn->prepare("UPDATE deposit SET crypto_status=2 WHERE refrence_id=:id AND crypto_status = 0");
+    $upd->execute(['id' => $id]);
+    if ($upd->rowCount() === 1) {
+        $mailDeposit('On Hold', $result['acct_balance']);
+        toast_alert('success', 'Deposit Placed on Hold', 'Hold');
+    } else {
+        toast_alert('info', 'Deposit already finalised', 'No change');
+    }
 }
 
 if (isset($_POST['trans_delete'])) {

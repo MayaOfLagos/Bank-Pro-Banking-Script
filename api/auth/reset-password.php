@@ -20,7 +20,7 @@ if (strlen($newPassword) < 6) {
     auth_json(422, ['ok' => false, 'message' => 'Password must be at least 6 characters.']);
 }
 
-$stmt = $conn->prepare('SELECT * FROM users WHERE acct_email = :email AND resettoken = :token AND resettokenexp >= CURDATE() LIMIT 1');
+$stmt = $conn->prepare('SELECT * FROM users WHERE acct_email = :email AND resettoken = :token AND resettokenexp >= NOW() LIMIT 1');
 $stmt->execute([
     'email' => $email,
     'token' => $token,

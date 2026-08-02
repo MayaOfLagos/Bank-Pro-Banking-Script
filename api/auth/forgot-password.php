@@ -18,16 +18,20 @@ $stmt->execute(['email' => $email]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$user) {
-    auth_json(422, ['ok' => false, 'message' => 'No user is registered with this email address.']);
+    // Do not disclose whether an account exists for the submitted email.
+    auth_json(200, [
+        'ok' => true,
+        'message' => 'If an account matches that email, a password reset link will be sent.',
+    ]);
 }
 
 $token = bin2hex(random_bytes(16));
-$date = date('Y-m-d');
+$expiresAt = date('Y-m-d H:i:s', time() + 1800);
 
 $update = $conn->prepare('UPDATE users SET resettoken = :token, resettokenexp = :exp WHERE acct_email = :email');
 $update->execute([
     'token' => $token,
-    'exp' => $date,
+    'exp' => $expiresAt,
     'email' => $email,
 ]);
 

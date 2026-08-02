@@ -29,24 +29,45 @@ if (isset($_POST['loan_submit'])) {
     $loan_message = $_POST['loan_message'];
     $loan_status  = (int)$_POST['loan_status'];
 
-    $stmt = $conn->prepare("UPDATE loan SET loan_status=:s, loan_message=:m WHERE loan_reference_id=:id");
-    $stmt->execute(['s' => $loan_status, 'm' => $loan_message, 'id' => $id]);
+    if (!in_array($loan_status, [1, 2, 3], true)) {
+        toast_alert('error', 'Invalid loan action', 'Error');
+    } else {
+        // Status transitions and (for approval) loan credit must be idempotent so that
+        // resubmitting the same form does not credit loan_balance twice.
+        try {
+            $conn->beginTransaction();
+            $stmt = $conn->prepare("UPDATE loan SET loan_status=:s, loan_message=:m WHERE loan_reference_id=:id AND loan_status IN (0, 2)");
+            $stmt->execute(['s' => $loan_status, 'm' => $loan_message, 'id' => $id]);
 
-    $available_loan = $row['loan_balance'];
-    if ($loan_status === 1) {
-        $available_loan = $row['loan_balance'] + $row['amount'];
-        $upd = $conn->prepare("UPDATE users SET loan_balance=:b WHERE acct_no=:id");
-        $upd->execute(['b' => $available_loan, 'id' => $acct_no]);
+            $available_loan = $row['loan_balance'];
+            if ($stmt->rowCount() === 1) {
+                if ($loan_status === 1) {
+                    $lock = $conn->prepare('SELECT loan_balance FROM users WHERE acct_no=:acct_no FOR UPDATE');
+                    $lock->execute(['acct_no' => $acct_no]);
+                    $currentLoan = (float)$lock->fetchColumn();
+                    $available_loan = $currentLoan + (float)$row['amount'];
+                    $upd = $conn->prepare("UPDATE users SET loan_balance=:b WHERE acct_no=:id");
+                    $upd->execute(['b' => $available_loan, 'id' => $acct_no]);
+                }
+                $conn->commit();
+
+                $statusLabel = ['1' => 'Approved', '2' => 'Hold', '3' => 'Declined'][$loan_status] ?? 'Updated';
+                $message = $sendMail->loanMsg($currency, $row['amount'], $row['acct_balance'], $available_loan, $APP_NAME, $statusLabel, $loan_message);
+                $email_message->send_to_both($email, $message, "[LOAN " . strtoupper($statusLabel) . "] - $APP_NAME");
+                toast_alert('success', "Loan $statusLabel Successfully", $statusLabel);
+            } else {
+                $conn->rollBack();
+                toast_alert('info', 'Loan already finalised', 'No change');
+            }
+
+            $stmt = $conn->prepare("SELECT * FROM loan LEFT JOIN users ON loan.acct_id = users.id WHERE loan_reference_id =:id");
+            $stmt->execute(['id' => $id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (Throwable $e) {
+            if ($conn->inTransaction()) $conn->rollBack();
+            toast_alert('error', 'Unable to update loan', 'Error');
+        }
     }
-
-    $statusLabel = ['1' => 'Approved', '2' => 'Hold', '3' => 'Declined'][$loan_status] ?? 'Updated';
-    $message = $sendMail->loanMsg($currency, $row['amount'], $row['acct_balance'], $available_loan, $APP_NAME, $statusLabel, $loan_message);
-    $email_message->send_to_both($email, $message, "[LOAN " . strtoupper($statusLabel) . "] - $APP_NAME");
-    toast_alert('success', "Loan $statusLabel Successfully", $statusLabel);
-
-    $stmt = $conn->prepare("SELECT * FROM loan LEFT JOIN users ON loan.acct_id = users.id WHERE loan_reference_id =:id");
-    $stmt->execute(['id' => $id]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
 $tran_status = $statusMap[(string)$row['loan_status']] ?? '<span class="badge badge-light">Unknown</span>';

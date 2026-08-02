@@ -31,26 +31,53 @@ $mailWithdraw = function ($balance) use ($sendMail, $email_message, $email, $APP
 };
 
 if (isset($_POST['accept'])) {
-    $stmt = $conn->prepare("UPDATE withdrawal SET status=:s WHERE reference_id=:id");
-    $stmt->execute(['s' => 1, 'id' => $id]);
-    $mailWithdraw($row['acct_balance']);
-    toast_alert('success', 'Withdrawal Approved', 'Approved');
+    // Approve only from Processing (0) or Hold (2). Idempotent: repeat clicks are no-ops.
+    $upd = $conn->prepare("UPDATE withdrawal SET status=1 WHERE reference_id=:id AND status IN (0, 2)");
+    $upd->execute(['id' => $id]);
+    if ($upd->rowCount() === 1) {
+        $mailWithdraw($row['acct_balance']);
+        toast_alert('success', 'Withdrawal Approved', 'Approved');
+    } else {
+        toast_alert('info', 'Withdrawal already finalised', 'No change');
+    }
 }
 
 if (isset($_POST['decline'])) {
-    $stmt = $conn->prepare("UPDATE withdrawal SET status=:s WHERE reference_id=:id");
-    $stmt->execute(['s' => 3, 'id' => $id]);
-    $amount_balance = $row['acct_balance'] + $row['amount'];
-    $upd = $conn->prepare("UPDATE users SET acct_balance=:b WHERE id=:id");
-    $upd->execute(['b' => $amount_balance, 'id' => $user_id]);
-    $mailWithdraw($amount_balance);
-    toast_alert('success', 'Withdrawal Declined', 'Decline');
+    // Decline + refund only from Processing (0) or Hold (2). Refund runs at most once
+    // by combining the status transition with a locked balance read in one transaction.
+    try {
+        $conn->beginTransaction();
+        $stmt = $conn->prepare("UPDATE withdrawal SET status=3 WHERE reference_id=:id AND status IN (0, 2)");
+        $stmt->execute(['id' => $id]);
+        if ($stmt->rowCount() !== 1) {
+            $conn->rollBack();
+            toast_alert('info', 'Withdrawal already finalised', 'No change');
+        } else {
+            $lock = $conn->prepare('SELECT acct_balance FROM users WHERE id=:id FOR UPDATE');
+            $lock->execute(['id' => $user_id]);
+            $currentBalance = (float)$lock->fetchColumn();
+            $amount_balance = $currentBalance + (float)$row['amount'];
+            $upd = $conn->prepare('UPDATE users SET acct_balance=:b WHERE id=:id');
+            $upd->execute(['b' => $amount_balance, 'id' => $user_id]);
+            $conn->commit();
+            $mailWithdraw($amount_balance);
+            toast_alert('success', 'Withdrawal Declined', 'Decline');
+        }
+    } catch (Throwable $e) {
+        if ($conn->inTransaction()) $conn->rollBack();
+        toast_alert('error', 'Unable to decline withdrawal', 'Error');
+    }
 }
 
 if (isset($_POST['hold'])) {
-    $stmt = $conn->prepare("UPDATE withdrawal SET status=:s WHERE reference_id=:id");
-    $stmt->execute(['s' => 2, 'id' => $id]);
-    toast_alert('success', 'Withdrawal Placed on Hold', 'Hold');
+    // Hold only from Processing (0).
+    $upd = $conn->prepare("UPDATE withdrawal SET status=2 WHERE reference_id=:id AND status = 0");
+    $upd->execute(['id' => $id]);
+    if ($upd->rowCount() === 1) {
+        toast_alert('success', 'Withdrawal Placed on Hold', 'Hold');
+    } else {
+        toast_alert('info', 'Withdrawal already finalised', 'No change');
+    }
 }
 
 if (isset($_POST['trans_delete'])) {

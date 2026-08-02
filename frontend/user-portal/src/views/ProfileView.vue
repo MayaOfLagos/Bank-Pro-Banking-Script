@@ -13,8 +13,8 @@ const profile = ref({
   full_name: '',
   firstname: '',
   lastname: '',
-  acct_email: '',
-  acct_phone: '',
+  email: '',
+  phone: '',
   acct_no: '',
   acct_type: '',
   acct_status: '',
@@ -60,7 +60,7 @@ async function loadProfile() {
     profile.value = { ...profile.value, ...data.data }
     editFirst.value = data.data.firstname ?? ''
     editLast.value = data.data.lastname ?? ''
-    editPhone.value = data.data.acct_phone ?? ''
+    editPhone.value = data.data.phone ?? ''
   } catch (err) {
     error.value = err?.response?.data?.message || err.message
   } finally {
@@ -77,7 +77,7 @@ async function handleSave() {
       action: 'update',
       firstname: editFirst.value,
       lastname: editLast.value,
-      acct_phone: editPhone.value
+      phone: editPhone.value
     })
     if (!data?.ok) throw new Error(data?.message || 'Update failed.')
     saveSuccess.value = true
@@ -157,7 +157,7 @@ onMounted(loadProfile)
         </div>
         <div class="px-4 py-3.5 flex justify-between items-center">
           <span class="text-slate-400 text-sm">Email</span>
-          <span class="text-white text-sm truncate max-w-[55%] text-right">{{ profile.acct_email || '—' }}</span>
+          <span class="text-white text-sm truncate max-w-[55%] text-right">{{ profile.email || '—' }}</span>
         </div>
       </div>
 

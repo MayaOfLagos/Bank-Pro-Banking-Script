@@ -8,7 +8,7 @@ if (!$email || !preg_match('/^[a-zA-Z0-9_\-]{8,}$/', $token)) {
     auth_json(422, ['ok' => false, 'message' => 'Reset link is invalid or has expired.']);
 }
 
-$stmt = $conn->prepare('SELECT id FROM users WHERE acct_email = :email AND resettoken = :token AND resettokenexp >= CURDATE() LIMIT 1');
+$stmt = $conn->prepare('SELECT id FROM users WHERE acct_email = :email AND resettoken = :token AND resettokenexp >= NOW() LIMIT 1');
 $stmt->execute([
     'email' => $email,
     'token' => $token,

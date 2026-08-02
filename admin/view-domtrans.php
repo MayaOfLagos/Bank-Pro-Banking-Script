@@ -31,26 +31,51 @@ $mailDom = function ($status_label) use ($sendMail, $email_message, $email, $APP
 };
 
 if (isset($_POST['accept'])) {
-    $stmt = $conn->prepare("UPDATE domestic_transfer SET dom_status=:s WHERE refrence_id=:id");
-    $stmt->execute(['s' => 1, 'id' => $id]);
-    $mailDom('Approved');
-    toast_alert('success', 'Domestic Transfer Approved', 'Approved');
+    // Approve only from Processing (0) or Hold (2). Idempotent: repeat clicks are no-ops.
+    $upd = $conn->prepare("UPDATE domestic_transfer SET dom_status=1 WHERE refrence_id=:id AND dom_status IN (0, 2)");
+    $upd->execute(['id' => $id]);
+    if ($upd->rowCount() === 1) {
+        $mailDom('Approved');
+        toast_alert('success', 'Domestic Transfer Approved', 'Approved');
+    } else {
+        toast_alert('info', 'Domestic transfer already finalised', 'No change');
+    }
 }
 
 if (isset($_POST['decline'])) {
-    $stmt = $conn->prepare("UPDATE domestic_transfer SET dom_status=:s WHERE refrence_id=:id");
-    $stmt->execute(['s' => 3, 'id' => $id]);
-    $upd = $conn->prepare("UPDATE users SET acct_balance=:b WHERE id=:id");
-    $upd->execute(['b' => $row['acct_balance'] + $row['amount'], 'id' => $user_id]);
-    $mailDom('Declined');
-    toast_alert('success', 'Domestic Transfer Declined', 'Decline');
+    // Decline + refund only from Processing (0) or Hold (2). Refund runs at most once.
+    try {
+        $conn->beginTransaction();
+        $stmt = $conn->prepare("UPDATE domestic_transfer SET dom_status=3 WHERE refrence_id=:id AND dom_status IN (0, 2)");
+        $stmt->execute(['id' => $id]);
+        if ($stmt->rowCount() !== 1) {
+            $conn->rollBack();
+            toast_alert('info', 'Domestic transfer already finalised', 'No change');
+        } else {
+            $lock = $conn->prepare('SELECT acct_balance FROM users WHERE id=:id FOR UPDATE');
+            $lock->execute(['id' => $user_id]);
+            $currentBalance = (float)$lock->fetchColumn();
+            $upd = $conn->prepare('UPDATE users SET acct_balance=:b WHERE id=:id');
+            $upd->execute(['b' => $currentBalance + (float)$row['amount'], 'id' => $user_id]);
+            $conn->commit();
+            $mailDom('Declined');
+            toast_alert('success', 'Domestic Transfer Declined', 'Decline');
+        }
+    } catch (Throwable $e) {
+        if ($conn->inTransaction()) $conn->rollBack();
+        toast_alert('error', 'Unable to decline domestic transfer', 'Error');
+    }
 }
 
 if (isset($_POST['hold'])) {
-    $stmt = $conn->prepare("UPDATE domestic_transfer SET dom_status=:s WHERE refrence_id=:id");
-    $stmt->execute(['s' => 2, 'id' => $id]);
-    $mailDom('On Hold');
-    toast_alert('success', 'Domestic Transfer Placed on Hold', 'Hold');
+    $upd = $conn->prepare("UPDATE domestic_transfer SET dom_status=2 WHERE refrence_id=:id AND dom_status = 0");
+    $upd->execute(['id' => $id]);
+    if ($upd->rowCount() === 1) {
+        $mailDom('On Hold');
+        toast_alert('success', 'Domestic Transfer Placed on Hold', 'Hold');
+    } else {
+        toast_alert('info', 'Domestic transfer already finalised', 'No change');
+    }
 }
 
 if (isset($_POST['trans_delete'])) {
