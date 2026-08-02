@@ -1,9 +1,9 @@
 <template>
   <AuthShell>
-    <h2 class="text-xl font-bold text-white mb-1">Reset password</h2>
-    <p class="text-slate-400 text-sm mb-6">Enter your email to receive a reset link</p>
+    <h2 class="auth-heading">Reset password</h2>
+    <p class="auth-subheading">Enter your email to receive a reset link</p>
 
-    <form @submit.prevent="onSubmit" class="space-y-4">
+    <form @submit.prevent="onSubmit" class="auth-form">
       <FormField label="Email address" :error="errors.email" required>
         <template #default="{ id, describedBy }">
           <input
@@ -15,30 +15,28 @@
             autocomplete="email"
             :aria-describedby="describedBy"
             :aria-invalid="!!errors.email || null"
-            class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
+            class="auth-input"
           />
         </template>
       </FormField>
 
       <ErrorState v-if="serverError" :message="serverError" compact />
 
-      <div v-if="sent" class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm rounded-xl px-4 py-3">
+      <div v-if="sent" class="auth-success">
         If an account matches that email, a password reset link has been sent. Check your inbox.
       </div>
 
       <button
         type="submit"
         :disabled="isSubmitting || cooldown > 0"
-        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl py-4 transition disabled:opacity-50 disabled:cursor-not-allowed"
+        class="auth-submit"
       >
         {{ buttonLabel }}
       </button>
     </form>
 
     <template #footer>
-      <RouterLink to="/login" class="text-blue-400 text-sm hover:underline">
-        Back to sign in
-      </RouterLink>
+      <RouterLink to="/login" class="auth-link">Back to sign in</RouterLink>
     </template>
   </AuthShell>
 </template>

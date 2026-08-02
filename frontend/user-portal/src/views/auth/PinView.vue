@@ -1,24 +1,22 @@
 <template>
   <AuthShell>
-    <h2 class="text-xl font-bold text-white mb-1">Enter your PIN</h2>
-    <p class="text-slate-400 text-sm mb-6">Verify your identity to continue</p>
+    <h2 class="auth-heading">Enter your PIN</h2>
+    <p class="auth-subheading">Verify your identity to continue</p>
 
-    <div v-if="contextLoading" class="flex justify-center py-6">
-      <div class="h-8 w-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"></div>
+    <div v-if="contextLoading" class="loading-spinner">
+      <div class="spinner"></div>
     </div>
 
     <template v-else>
-      <div v-if="profile.fullname" class="flex items-center gap-3 bg-[#1a2436] border border-[#1e2d44] rounded-2xl px-4 py-3 mb-5">
-        <div class="h-10 w-10 rounded-full bg-blue-600/20 flex items-center justify-center flex-shrink-0">
-          <span class="text-blue-400 font-bold text-sm">{{ initials }}</span>
-        </div>
-        <div class="min-w-0">
-          <p class="text-white text-sm font-semibold truncate">{{ profile.fullname }}</p>
-          <p class="text-slate-500 text-xs">Account {{ profile.acct_no }}</p>
+      <div v-if="profile.fullname" class="auth-context">
+        <div class="auth-context-avatar">{{ initials }}</div>
+        <div>
+          <p class="auth-context-name">{{ profile.fullname }}</p>
+          <p class="auth-context-meta">Account {{ profile.acct_no }}</p>
         </div>
       </div>
 
-      <form @submit.prevent="onSubmit" class="space-y-4">
+      <form @submit.prevent="onSubmit" class="auth-form">
         <FormField label="PIN code" :error="errors.pin" required>
           <template #default="{ id, describedBy }">
             <input
@@ -32,34 +30,26 @@
               placeholder="••••"
               :aria-describedby="describedBy"
               :aria-invalid="!!errors.pin || null"
-              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-center text-2xl tracking-[0.4em] font-bold"
+              class="auth-input auth-input--pin"
             />
           </template>
         </FormField>
 
         <ErrorState v-if="serverError" :message="serverError" compact />
 
-        <p v-if="attemptsRemaining !== null" class="text-xs text-amber-400 text-center">
+        <p v-if="attemptsRemaining !== null" class="auth-attempts">
           {{ attemptsRemaining === 0
             ? 'Account locked. Try again later.'
             : `${attemptsRemaining} attempt${attemptsRemaining === 1 ? '' : 's'} remaining before the account is locked.` }}
         </p>
 
-        <button
-          type="submit"
-          :disabled="isSubmitting"
-          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl py-4 transition disabled:opacity-50 disabled:cursor-not-allowed"
-        >
+        <button type="submit" :disabled="isSubmitting" class="auth-submit">
           {{ isSubmitting ? 'Verifying...' : 'Verify PIN' }}
         </button>
       </form>
 
-      <div class="mt-5 text-center">
-        <button
-          type="button"
-          @click="logout"
-          class="text-slate-500 text-sm hover:text-slate-300 transition"
-        >
+      <div class="cancel-row">
+        <button type="button" @click="logout" class="auth-cancel">
           Cancel &amp; sign out
         </button>
       </div>
@@ -88,10 +78,7 @@ const contextLoading = ref(true)
 const serverError = ref('')
 const attemptsRemaining = ref(null)
 
-const profile = reactive({
-  fullname: '',
-  acct_no: '',
-})
+const profile = reactive({ fullname: '', acct_no: '' })
 
 const initials = computed(() =>
   profile.fullname
@@ -130,7 +117,6 @@ const onSubmit = handleSubmit(async (values) => {
     if (!data?.ok) throw new Error(data?.message || 'PIN verification failed')
     auth.setState('authenticated', '/dashboard')
     auth.setCsrfToken(data.data?.csrf_token || '')
-    // Warm the profile store so the dashboard doesn't do a cold fetch.
     profileStore.loadProfile().catch(() => {})
     await router.push(data.data?.next_route || '/dashboard')
   } catch (err) {
@@ -153,3 +139,24 @@ const logout = async () => {
   }
 }
 </script>
+
+<style scoped>
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-5) 0;
+}
+.spinner {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.cancel-row {
+  text-align: center;
+  margin-top: var(--space-4);
+}
+</style>

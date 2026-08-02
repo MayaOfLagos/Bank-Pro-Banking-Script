@@ -1,18 +1,18 @@
 <template>
   <AuthShell>
-    <h2 class="text-xl font-bold text-white mb-1">New password</h2>
-    <p class="text-slate-400 text-sm mb-6">Set a new secure password for your account</p>
+    <h2 class="auth-heading">New password</h2>
+    <p class="auth-subheading">Set a new secure password for your account</p>
 
-    <div v-if="tokenLoading" class="flex justify-center py-6">
-      <div class="h-8 w-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"></div>
+    <div v-if="tokenLoading" class="loading-spinner">
+      <div class="spinner"></div>
     </div>
 
     <ErrorState v-else-if="!tokenValid && serverError" :message="serverError" compact />
 
-    <form v-else @submit.prevent="onSubmit" class="space-y-4">
+    <form v-else @submit.prevent="onSubmit" class="auth-form">
       <FormField label="New password" :error="errors.new_password" required>
         <template #default="{ id, describedBy }">
-          <div class="relative">
+          <div class="auth-input-wrap">
             <input
               :id="id"
               v-bind="newPasswordAttrs"
@@ -22,37 +22,36 @@
               placeholder="Enter new password"
               :aria-describedby="describedBy"
               :aria-invalid="!!errors.new_password || null"
-              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm pr-10"
+              class="auth-input auth-input--with-toggle"
             />
             <button
               type="button"
               @click="showPassword = !showPassword"
               :aria-label="showPassword ? 'Hide password' : 'Show password'"
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition"
+              class="auth-toggle"
             >
-              <EyeIcon v-if="!showPassword" class="h-4 w-4" />
-              <EyeSlashIcon v-else class="h-4 w-4" />
+              <EyeIcon v-if="!showPassword" class="auth-toggle-icon" />
+              <EyeSlashIcon v-else class="auth-toggle-icon" />
             </button>
           </div>
         </template>
       </FormField>
 
-      <!-- Strength meter -->
       <div v-if="newPassword" aria-live="polite">
-        <div class="flex gap-1 mb-1">
+        <div class="auth-strength-bars">
           <div
             v-for="segment in 4"
             :key="segment"
-            class="h-1.5 flex-1 rounded-full transition-colors"
-            :class="segment <= strength.score ? strength.color : 'bg-[#1e2d44]'"
+            class="auth-strength-bar"
+            :class="segment <= strength.score ? `auth-strength-bar--${strength.tier}` : ''"
           />
         </div>
-        <p class="text-xs" :class="strength.textColor">{{ strength.label }}</p>
+        <p class="auth-strength-label" :class="`auth-strength-label--${strength.tier}`">{{ strength.label }}</p>
       </div>
 
       <FormField label="Confirm password" :error="errors.confirm_password" required>
         <template #default="{ id, describedBy }">
-          <div class="relative">
+          <div class="auth-input-wrap">
             <input
               :id="id"
               v-bind="confirmPasswordAttrs"
@@ -62,16 +61,16 @@
               placeholder="Re-enter new password"
               :aria-describedby="describedBy"
               :aria-invalid="!!errors.confirm_password || null"
-              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm pr-10"
+              class="auth-input auth-input--with-toggle"
             />
             <button
               type="button"
               @click="showConfirm = !showConfirm"
               :aria-label="showConfirm ? 'Hide password' : 'Show password'"
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition"
+              class="auth-toggle"
             >
-              <EyeIcon v-if="!showConfirm" class="h-4 w-4" />
-              <EyeSlashIcon v-else class="h-4 w-4" />
+              <EyeIcon v-if="!showConfirm" class="auth-toggle-icon" />
+              <EyeSlashIcon v-else class="auth-toggle-icon" />
             </button>
           </div>
         </template>
@@ -79,19 +78,13 @@
 
       <ErrorState v-if="serverError" :message="serverError" compact />
 
-      <button
-        type="submit"
-        :disabled="isSubmitting"
-        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl py-4 transition disabled:opacity-50 disabled:cursor-not-allowed"
-      >
+      <button type="submit" :disabled="isSubmitting" class="auth-submit">
         {{ isSubmitting ? 'Updating...' : 'Update password' }}
       </button>
     </form>
 
     <template #footer>
-      <RouterLink to="/login" class="text-blue-400 text-sm hover:underline">
-        Back to sign in
-      </RouterLink>
+      <RouterLink to="/login" class="auth-link">Back to sign in</RouterLink>
     </template>
   </AuthShell>
 </template>
@@ -133,10 +126,10 @@ const strength = computed(() => {
   if (/\d/.test(pw)) score += 1
   if (/[^A-Za-z0-9]/.test(pw) || pw.length >= 12) score += 1
 
-  if (score <= 1) return { score: 1, label: 'Weak — add length and a digit', color: 'bg-red-500', textColor: 'text-red-400' }
-  if (score === 2) return { score: 2, label: 'Fair — mix upper/lower case and add a digit', color: 'bg-amber-500', textColor: 'text-amber-400' }
-  if (score === 3) return { score: 3, label: 'Good password', color: 'bg-emerald-500', textColor: 'text-emerald-400' }
-  return { score: 4, label: 'Strong password', color: 'bg-emerald-500', textColor: 'text-emerald-400' }
+  if (score <= 1) return { score: 1, tier: 'weak', label: 'Weak — add length and a digit' }
+  if (score === 2) return { score: 2, tier: 'fair', label: 'Fair — mix upper/lower case and add a digit' }
+  if (score === 3) return { score: 3, tier: 'good', label: 'Good password' }
+  return { score: 4, tier: 'strong', label: 'Strong password' }
 })
 
 onMounted(async () => {
@@ -174,3 +167,20 @@ const onSubmit = handleSubmit(async (formValues) => {
   }
 })
 </script>
+
+<style scoped>
+.loading-spinner {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-5) 0;
+}
+.spinner {
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>

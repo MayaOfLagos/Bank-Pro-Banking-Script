@@ -1,9 +1,9 @@
 <template>
   <AuthShell>
-    <h2 class="text-xl font-bold text-white mb-1">Welcome back</h2>
-    <p class="text-slate-400 text-sm mb-6">Sign in to your account</p>
+    <h2 class="auth-heading">Welcome back</h2>
+    <p class="auth-subheading">Sign in to your account</p>
 
-    <form @submit.prevent="onSubmit" class="space-y-4">
+    <form @submit.prevent="onSubmit" class="auth-form">
       <FormField label="Account number" :error="errors.acct_no" required>
         <template #default="{ id, describedBy }">
           <input
@@ -16,14 +16,14 @@
             placeholder="Enter account number, username, or email"
             :aria-describedby="describedBy"
             :aria-invalid="!!errors.acct_no || null"
-            class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
+            class="auth-input"
           />
         </template>
       </FormField>
 
       <FormField label="Password" :error="errors.acct_password" required>
         <template #default="{ id, describedBy }">
-          <div class="relative">
+          <div class="auth-input-wrap">
             <input
               :id="id"
               v-bind="passwordAttrs"
@@ -33,16 +33,16 @@
               placeholder="Enter password"
               :aria-describedby="describedBy"
               :aria-invalid="!!errors.acct_password || null"
-              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm pr-10"
+              class="auth-input auth-input--with-toggle"
             />
             <button
               type="button"
               @click="showPassword = !showPassword"
               :aria-label="showPassword ? 'Hide password' : 'Show password'"
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition"
+              class="auth-toggle"
             >
-              <EyeIcon v-if="!showPassword" class="h-4 w-4" />
-              <EyeSlashIcon v-else class="h-4 w-4" />
+              <EyeIcon v-if="!showPassword" class="auth-toggle-icon" />
+              <EyeSlashIcon v-else class="auth-toggle-icon" />
             </button>
           </div>
         </template>
@@ -50,25 +50,19 @@
 
       <ErrorState v-if="serverError" :message="serverError" compact />
 
-      <p v-if="attemptsRemaining !== null" class="text-xs text-amber-400 text-center">
+      <p v-if="attemptsRemaining !== null" class="auth-attempts">
         {{ attemptsRemaining === 0
           ? 'Account locked. Try again later.'
           : `${attemptsRemaining} attempt${attemptsRemaining === 1 ? '' : 's'} remaining before the account is locked.` }}
       </p>
 
-      <button
-        type="submit"
-        :disabled="isSubmitting"
-        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl py-4 transition disabled:opacity-50 disabled:cursor-not-allowed"
-      >
+      <button type="submit" :disabled="isSubmitting" class="auth-submit">
         {{ isSubmitting ? 'Signing in...' : 'Sign in' }}
       </button>
     </form>
 
     <template #footer>
-      <RouterLink to="/reset-password" class="text-blue-400 text-sm hover:underline">
-        Forgot password?
-      </RouterLink>
+      <RouterLink to="/reset-password" class="auth-link">Forgot password?</RouterLink>
     </template>
   </AuthShell>
 </template>
