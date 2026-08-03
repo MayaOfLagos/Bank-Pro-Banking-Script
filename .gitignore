@@ -11,6 +11,7 @@ Thumbs.db
 .env.*
 !.env.example
 include/config.php
+include/webhook-config.php
 
 # Frontend dependencies and local caches
 frontend/user-portal/node_modules/

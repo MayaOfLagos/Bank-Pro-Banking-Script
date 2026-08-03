@@ -1,0 +1,64 @@
+---
+# cPanel deploy manifest. Runs when the "Update from Remote and Deploy HEAD"
+# button is clicked in cPanel > Git Version Control, or when triggered via
+# the VersionControlDeployment UAPI (see deploy-webhook.php).
+#
+# Layout assumption:
+#   Repo clone lives at ~/repositories/bankpro-banking-script/
+#   Live site lives at ~/public_html/
+# Both are configurable via DEPLOYPATH below.
+
+deployment:
+  tasks:
+    - export DEPLOYPATH=$HOME/public_html/
+
+    # Sync repo files → live site. Keeps .git out of web root and preserves
+    # the per-server files listed in --exclude below.
+    - /usr/bin/rsync -av --delete
+        --exclude='.git/'
+        --exclude='.gitignore'
+        --exclude='.cpanel.yml'
+        --exclude='.github/'
+        --exclude='deploy-webhook.php'
+        --exclude='include/config.php'
+        --exclude='include/webhook-config.php'
+        --exclude='frontend/user-portal/node_modules/'
+        --exclude='frontend/user-portal/src/'
+        --exclude='frontend/user-portal/scripts/'
+        --exclude='frontend/user-portal/package.json'
+        --exclude='frontend/user-portal/package-lock.json'
+        --exclude='frontend/user-portal/vite.config.js'
+        --exclude='frontend/user-portal/tailwind.config.js'
+        --exclude='frontend/user-portal/postcss.config.js'
+        --exclude='frontend/user-portal/index.html'
+        --exclude='frontend/user-portal/.eslintrc*'
+        --exclude='frontend/user-portal/README*'
+        --exclude='frontend/user-portal/*.log*'
+        --exclude='assets/deposit/*.png'
+        --exclude='assets/deposit/*.jpg'
+        --exclude='assets/deposit/*.jpeg'
+        --exclude='assets/idcard/*'
+        --exclude='assets/profile/*'
+        --exclude='SQL File/database.sql'
+        --exclude='admin/admin.zip'
+        --exclude='scripts/'
+        --exclude='*.log'
+        --exclude='*.log.txt'
+        --exclude='.env'
+        --exclude='.env.*'
+        --exclude='.DS_Store'
+        --exclude='Thumbs.db'
+        --exclude='.vscode/'
+        --exclude='.claude/'
+        --exclude='.agents/'
+        --exclude='.codex/'
+        ./ $DEPLOYPATH
+
+    # Ensure upload directories exist and are writable by PHP (Apache user).
+    - /bin/mkdir -p $DEPLOYPATH/assets/deposit $DEPLOYPATH/assets/idcard $DEPLOYPATH/assets/profile
+    - /bin/chmod 755 $DEPLOYPATH/assets
+    - /bin/chmod 775 $DEPLOYPATH/assets/deposit $DEPLOYPATH/assets/idcard $DEPLOYPATH/assets/profile
+
+    # Deny public access to any leftover .git metadata as a safety net —
+    # rsync excludes it, but this catches edge cases.
+    - /usr/bin/find $DEPLOYPATH -name '.git' -type d -exec /bin/rm -rf {} + || true

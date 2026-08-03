@@ -1,3 +1,15 @@
+# Block direct access to git metadata and deployment config. Defence in
+# depth — rsync in .cpanel.yml already excludes .git/, but if someone
+# ever clones the repo directly into public_html these blocks matter.
+<FilesMatch "^\.(git|gitignore|env|htaccess)">
+  Require all denied
+</FilesMatch>
+<IfModule mod_authz_core.c>
+  <DirectoryMatch "^.*/\.git">
+    Require all denied
+  </DirectoryMatch>
+</IfModule>
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
