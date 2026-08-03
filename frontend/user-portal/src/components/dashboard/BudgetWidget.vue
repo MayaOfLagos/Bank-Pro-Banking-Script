@@ -53,8 +53,14 @@ const limitDisplay = computed(() => `${props.currency}${formatMoneyInline(limitV
   <section class="widget" :aria-label="`${label}: ${spentDisplay} of ${limitDisplay}`">
     <div class="pie">
       <svg viewBox="0 0 36 36" aria-hidden="true">
+        <!-- Base pie in tint; wedge overlay for spent portion. A darker
+             stroke around the whole pie plus a hairline divider from the
+             center to 12 o'clock guarantee the icon reads as a chart even
+             at 0% spent. -->
         <circle cx="18" cy="18" r="15" class="pie-base" />
         <path v-if="spentWedge" :d="spentWedge" class="pie-spent" />
+        <line x1="18" y1="18" x2="18" y2="3" class="pie-tick" />
+        <circle cx="18" cy="18" r="15" class="pie-ring" />
       </svg>
     </div>
     <div class="meta">
@@ -92,6 +98,17 @@ const limitDisplay = computed(() => `${props.currency}${formatMoneyInline(limitV
 }
 .pie-spent {
   fill: var(--accent);
+}
+.pie-tick {
+  stroke: var(--accent-strong);
+  stroke-width: 0.6;
+  opacity: 0.6;
+}
+.pie-ring {
+  fill: none;
+  stroke: var(--accent-strong);
+  stroke-width: 0.6;
+  opacity: 0.5;
 }
 .meta {
   flex: 1;

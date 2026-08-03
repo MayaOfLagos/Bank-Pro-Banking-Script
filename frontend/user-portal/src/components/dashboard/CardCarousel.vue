@@ -117,24 +117,26 @@ function handleSelect(card) {
   margin: 0;
 }
 .add {
-  width: 2rem;
-  height: 2rem;
-  border-radius: var(--radius-pill);
+  padding: 0.35rem;
   border: none;
-  background: var(--accent-tint);
+  background: transparent;
   color: var(--text-primary);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.15s ease;
+  transition: color 0.15s ease, transform 0.08s ease;
 }
 .add:hover {
-  background: color-mix(in srgb, var(--accent-tint) 85%, var(--text-primary));
+  color: var(--accent-strong);
+}
+.add:active {
+  transform: scale(0.92);
 }
 .add-icon {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke-width: 2;
 }
 .empty {
   color: var(--text-secondary);

@@ -32,13 +32,13 @@ const { isDark, toggleTheme } = useTheme()
     </RouterLink>
 
     <div class="actions">
-      <RouterLink :to="notificationsHref" class="icon-btn" aria-label="Notifications">
+      <RouterLink :to="notificationsHref" class="icon-plain" aria-label="Notifications">
         <BellAlertIcon class="icon" aria-hidden="true" />
         <span v-if="hasUnread" class="dot" aria-hidden="true"></span>
       </RouterLink>
       <button
         type="button"
-        class="icon-btn"
+        class="icon-bordered"
         :aria-label="isDark ? 'Switch to light theme' : 'Switch to dark theme'"
         :aria-pressed="isDark"
         @click="toggleTheme"
@@ -102,42 +102,59 @@ const { isDark, toggleTheme } = useTheme()
 }
 .actions {
   display: flex;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-3);
   flex-shrink: 0;
 }
-.icon-btn {
+.icon-plain {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: var(--radius-pill);
-  border: none;
-  background: var(--accent-tint);
+  padding: 0.4rem;
   color: var(--text-primary);
   text-decoration: none;
   cursor: pointer;
+  transition: transform 0.1s ease, color 0.15s ease;
+}
+.icon-plain:hover {
+  color: var(--accent-strong);
+}
+.icon-plain:active {
+  transform: scale(0.94);
+}
+.icon-bordered {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.65rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
   transition: transform 0.1s ease, background-color 0.15s ease;
 }
-.icon-btn:hover {
-  background: color-mix(in srgb, var(--accent-tint) 85%, var(--text-primary));
+.icon-bordered:hover {
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
 }
-.icon-btn:active {
+.icon-bordered:active {
   transform: scale(0.94);
 }
 .icon {
-  width: 1.15rem;
-  height: 1.15rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke-width: 1.8;
 }
 .dot {
   position: absolute;
-  top: 0.35rem;
-  right: 0.4rem;
-  width: 0.55rem;
-  height: 0.55rem;
+  top: 0.15rem;
+  right: 0.2rem;
+  width: 0.5rem;
+  height: 0.5rem;
   border-radius: var(--radius-pill);
   background: #ff4d6d;
-  border: 2px solid var(--surface);
+  border: 2px solid transparent;
 }
 </style>

@@ -16,7 +16,13 @@
 
   /* Surfaces */
   --bg: #eef1fb;
-  --bg-gradient: linear-gradient(180deg, #e6ebff 0%, #eef1fb 60%, #ede2ff 100%);
+  /* Layered gradient: soft violet top-left, cooler blue-lavender in the middle,
+     warmer purple bottom-right. Layered radials give the depth the reference has. */
+  --bg-gradient:
+    radial-gradient(ellipse 90% 60% at 15% -5%, #d9e0ff 0%, transparent 55%),
+    radial-gradient(ellipse 80% 70% at 100% 100%, #e2d0ff 0%, transparent 55%),
+    radial-gradient(ellipse 60% 45% at 80% 10%, #cad4ff 0%, transparent 50%),
+    linear-gradient(180deg, #dfe6ff 0%, #e7ecff 45%, #e8dbff 100%);
   --surface: #ffffff;
   --surface-muted: #f4f5fb;
   --border: rgba(15, 15, 30, 0.08);
@@ -88,7 +94,10 @@
   color-scheme: dark;
 
   --bg: #0f0f14;
-  --bg-gradient: linear-gradient(180deg, #0f0f14 0%, #14141c 60%, #1a1a22 100%);
+  --bg-gradient:
+    radial-gradient(ellipse 90% 60% at 15% -5%, #241d3c 0%, transparent 55%),
+    radial-gradient(ellipse 80% 70% at 100% 100%, #2b1e4a 0%, transparent 55%),
+    linear-gradient(180deg, #0f0f14 0%, #14141c 60%, #1a1a22 100%);
   --surface: #1e1e26;
   --surface-muted: #24242e;
   --border: rgba(255, 255, 255, 0.08);
