@@ -27,8 +27,14 @@ auth_require($payload, ['acct_no', 'acct_password']);
 $acctNo = auth_field($payload, 'acct_no');
 $acctPassword = auth_field($payload, 'acct_password');
 
-$stmt = $conn->prepare('SELECT * FROM users WHERE acct_no = :identifier OR acct_username = :identifier OR acct_email = :identifier LIMIT 1');
-$stmt->execute(['identifier' => $acctNo]);
+// Bind the same value to three distinct placeholders because PDO on PHP 7
+// (and MySQL native prepares) reject reusing a named placeholder in one query.
+$stmt = $conn->prepare('SELECT * FROM users WHERE acct_no = :acct OR acct_username = :username OR acct_email = :email LIMIT 1');
+$stmt->execute([
+    'acct' => $acctNo,
+    'username' => $acctNo,
+    'email' => $acctNo,
+]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$user) {
