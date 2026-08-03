@@ -9,14 +9,10 @@ $requestStmt = $conn->prepare('SELECT reference_id, card_type, card_reason, card
 $requestStmt->execute(['user_id' => $user['id']]);
 $requests = $requestStmt->fetchAll(PDO::FETCH_ASSOC);
 
+$requestStatusLabels = [0 => 'Processing', 1 => 'Approved', 2 => 'Processing', 3 => 'Declined'];
 foreach ($requests as &$request) {
   $request['card_request_status'] = (int)($request['card_request_status'] ?? 0);
-  $request['status'] = match ($request['card_request_status']) {
-    0, 2 => 'Processing',
-    1 => 'Approved',
-    3 => 'Declined',
-    default => 'Unknown',
-  };
+  $request['status'] = $requestStatusLabels[$request['card_request_status']] ?? 'Unknown';
 }
 unset($request);
 

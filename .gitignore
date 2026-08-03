@@ -30,6 +30,7 @@ assets/profile/*
 
 # Legacy data exports and backup archives
 SQL File/database.sql
+SQL File/database-*.sql
 admin/admin.zip
 
 # Local dev/verification helpers (Playwright screenshots, adhoc scripts)

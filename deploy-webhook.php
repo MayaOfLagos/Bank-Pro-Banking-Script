@@ -52,7 +52,7 @@ $cfg = require $configPath;
 // Reject if any required key is missing or still the placeholder.
 $required = ['github_secret', 'cpanel_user', 'cpanel_token', 'cpanel_host', 'repo_root', 'allowed_branch'];
 foreach ($required as $key) {
-    if (empty($cfg[$key]) || str_starts_with((string)$cfg[$key], 'CHANGE_ME')) {
+    if (empty($cfg[$key]) || strncmp((string)$cfg[$key], 'CHANGE_ME', 9) === 0) {
         error_log("deploy-webhook: webhook-config.php missing/placeholder value for {$key}");
         http_response_code(500);
         echo json_encode(['ok' => false, 'error' => 'Server misconfigured']);

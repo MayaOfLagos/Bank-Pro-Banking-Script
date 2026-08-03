@@ -97,11 +97,11 @@ if (isset($legacyUserRedirects[$normalizedPath])) {
     $permanentRedirect($legacyUserRedirects[$normalizedPath]);
 }
 
-if ($normalizedPath === '/user' || str_starts_with($normalizedPath, '/user/')) {
+if ($normalizedPath === '/user' || strncmp($normalizedPath, '/user/', 6) === 0) {
     $permanentRedirect('/dashboard');
 }
 
-if ($normalizedPath === '/signup' || str_starts_with($normalizedPath, '/signup/')) {
+if ($normalizedPath === '/signup' || strncmp($normalizedPath, '/signup/', 8) === 0) {
     $permanentRedirect('/login');
 }
 

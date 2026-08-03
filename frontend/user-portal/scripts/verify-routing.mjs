@@ -125,8 +125,15 @@ if (!apacheSource.includes('^signup(?:/.*)?$') || !apacheSource.includes('^user(
   throw new Error('.htaccess must keep signup and the source-only user tree outside the PHP runtime')
 }
 
-if (!developmentRouterSource.includes("str_starts_with($normalizedPath, '/user/')") ||
-    !developmentRouterSource.includes("str_starts_with($normalizedPath, '/signup/')")) {
+// Accept either str_starts_with (PHP 8+) or strncmp (PHP 7 compatible) —
+// what matters is that /user/ and /signup/ prefix guards exist.
+const userGuard =
+  developmentRouterSource.includes("str_starts_with($normalizedPath, '/user/')") ||
+  developmentRouterSource.includes("strncmp($normalizedPath, '/user/', 6) === 0")
+const signupGuard =
+  developmentRouterSource.includes("str_starts_with($normalizedPath, '/signup/')") ||
+  developmentRouterSource.includes("strncmp($normalizedPath, '/signup/', 8) === 0")
+if (!userGuard || !signupGuard) {
   throw new Error('router.php must keep signup and the source-only user tree outside the PHP runtime')
 }
 
