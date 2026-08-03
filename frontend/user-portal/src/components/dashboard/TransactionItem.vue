@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import { ArrowDownIcon } from '@heroicons/vue/24/solid'
 import { formatMoneyInline, coerceNumber, merchantInitials } from '../../utils/format'
 
 const props = defineProps({
@@ -14,11 +15,10 @@ const isCredit = computed(() => Number(tx.value.trans_type) === 1)
 const amountValue = computed(() => coerceNumber(tx.value.amount))
 const amountDisplay = computed(() => {
   const sign = isCredit.value ? '+' : '-'
-  return `${sign}${props.currency}${formatMoneyInline(amountValue.value)}`
+  return `${sign}${props.currency}${formatMoneyInline(amountValue.value, { trimTrailingZero: true })}`
 })
 
 const merchant = computed(() => tx.value.description || tx.value.sender_name || 'Account transaction')
-const initials = computed(() => merchantInitials(merchant.value))
 
 const timeLabel = computed(() => {
   const raw = tx.value.created_at || tx.value.time_created || tx.value.date
@@ -27,17 +27,51 @@ const timeLabel = computed(() => {
   if (Number.isNaN(d.getTime())) return String(raw)
   return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 })
+
+/**
+ * Merchant category → avatar style. Matches the reference's per-merchant
+ * treatment (Uber = black text, Amazon = orange "a", Cashback = purple
+ * with arrow, FlowerShop = light purple w/ flower). Unknown merchants
+ * fall back to purple-tinted initials.
+ */
+const category = computed(() => {
+  const name = merchant.value.toLowerCase()
+  if (name.includes('uber')) return 'uber'
+  if (name.includes('amazon')) return 'amazon'
+  if (name.includes('cashback') || name.includes('refund') || name.includes('reward')) return 'cashback'
+  if (name.includes('flower')) return 'flower'
+  if (isCredit.value) return 'cashback'
+  return 'default'
+})
+
+const initials = computed(() => merchantInitials(merchant.value))
 </script>
 
 <template>
   <div class="row">
-    <div class="avatar" :class="{ 'avatar--credit': isCredit }" aria-hidden="true">
-      {{ initials }}
+    <div class="avatar" :class="`avatar--${category}`" aria-hidden="true">
+      <template v-if="category === 'uber'">
+        <span class="uber-mark">Uber</span>
+      </template>
+      <template v-else-if="category === 'amazon'">
+        <span class="amazon-mark">a</span>
+      </template>
+      <template v-else-if="category === 'cashback'">
+        <ArrowDownIcon class="cashback-icon" />
+      </template>
+      <template v-else-if="category === 'flower'">
+        <span class="flower-mark">✿</span>
+      </template>
+      <template v-else>
+        {{ initials }}
+      </template>
     </div>
+
     <div class="meta">
       <p class="merchant">{{ merchant }}</p>
       <p v-if="timeLabel" class="time">{{ timeLabel }}</p>
     </div>
+
     <p class="amount" :class="{ 'amount--credit': isCredit }">{{ amountDisplay }}</p>
   </div>
 </template>
@@ -53,18 +87,50 @@ const timeLabel = computed(() => {
   width: 2.5rem;
   height: 2.5rem;
   border-radius: var(--radius-pill);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: 0.75rem;
   font-weight: 700;
   flex-shrink: 0;
+  overflow: hidden;
 }
-.avatar--credit {
-  background: var(--accent-soft);
+.avatar--default,
+.avatar--flower {
+  background: var(--accent-tint);
   color: var(--accent-strong);
+}
+.avatar--cashback {
+  background: var(--accent);
+  color: var(--text-on-accent);
+}
+.avatar--uber {
+  background: var(--text-primary);
+  color: var(--surface);
+}
+.avatar--amazon {
+  background: var(--text-primary);
+  color: #ff9900;
+}
+.uber-mark {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.amazon-mark {
+  font-family: "Comic Sans MS", "Verdana", sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.cashback-icon {
+  width: 1rem;
+  height: 1rem;
+}
+.flower-mark {
+  color: #d946ef;
+  font-size: 1.1rem;
+  line-height: 1;
 }
 .meta {
   flex: 1;

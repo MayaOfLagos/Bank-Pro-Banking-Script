@@ -34,6 +34,7 @@
   /* Brand */
   --accent: #7b5cff;
   --accent-soft: rgba(123, 92, 255, 0.14);
+  --accent-tint: #e5deff; /* solid light purple for pie/avatar backgrounds */
   --accent-strong: #5a3ee0;
 
   /* Money semantic colors — positives use the brand accent, expenses stay
@@ -101,6 +102,7 @@
 
   --accent: #8f74ff;
   --accent-soft: rgba(143, 116, 255, 0.18);
+  --accent-tint: #302658; /* dark-mode variant so tinted areas still read as light-purple */
   --accent-strong: #7051ff;
 
   --money-positive: var(--accent);

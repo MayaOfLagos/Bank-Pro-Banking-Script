@@ -5,16 +5,26 @@
  */
 
 /** Format a number for display. Returns { integer, fraction } so views can
- *  render the fraction at a smaller size than the integer per the spec. */
-export function formatMoney(value, { minFractionDigits = 2, maxFractionDigits = 2 } = {}) {
+ *  render the fraction at a smaller size than the integer per the spec.
+ *  Set trimTrailingZero to collapse ".00" -> ".0" and ".50" -> ".5" for
+ *  the round-number typography the reference uses. */
+export function formatMoney(value, {
+  minFractionDigits = 2,
+  maxFractionDigits = 2,
+  trimTrailingZero = false,
+} = {}) {
   const n = coerceNumber(value)
   const parts = n.toLocaleString(undefined, {
     minimumFractionDigits: minFractionDigits,
     maximumFractionDigits: maxFractionDigits,
   }).split('.')
+  let fraction = parts[1] ?? ''
+  if (trimTrailingZero && fraction.length === 2 && fraction.endsWith('0')) {
+    fraction = fraction.slice(0, 1)
+  }
   return {
     integer: parts[0],
-    fraction: parts[1] ?? '',
+    fraction,
   }
 }
 

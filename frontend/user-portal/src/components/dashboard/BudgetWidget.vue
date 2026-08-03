@@ -19,42 +19,42 @@ const ratio = computed(() => {
   return Math.min(1, Math.max(0, spentValue.value / limitValue.value))
 })
 
-// SVG donut math: r = 15, circumference ≈ 94.2. dash = ratio * circumference
-const circumference = 2 * Math.PI * 15
-const dashOffset = computed(() => circumference * (1 - ratio.value))
+/**
+ * Pie: base circle is the light "remaining" color, wedge on top is the
+ * dark "spent" color sweeping clockwise from 12 o'clock by (ratio * 2π).
+ * Matches the reference — as the user spends more, the dark wedge grows.
+ * Center (18,18), radius 15.
+ */
+const spentWedge = computed(() => {
+  const r = ratio.value
+  if (r <= 0) return ''
+  if (r >= 1) {
+    // Full circle via two half-arcs so no degenerate start=end point.
+    return 'M 3 18 A 15 15 0 0 1 33 18 A 15 15 0 0 1 3 18 Z'
+  }
+  const angle = r * 2 * Math.PI
+  // Sweep clockwise from 12 o'clock (18, 3) by `angle` radians.
+  const endX = 18 + 15 * Math.sin(angle)
+  const endY = 18 - 15 * Math.cos(angle)
+  const largeArc = angle > Math.PI ? 1 : 0
+  return `M 18 18 L 18 3 A 15 15 0 ${largeArc} 1 ${endX.toFixed(3)} ${endY.toFixed(3)} Z`
+})
 
 const rangeLabel = computed(() => {
   if (!props.weekStart && !props.weekEnd) return ''
   return [props.weekStart, props.weekEnd].filter(Boolean).join('–')
 })
 
-const spentDisplay = computed(() => `${props.currency}${formatMoneyInline(spentValue.value)}`)
-const limitDisplay = computed(() => `${props.currency}${formatMoneyInline(limitValue.value)}`)
+const spentDisplay = computed(() => `${props.currency}${formatMoneyInline(spentValue.value, { trimTrailingZero: true })}`)
+const limitDisplay = computed(() => `${props.currency}${formatMoneyInline(limitValue.value, { trimTrailingZero: true })}`)
 </script>
 
 <template>
   <section class="widget" :aria-label="`${label}: ${spentDisplay} of ${limitDisplay}`">
-    <div class="donut">
+    <div class="pie">
       <svg viewBox="0 0 36 36" aria-hidden="true">
-        <circle
-          class="track"
-          cx="18"
-          cy="18"
-          r="15"
-          fill="none"
-          stroke-width="4"
-        />
-        <circle
-          class="progress"
-          cx="18"
-          cy="18"
-          r="15"
-          fill="none"
-          stroke-width="4"
-          :stroke-dasharray="circumference"
-          :stroke-dashoffset="dashOffset"
-          transform="rotate(-90 18 18)"
-        />
+        <circle cx="18" cy="18" r="15" class="pie-base" />
+        <path v-if="spentWedge" :d="spentWedge" class="pie-spent" />
       </svg>
     </div>
     <div class="meta">
@@ -78,30 +78,28 @@ const limitDisplay = computed(() => `${props.currency}${formatMoneyInline(limitV
   padding: var(--space-4);
   box-shadow: var(--shadow-card);
 }
-.donut {
+.pie {
   width: 2.75rem;
   height: 2.75rem;
   flex-shrink: 0;
 }
-.donut svg {
+.pie svg {
   width: 100%;
   height: 100%;
 }
-.donut .track {
-  stroke: var(--divider);
+.pie-base {
+  fill: var(--accent-tint);
 }
-.donut .progress {
-  stroke: var(--accent);
-  stroke-linecap: round;
-  transition: stroke-dashoffset 0.4s ease;
+.pie-spent {
+  fill: var(--accent);
 }
 .meta {
   flex: 1;
   min-width: 0;
 }
 .label {
-  font-size: 0.9rem;
-  font-weight: 600;
+  font-size: 0.95rem;
+  font-weight: 700;
   color: var(--text-primary);
   margin: 0;
 }
@@ -115,13 +113,13 @@ const limitDisplay = computed(() => `${props.currency}${formatMoneyInline(limitV
   flex-shrink: 0;
 }
 .spent {
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
 }
 .limit {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: var(--text-secondary);
   margin: 0.15rem 0 0;
 }

@@ -29,7 +29,7 @@ const balances = computed(() => profileStore.balances ?? {})
 const profile = computed(() => profileStore.profile ?? balances.value.profile ?? {})
 const currency = computed(() => balances.value.currency || profile.value.currency || '$')
 
-const balanceParts = computed(() => formatMoney(balances.value.acct_balance ?? 0))
+const balanceParts = computed(() => formatMoney(balances.value.acct_balance ?? 0, { trimTrailingZero: true }))
 
 const firstName = computed(() => {
   const full = profile.value.full_name || `${profile.value.firstname || ''} ${profile.value.lastname || ''}`.trim()
@@ -129,13 +129,13 @@ function onAddCard() {
   line-height: 1;
 }
 .int {
-  font-size: 2.5rem;
-  letter-spacing: -0.01em;
+  font-size: 3rem;
+  letter-spacing: -0.02em;
 }
 .frac {
-  font-size: 1.5rem;
-  color: var(--text-secondary);
-  font-weight: 700;
-  margin-left: 0.15rem;
+  font-size: 1.75rem;
+  color: var(--text-primary);
+  font-weight: 800;
+  margin-left: 0.05rem;
 }
 </style>

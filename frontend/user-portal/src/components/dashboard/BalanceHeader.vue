@@ -1,8 +1,9 @@
 <script setup>
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { BellIcon, ChartBarSquareIcon } from '@heroicons/vue/24/outline'
+import { BellAlertIcon, SunIcon, MoonIcon } from '@heroicons/vue/24/outline'
 import { merchantInitials } from '../../utils/format'
+import { useTheme } from '../../composables/useTheme'
 
 const props = defineProps({
   firstName: { type: String, default: '' },
@@ -11,10 +12,10 @@ const props = defineProps({
   hasUnread: { type: Boolean, default: false },
   profileHref: { type: String, default: '/profile' },
   notificationsHref: { type: String, default: '/tickets' },
-  statsHref: { type: String, default: '/transactions' },
 })
 
 const initials = computed(() => merchantInitials(props.firstName || 'A'))
+const { isDark, toggleTheme } = useTheme()
 </script>
 
 <template>
@@ -32,12 +33,19 @@ const initials = computed(() => merchantInitials(props.firstName || 'A'))
 
     <div class="actions">
       <RouterLink :to="notificationsHref" class="icon-btn" aria-label="Notifications">
-        <BellIcon class="icon" aria-hidden="true" />
+        <BellAlertIcon class="icon" aria-hidden="true" />
         <span v-if="hasUnread" class="dot" aria-hidden="true"></span>
       </RouterLink>
-      <RouterLink :to="statsHref" class="icon-btn" aria-label="Activity and insights">
-        <ChartBarSquareIcon class="icon" aria-hidden="true" />
-      </RouterLink>
+      <button
+        type="button"
+        class="icon-btn"
+        :aria-label="isDark ? 'Switch to light theme' : 'Switch to dark theme'"
+        :aria-pressed="isDark"
+        @click="toggleTheme"
+      >
+        <SunIcon v-if="isDark" class="icon" aria-hidden="true" />
+        <MoonIcon v-else class="icon" aria-hidden="true" />
+      </button>
     </div>
   </header>
 </template>
@@ -62,8 +70,8 @@ const initials = computed(() => merchantInitials(props.firstName || 'A'))
   width: 2.75rem;
   height: 2.75rem;
   border-radius: var(--radius-pill);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
+  background: var(--text-primary);
+  color: var(--surface);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -104,15 +112,19 @@ const initials = computed(() => merchantInitials(props.firstName || 'A'))
   justify-content: center;
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: var(--surface);
+  border-radius: var(--radius-pill);
+  border: none;
+  background: var(--accent-tint);
   color: var(--text-primary);
   text-decoration: none;
-  transition: transform 0.1s ease;
+  cursor: pointer;
+  transition: transform 0.1s ease, background-color 0.15s ease;
+}
+.icon-btn:hover {
+  background: color-mix(in srgb, var(--accent-tint) 85%, var(--text-primary));
 }
 .icon-btn:active {
-  transform: scale(0.96);
+  transform: scale(0.94);
 }
 .icon {
   width: 1.15rem;
@@ -120,10 +132,10 @@ const initials = computed(() => merchantInitials(props.firstName || 'A'))
 }
 .dot {
   position: absolute;
-  top: 0.4rem;
-  right: 0.5rem;
-  width: 0.5rem;
-  height: 0.5rem;
+  top: 0.35rem;
+  right: 0.4rem;
+  width: 0.55rem;
+  height: 0.55rem;
   border-radius: var(--radius-pill);
   background: #ff4d6d;
   border: 2px solid var(--surface);

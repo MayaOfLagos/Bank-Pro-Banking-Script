@@ -121,12 +121,16 @@ function handleSelect(card) {
   height: 2rem;
   border-radius: var(--radius-pill);
   border: none;
-  background: var(--surface-muted);
+  background: var(--accent-tint);
   color: var(--text-primary);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: background-color 0.15s ease;
+}
+.add:hover {
+  background: color-mix(in srgb, var(--accent-tint) 85%, var(--text-primary));
 }
 .add-icon {
   width: 1.1rem;
