@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { GlobeAltIcon, HomeIcon } from '@heroicons/vue/24/outline'
+import { GlobeAltIcon, HomeIcon } from '@heroicons/vue/24/solid'
 import BalanceHeader from '../components/dashboard/BalanceHeader.vue'
 import ActionButtons from '../components/dashboard/ActionButtons.vue'
 import CardCarousel from '../components/dashboard/CardCarousel.vue'
@@ -66,7 +66,7 @@ function onAddCard() {
         <p class="label">Your Balance</p>
         <p class="amount">
           <span class="int">{{ currency }}{{ balanceParts.integer }}</span>
-          <span class="frac">.{{ balanceParts.fraction }}</span>
+          <span v-if="balanceParts.fraction" class="frac">.{{ balanceParts.fraction }}</span>
         </p>
         <ActionButtons :actions="dashboardActions" />
       </section>

@@ -93,7 +93,8 @@ function handleClick(item, event) {
   pointer-events: none;
 }
 .btn-icon {
-  width: 1rem;
-  height: 1rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke-width: 2.25;
 }
 </style>

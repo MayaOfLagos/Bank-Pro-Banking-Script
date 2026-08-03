@@ -1,13 +1,21 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
-import { BoltIcon, CreditCardIcon, ChatBubbleOvalLeftIcon } from '@heroicons/vue/24/solid'
+import {
+  HomeIcon,
+  ArrowsRightLeftIcon,
+  ArrowDownTrayIcon,
+  CreditCardIcon,
+  Bars3Icon,
+} from '@heroicons/vue/24/solid'
 
 /**
- * Bottom floating pill nav. Three destinations by default:
- *   home (Dashboard, lightning icon)
- *   cards (/cards, credit-card icon)
- *   support (/tickets, chat bubble)
+ * Bottom floating pill nav. Five destinations by default:
+ *   home (Dashboard)
+ *   transfer (/wire-transfer)
+ *   deposit (/transactions — funding history hub until a dedicated deposit flow lands)
+ *   card (/cards)
+ *   more (/profile — hub for profile, support, loans, logout)
  * Kept dark in both themes per spec.
  */
 
@@ -15,9 +23,11 @@ const props = defineProps({
   items: {
     type: Array,
     default: () => [
-      { key: 'home', label: 'Home', to: '/dashboard', icon: BoltIcon },
-      { key: 'cards', label: 'Cards', to: '/cards', icon: CreditCardIcon },
-      { key: 'support', label: 'Support', to: '/tickets', icon: ChatBubbleOvalLeftIcon },
+      { key: 'home', label: 'Home', to: '/dashboard', icon: HomeIcon },
+      { key: 'transfer', label: 'Transfer', to: '/wire-transfer', icon: ArrowsRightLeftIcon },
+      { key: 'deposit', label: 'Deposit', to: '/deposits', icon: ArrowDownTrayIcon },
+      { key: 'card', label: 'Card', to: '/cards', icon: CreditCardIcon },
+      { key: 'more', label: 'More', to: '/profile', icon: Bars3Icon },
     ],
   },
 })
@@ -25,10 +35,20 @@ const props = defineProps({
 const route = useRoute()
 
 const activeKey = computed(() => {
-  const match = props.items.find((item) =>
-    route.path === item.to || route.path.startsWith(`${item.to}/`)
-  )
-  return match?.key ?? props.items[0]?.key
+  // Longest-match wins so /wire-transfer routes highlight "transfer"
+  // rather than accidentally matching "/". Explicit-order tie-break falls
+  // back to first item.
+  let best = null
+  let bestLen = -1
+  for (const item of props.items) {
+    if (route.path === item.to || route.path.startsWith(`${item.to}/`)) {
+      if (item.to.length > bestLen) {
+        best = item
+        bestLen = item.to.length
+      }
+    }
+  }
+  return best?.key ?? props.items[0]?.key
 })
 </script>
 
@@ -71,7 +91,7 @@ const activeKey = computed(() => {
   justify-content: center;
   width: 2.75rem;
   height: 2.75rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill);
   color: var(--floating-bar-idle-fg);
   text-decoration: none;
   transition: transform 0.1s ease, background-color 0.2s ease;

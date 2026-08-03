@@ -1,202 +1,306 @@
 <script setup>
-import { onMounted, ref, computed } from 'vue'
-import { RouterLink } from 'vue-router'
-import { ChevronLeftIcon, ListBulletIcon } from '@heroicons/vue/24/outline'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ChevronLeftIcon, ListBulletIcon } from '@heroicons/vue/24/solid'
 import client from '../api/client'
+import TransactionItem from '../components/dashboard/TransactionItem.vue'
+import EmptyState from '../components/ui/EmptyState.vue'
+import ErrorState from '../components/ui/ErrorState.vue'
 
 const router = useRouter()
+const route = useRoute()
 
-// ─── State ────────────────────────────────────────────────────────────────────
-const loading       = ref(true)
-const error         = ref('')
-const transactions  = ref([])
-const activeTab     = ref('All')
+const loading = ref(true)
+const error = ref('')
+const transactions = ref([])
 
 const TABS = ['All', 'Credits', 'Debits']
+// /deposits mounts this same view pre-filtered to Credits, with a
+// deposit-oriented page title/subtitle. Meta-driven so the routing table
+// stays the single source of truth.
+const initialTab = TABS.includes(route.meta?.defaultTab) ? route.meta.defaultTab : 'All'
+const activeTab = ref(initialTab)
+const pageTitle = computed(() => route.meta?.pageTitle || 'Activity')
+const pageSubtitle = computed(() => route.meta?.pageSubtitle || 'All account movement')
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const formatMoney = (currency, amount) =>
-  `${currency || '$'}${Number(amount || 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })}`
+// Re-sync the active tab when the user navigates between /transactions and
+// /deposits without a full remount (router keeps the component alive).
+watch(() => route.meta?.defaultTab, (val) => {
+  activeTab.value = TABS.includes(val) ? val : 'All'
+})
 
-const txInitials = (tx) => {
-  const name = tx.description || tx.sender_name || tx.type_label || '?'
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join('')
-}
-
-const txDate = (tx) => {
-  const raw = tx.created_at || tx.date || ''
-  if (!raw) return ''
-  const d = new Date(raw.replace(' ', 'T'))
-  if (isNaN(d.getTime())) return raw
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-const statusBadgeClass = (statusLabel = '') => {
-  const s = statusLabel.toLowerCase()
-  if (s.includes('complet') || s.includes('approv') || s.includes('success'))
-    return 'bg-emerald-500/20 text-emerald-400'
-  if (s.includes('hold') || s.includes('pending') || s.includes('process'))
-    return 'bg-amber-500/20 text-amber-400'
-  if (s.includes('reject') || s.includes('fail') || s.includes('cancel'))
-    return 'bg-red-500/20 text-red-400'
-  return 'bg-slate-700 text-slate-300'
-}
-
-// ─── Filtered rows ────────────────────────────────────────────────────────────
 const filteredRows = computed(() => {
   const tab = activeTab.value
   if (tab === 'Credits') return transactions.value.filter((t) => Number(t.trans_type) === 1)
-  if (tab === 'Debits')  return transactions.value.filter((t) => Number(t.trans_type) === 2)
+  if (tab === 'Debits') return transactions.value.filter((t) => Number(t.trans_type) === 2)
   return transactions.value
 })
 
-// ─── Data fetch ───────────────────────────────────────────────────────────────
-const loadTransactions = async () => {
+/**
+ * Group by day so the list reads like a mini-statement.
+ * Buckets: Today, Yesterday, or "Mon 3 Aug 2026".
+ */
+const groupedRows = computed(() => {
+  const buckets = new Map()
+  const today = startOfDay(new Date())
+  const yesterday = startOfDay(new Date(today.getTime() - 86_400_000))
+
+  for (const tx of filteredRows.value) {
+    const raw = tx.created_at || tx.date || tx.time_created || ''
+    const d = parseDate(raw)
+    let key
+    let label
+    let sortKey
+    if (!d) {
+      key = 'unknown'
+      label = 'Unknown date'
+      sortKey = -Infinity
+    } else {
+      const day = startOfDay(d)
+      sortKey = day.getTime()
+      key = String(sortKey)
+      if (sortKey === today.getTime()) label = 'Today'
+      else if (sortKey === yesterday.getTime()) label = 'Yesterday'
+      else label = day.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })
+    }
+    const bucket = buckets.get(key) || { key, label, sortKey, rows: [] }
+    bucket.rows.push(tx)
+    buckets.set(key, bucket)
+  }
+
+  return Array.from(buckets.values()).sort((a, b) => b.sortKey - a.sortKey)
+})
+
+function startOfDay(d) {
+  const copy = new Date(d)
+  copy.setHours(0, 0, 0, 0)
+  return copy
+}
+
+function parseDate(raw) {
+  if (!raw) return null
+  const d = new Date(String(raw).replace(' ', 'T'))
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+async function loadTransactions() {
   loading.value = true
-  error.value   = ''
+  error.value = ''
   try {
-    const { data } = await client.get('/api/user/transactions.php?limit=50')
-    if (!data?.ok && data?.ok !== undefined) throw new Error(data?.message || 'Failed to load transactions')
+    const { data } = await client.get('/api/user/transactions.php?limit=200')
+    if (data?.ok === false) throw new Error(data?.message || 'Failed to load transactions')
     transactions.value = data?.data || []
   } catch (err) {
-    error.value = err?.response?.data?.message || err.message || 'An error occurred'
+    error.value = err?.response?.data?.message || err.message || 'Unable to load transactions'
   } finally {
     loading.value = false
   }
 }
 
+const currency = computed(() => transactions.value[0]?.currency || '$')
+
 onMounted(loadTransactions)
 </script>
 
 <template>
-  <!-- Full-bleed dark page -->
-  <div class="min-h-screen bg-[#080d18] -mx-4 -mt-6 sm:-mx-6 lg:-mx-8 lg:-mt-8 pb-6">
-
-    <!-- ── HEADER ──────────────────────────────────────────────────────────────── -->
-    <div class="bg-gradient-to-b from-[#0d1b38] to-[#080d18] px-5 pt-12 pb-6">
-      <div class="flex items-center gap-3">
-        <button
-          type="button"
-          class="h-9 w-9 rounded-full bg-[#1a2436] border border-[#1e2d44] flex items-center justify-center shrink-0"
-          @click="router.back()"
-        >
-          <ChevronLeftIcon class="h-4 w-4 text-white" />
+  <div class="page">
+    <div class="content">
+      <header class="header">
+        <button type="button" class="back" aria-label="Go back" @click="router.back()">
+          <ChevronLeftIcon class="back-icon" aria-hidden="true" />
         </button>
-        <div>
-          <h1 class="text-xl font-semibold text-white">Activity</h1>
-          <p class="text-slate-400 text-sm">All account movement</p>
+        <div class="titles">
+          <h1 class="title">{{ pageTitle }}</h1>
+          <p class="subtitle">{{ pageSubtitle }}</p>
         </div>
-      </div>
-    </div>
+      </header>
 
-    <!-- ── FILTER TABS ─────────────────────────────────────────────────────────── -->
-    <div class="flex gap-2 px-4 mt-4 overflow-x-auto no-scrollbar pb-2">
-      <button
-        v-for="tab in TABS"
-        :key="tab"
-        type="button"
-        class="rounded-full px-4 py-2 text-sm font-medium whitespace-nowrap transition"
-        :class="activeTab === tab
-          ? 'bg-blue-600 text-white'
-          : 'bg-[#1a2436] text-slate-400 border border-[#1e2d44]'"
-        @click="activeTab = tab"
-      >
-        {{ tab }}
-      </button>
-    </div>
-
-    <!-- ── SKELETON ─────────────────────────────────────────────────────────────── -->
-    <template v-if="loading">
-      <div class="px-4 mt-3 space-y-2">
-        <div v-for="i in 6" :key="i" class="h-16 rounded-2xl bg-[#111827] animate-pulse" />
-      </div>
-    </template>
-
-    <!-- ── ERROR ──────────────────────────────────────────────────────────────── -->
-    <div
-      v-else-if="error"
-      class="mx-4 mt-4 rounded-2xl bg-red-500/10 border border-red-500/30 p-5 text-red-400 text-sm"
-    >
-      {{ error }}
-    </div>
-
-    <!-- ── CONTENT ─────────────────────────────────────────────────────────────── -->
-    <template v-else>
-      <!-- Record count -->
-      <p class="text-slate-500 text-xs px-4 pb-2 mt-3">
-        Showing {{ filteredRows.length }} record{{ filteredRows.length !== 1 ? 's' : '' }}
-      </p>
-
-      <!-- Empty state -->
-      <div
-        v-if="!filteredRows.length"
-        class="px-4 mt-4 flex flex-col items-center gap-3 py-16"
-      >
-        <ListBulletIcon class="h-10 w-10 text-slate-600" />
-        <p class="text-slate-500 text-sm">No transactions found</p>
-      </div>
-
-      <!-- Transaction list -->
-      <div v-else class="px-4 mt-1 space-y-1">
-        <div
-          v-for="tx in filteredRows"
-          :key="tx.trans_id"
-          class="bg-[#111827] rounded-2xl px-4 py-4 flex items-center gap-3"
+      <div class="tabs" role="tablist" aria-label="Filter transactions">
+        <button
+          v-for="tab in TABS"
+          :key="tab"
+          type="button"
+          role="tab"
+          :aria-selected="activeTab === tab"
+          class="tab"
+          :class="{ 'tab--active': activeTab === tab }"
+          @click="activeTab = tab"
         >
-          <!-- Icon circle -->
-          <div
-            class="h-10 w-10 rounded-full flex items-center justify-center shrink-0"
-            :class="Number(tx.trans_type) === 1 ? 'bg-emerald-500/20' : 'bg-red-500/20'"
-          >
-            <span
-              class="text-sm font-semibold"
-              :class="Number(tx.trans_type) === 1 ? 'text-emerald-400' : 'text-red-400'"
-            >
-              {{ txInitials(tx) }}
-            </span>
-          </div>
-
-          <!-- Description + meta -->
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-semibold text-white truncate">
-              {{ tx.description || tx.sender_name || 'Account transaction' }}
-            </p>
-            <div class="flex items-center gap-2 mt-0.5">
-              <p class="text-xs text-slate-500">{{ txDate(tx) }}</p>
-              <span
-                v-if="tx.status_label"
-                class="rounded-full px-1.5 py-0.5 text-[10px] font-medium"
-                :class="statusBadgeClass(tx.status_label)"
-              >
-                {{ tx.status_label }}
-              </span>
-            </div>
-          </div>
-
-          <!-- Amount -->
-          <span
-            class="text-sm font-semibold shrink-0"
-            :class="Number(tx.trans_type) === 1 ? 'text-emerald-400' : 'text-red-400'"
-          >
-            {{ Number(tx.trans_type) === 1 ? '+' : '-' }}{{ formatMoney(tx.currency, tx.amount) }}
-          </span>
-        </div>
+          {{ tab }}
+        </button>
       </div>
-    </template>
 
+      <template v-if="loading">
+        <div class="skeleton-group">
+          <div v-for="i in 6" :key="i" class="skeleton-row" />
+        </div>
+      </template>
+
+      <ErrorState v-else-if="error" :message="error" />
+
+      <template v-else>
+        <p class="count" v-if="filteredRows.length">
+          Showing {{ filteredRows.length }} record{{ filteredRows.length !== 1 ? 's' : '' }}
+        </p>
+
+        <EmptyState
+          v-if="!filteredRows.length"
+          :icon="ListBulletIcon"
+          message="No transactions match this filter yet."
+        />
+
+        <section
+          v-for="group in groupedRows"
+          :key="group.key"
+          class="group"
+          :aria-label="group.label"
+        >
+          <h2 class="group-label">{{ group.label }}</h2>
+          <div class="rows">
+            <TransactionItem
+              v-for="(tx, i) in group.rows"
+              :key="tx.trans_id ?? tx.id ?? i"
+              :transaction="tx"
+              :currency="currency"
+              :to="tx.trans_id ? `/transactions/${tx.trans_id}` : null"
+            />
+          </div>
+        </section>
+      </template>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.page {
+  min-height: 100vh;
+  background: var(--bg-gradient);
+  padding: var(--space-5) var(--space-4) 7rem;
+}
+.content {
+  max-width: 30rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0 var(--space-1);
+}
+.back {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.7rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+.back:hover {
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+.back:active {
+  transform: scale(0.95);
+}
+.back-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+.titles {
+  min-width: 0;
+}
+.title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.1;
+}
+.subtitle {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0.15rem 0 0;
+}
+.tabs {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 0.25rem;
+}
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+.tab {
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.tab:hover {
+  color: var(--text-primary);
+}
+.tab--active {
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-fg);
+  border-color: var(--btn-primary-bg);
+}
+.count {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0;
+  padding: 0 var(--space-1);
+}
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.group-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0;
+  padding: 0 var(--space-1);
+}
+.rows {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-4);
+  box-shadow: var(--shadow-card);
+}
+.rows > * + * {
+  border-top: 1px solid var(--divider);
+}
+.skeleton-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.skeleton-row {
+  height: 4.5rem;
+  border-radius: var(--radius-lg);
+  background: var(--surface-muted);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.85; }
+}
 </style>

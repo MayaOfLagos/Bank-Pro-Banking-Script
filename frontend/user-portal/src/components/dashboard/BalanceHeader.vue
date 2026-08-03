@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { BellAlertIcon, SunIcon, MoonIcon } from '@heroicons/vue/24/outline'
+import { BellIcon, SunIcon, MoonIcon } from '@heroicons/vue/24/solid'
 import { merchantInitials } from '../../utils/format'
 import { useTheme } from '../../composables/useTheme'
 
@@ -33,7 +33,7 @@ const { isDark, toggleTheme } = useTheme()
 
     <div class="actions">
       <RouterLink :to="notificationsHref" class="icon-plain" aria-label="Notifications">
-        <BellAlertIcon class="icon" aria-hidden="true" />
+        <BellIcon class="icon" aria-hidden="true" />
         <span v-if="hasUnread" class="dot" aria-hidden="true"></span>
       </RouterLink>
       <button
@@ -127,9 +127,9 @@ const { isDark, toggleTheme } = useTheme()
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 0.65rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.7rem;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-primary);
@@ -143,9 +143,8 @@ const { isDark, toggleTheme } = useTheme()
   transform: scale(0.94);
 }
 .icon {
-  width: 1.25rem;
-  height: 1.25rem;
-  stroke-width: 1.8;
+  width: 1.4rem;
+  height: 1.4rem;
 }
 .dot {
   position: absolute;

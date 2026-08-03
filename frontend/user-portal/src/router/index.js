@@ -4,6 +4,8 @@ import { useAuthStore } from '../stores/auth'
 const DashboardView = () => import('../views/DashboardView.vue')
 const WireTransferView = () => import('../views/WireTransferView.vue')
 const TransactionsView = () => import('../views/TransactionsView.vue')
+const TransactionDetailView = () => import('../views/TransactionDetailView.vue')
+const DepositView = () => import('../views/DepositView.vue')
 const DomesticTransferView = () => import('../views/DomesticTransferView.vue')
 const WithdrawalsView = () => import('../views/WithdrawalsView.vue')
 const TicketsView = () => import('../views/TicketsView.vue')
@@ -30,6 +32,8 @@ const router = createRouter({
     { path: '/update-password', name: 'update-password', component: UpdatePasswordView, meta: { authPage: true, guestOnly: true } },
     { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { requiresAuth: true, title: 'Dashboard' } },
     { path: '/transactions', name: 'transactions', component: TransactionsView, meta: { requiresAuth: true, title: 'Transactions' } },
+    { path: '/transactions/:id(\\d+)', name: 'transaction-detail', component: TransactionDetailView, meta: { requiresAuth: true, title: 'Transaction' } },
+    { path: '/deposits', name: 'deposits', component: DepositView, meta: { requiresAuth: true, title: 'Deposit' } },
     { path: '/wire-transfer', name: 'wire-transfer', component: WireTransferView, meta: { requiresAuth: true, title: 'Wire Transfer' } },
     { path: '/domestic-transfer', name: 'domestic-transfer', component: DomesticTransferView, meta: { requiresAuth: true, title: 'Domestic Transfer' } },
     { path: '/withdrawals', name: 'withdrawals', component: WithdrawalsView, meta: { requiresAuth: true, title: 'Withdrawals' } },

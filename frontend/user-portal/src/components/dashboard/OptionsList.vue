@@ -67,8 +67,8 @@ function handleClick(option, event) {
   border-top: 1px solid var(--divider);
 }
 .icon-wrap {
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: var(--radius-md);
   background: var(--surface-muted);
   display: inline-flex;
@@ -77,8 +77,8 @@ function handleClick(option, event) {
   flex-shrink: 0;
 }
 .icon {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1.35rem;
+  height: 1.35rem;
   color: var(--text-primary);
 }
 .label {

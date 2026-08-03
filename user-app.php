@@ -16,6 +16,7 @@ $routeTitles = [
     '/update-password' => 'Update Password',
     '/dashboard' => 'Dashboard',
     '/transactions' => 'Transactions',
+    '/deposits' => 'Deposits',
     '/wire-transfer' => 'Wire Transfer',
     '/domestic-transfer' => 'Domestic Transfer',
     '/withdrawals' => 'Withdrawals',
@@ -33,6 +34,12 @@ $routeTitles = [
 $requestPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $requestPath = '/' . trim(rawurldecode($requestPath), '/');
 $requestPath = $requestPath === '//' ? '/' : $requestPath;
+
+// Dynamic detail routes: the SPA owns the exact rendering; the PHP shell
+// only needs to resolve a page title for the initial <head>.
+if (preg_match('#^/transactions/\d+$#', $requestPath)) {
+    $requestPath = '/transactions';
+}
 
 if (!isset($routeTitles[$requestPath])) {
     http_response_code(404);

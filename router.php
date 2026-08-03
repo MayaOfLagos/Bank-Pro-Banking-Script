@@ -13,6 +13,7 @@ $vueRoutes = [
     '/update-password',
     '/dashboard',
     '/transactions',
+    '/deposits',
     '/wire-transfer',
     '/domestic-transfer',
     '/withdrawals',
@@ -116,7 +117,8 @@ if ($path !== '/' && (is_file($absolute) || is_dir($absolute))) {
     return false;
 }
 
-if (in_array($normalizedPath, $vueRoutes, true)) {
+if (in_array($normalizedPath, $vueRoutes, true)
+    || preg_match('#^/transactions/\d+$#', $normalizedPath)) {
     require $root . '/user-app.php';
     return true;
 }

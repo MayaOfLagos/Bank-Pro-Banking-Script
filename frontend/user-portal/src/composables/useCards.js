@@ -12,6 +12,7 @@ export function useCards() {
   const hasRequestInProgress = ref(false)
   const loading = ref(false)
   const error = ref('')
+  const updating = ref(false)
 
   const primaryCard = computed(() => cards.value[0] ?? null)
 
@@ -32,5 +33,28 @@ export function useCards() {
     }
   }
 
-  return { cards, primaryCard, canRequest, hasRequestInProgress, loading, error, load }
+  async function updateStatus(action) {
+    if (!['pause', 'active'].includes(action)) throw new Error('Invalid card action')
+    updating.value = true
+    try {
+      const { data } = await client.post('/api/user/card-status.php', { action })
+      if (!data?.ok) throw new Error(data?.message || 'Card update failed')
+      await load()
+      return data
+    } finally {
+      updating.value = false
+    }
+  }
+
+  return {
+    cards,
+    primaryCard,
+    canRequest,
+    hasRequestInProgress,
+    loading,
+    error,
+    updating,
+    load,
+    updateStatus,
+  }
 }

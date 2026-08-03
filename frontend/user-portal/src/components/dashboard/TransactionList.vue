@@ -29,6 +29,7 @@ defineProps({
         :key="tx.trans_id ?? tx.id ?? i"
         :transaction="tx"
         :currency="currency"
+        :to="tx.trans_id ? `/transactions/${tx.trans_id}` : null"
       />
     </div>
   </section>

@@ -19,8 +19,11 @@ export function formatMoney(value, {
     maximumFractionDigits: maxFractionDigits,
   }).split('.')
   let fraction = parts[1] ?? ''
-  if (trimTrailingZero && fraction.length === 2 && fraction.endsWith('0')) {
-    fraction = fraction.slice(0, 1)
+  // Only trim when the fraction is entirely zeros — the intent is
+  // round-number typography ("$45.00" → "$45"), not lopping meaningful
+  // digits off values like $45.20.
+  if (trimTrailingZero && fraction && /^0+$/.test(fraction)) {
+    fraction = ''
   }
   return {
     integer: parts[0],

@@ -22,7 +22,42 @@ $tx = $conn->prepare('SELECT trans_id, amount, trans_type, sender_name, descript
 $tx->execute(['user_id' => $userId]);
 $transactions = $tx->fetchAll(PDO::FETCH_ASSOC);
 
-$recent = array_slice($transactions, 0, 8);
+// Pending deposits appear alongside real transactions so the user sees them
+// immediately after submission. Approved deposits already have a matching
+// transactions row created by the admin flow, so exclude status=1 here.
+$depRecent = $conn->prepare("SELECT d.d_id, d.refrence_id, d.amount, d.crypto_status, d.created_at, c.crypto_name
+                             FROM deposit d
+                             LEFT JOIN crypto_currency c ON c.id = d.crypto_id
+                             WHERE d.user_id = :user_id AND d.crypto_status IN (0, 2)
+                             ORDER BY d.d_id DESC
+                             LIMIT 20");
+$depRecent->execute(['user_id' => $userId]);
+$pendingDeposits = $depRecent->fetchAll(PDO::FETCH_ASSOC);
+
+$recent = $transactions;
+foreach ($pendingDeposits as $dep) {
+    $status = (int)($dep['crypto_status'] ?? 0);
+    $recent[] = [
+        'id' => 'd-' . (int)$dep['d_id'],
+        'amount' => (float)$dep['amount'],
+        'trans_type' => 1,
+        'type_label' => 'Credit',
+        'trans_status' => $status,
+        'status_label' => $status === 2 ? 'Hold' : 'Processing',
+        'sender_name' => 'Crypto Deposit',
+        'description' => 'Deposit — ' . ($dep['crypto_name'] ?? 'crypto'),
+        'refrence_id' => $dep['refrence_id'],
+        'created_at' => $dep['created_at'],
+        'time_created' => '',
+        'source' => 'deposit',
+    ];
+}
+usort($recent, static function ($a, $b): int {
+    $ta = strtotime((string)($a['created_at'] ?? '')) ?: 0;
+    $tb = strtotime((string)($b['created_at'] ?? '')) ?: 0;
+    return $tb <=> $ta;
+});
+$recent = array_slice($recent, 0, 8);
 
 $today = new DateTimeImmutable('today');
 $weeklyLabels = [];

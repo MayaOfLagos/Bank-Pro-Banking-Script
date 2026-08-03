@@ -32,7 +32,9 @@
 
   # Vue owns authentication and customer-facing routes through one PHP front controller.
   # Admin and public marketing routes continue to use their existing PHP entry points.
-  RewriteRule ^(login|pin|reset-password|update-password|dashboard|transactions|wire-transfer|domestic-transfer|withdrawals|cards|loans|tickets|profile|transfer-verify|transfer-cot|transfer-tax|transfer-imf|transfer-success)$ user-app.php [L,QSA]
+  RewriteRule ^(login|pin|reset-password|update-password|dashboard|transactions|deposits|wire-transfer|domestic-transfer|withdrawals|cards|loans|tickets|profile|transfer-verify|transfer-cot|transfer-tax|transfer-imf|transfer-success)$ user-app.php [L,QSA]
+  # Dynamic detail routes owned by the Vue SPA.
+  RewriteRule ^transactions/[0-9]+$ user-app.php [L,QSA]
 
   # Preserve extensionless URLs for existing public PHP and HTML pages.
   RewriteCond %{REQUEST_FILENAME} !-f

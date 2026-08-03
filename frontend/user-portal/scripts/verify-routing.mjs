@@ -13,6 +13,7 @@ const canonicalRoutes = [
   '/update-password',
   '/dashboard',
   '/transactions',
+  '/deposits',
   '/wire-transfer',
   '/domestic-transfer',
   '/withdrawals',
