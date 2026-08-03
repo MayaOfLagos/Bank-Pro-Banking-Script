@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { PlusIcon, ArrowUpRightIcon } from '@heroicons/vue/24/outline'
+import { GlobeAltIcon, HomeIcon } from '@heroicons/vue/24/outline'
 import BalanceHeader from '../components/dashboard/BalanceHeader.vue'
 import ActionButtons from '../components/dashboard/ActionButtons.vue'
 import CardCarousel from '../components/dashboard/CardCarousel.vue'
@@ -39,8 +39,8 @@ const firstName = computed(() => {
 const avatar = computed(() => profile.value.image || '')
 
 const dashboardActions = [
-  { label: 'Deposit', icon: PlusIcon, variant: 'filled', to: '/withdrawals' },
-  { label: 'Transfer', icon: ArrowUpRightIcon, variant: 'outlined', to: '/wire-transfer' },
+  { label: 'Wire', icon: GlobeAltIcon, variant: 'filled', to: '/wire-transfer', ariaLabel: 'Send a wire transfer' },
+  { label: 'Domestic', icon: HomeIcon, variant: 'outlined', to: '/domestic-transfer', ariaLabel: 'Send a domestic transfer' },
 ]
 
 const recentTransactions = computed(() => {
