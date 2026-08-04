@@ -90,6 +90,19 @@ if (isset($_POST['register'])) {
             $email_message->send_mail($email, $message, "Welcome $fullName - $APP_NAME");
             $email_message->send_mail(WEB_EMAIL, $message, "[New Account Registered] $fullName - $APP_NAME");
 
+            if (function_exists('audit_log')) {
+                // target_id is the newly-issued account number since we
+                // don't cheaply have the AUTO_INCREMENT id back here — the
+                // acct_no is human-searchable in the audit viewer anyway.
+                audit_log('user.created', 'user', (string)$acct_no, [
+                    'name'         => $fullName,
+                    'acct_email'   => $email,
+                    'acct_type'    => $acct_type,
+                    'acct_currency' => $acct_currency,
+                    'acct_balance' => $acct_balance,
+                ]);
+            }
+
             toast_alert('success', 'Account Created Successfully', 'Approved');
         }
     }

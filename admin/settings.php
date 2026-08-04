@@ -70,6 +70,9 @@ if (isset($_POST['save_settings'])) {
         ? $_POST['signup_default_status']
         : 'hold';
 
+    // Capture the previous row so audit_log can diff old→new for each field.
+    $prevSettings = $page ?: [];
+
     $stmt = $conn->prepare("UPDATE settings SET url_name=:url_name, url_tel=:url_tel, about_us=:about_us, url_email=:url_email, livechat=:livechat, trans_limit_min=:trans_limit_min, trans_limit_max=:trans_limit_max, transfer=:transfer, billing_code=:billing_code, bank_deposit=:bank_deposit, registration_enabled=:registration_enabled, signup_default_status=:signup_default_status WHERE id=1");
     $stmt->execute([
         'url_name'              => $_POST['url_name'],
@@ -86,6 +89,28 @@ if (isset($_POST['save_settings'])) {
         'signup_default_status' => $defaultStatus,
     ]);
     toast_alert('success', 'Settings updated successfully', 'Approved');
+
+    // Best-effort audit trail. Only include fields that actually changed so
+    // the log stays terse. about_us is truncated to keep the JSON small.
+    $trackedFields = [
+        'url_name', 'url_tel', 'about_us', 'url_email', 'livechat',
+        'trans_limit_min', 'trans_limit_max', 'transfer', 'billing_code', 'bank_deposit',
+        'registration_enabled', 'signup_default_status',
+    ];
+    $changed = [];
+    foreach ($trackedFields as $field) {
+        $old = isset($prevSettings[$field]) ? (string)$prevSettings[$field] : '';
+        $new = isset($_POST[$field]) ? (string)$_POST[$field] : '';
+        if ($old !== $new) {
+            $changed[$field] = [
+                'old' => $field === 'about_us' ? substr($old, 0, 200) : $old,
+                'new' => $field === 'about_us' ? substr($new, 0, 200) : $new,
+            ];
+        }
+    }
+    if (function_exists('audit_log')) {
+        audit_log('settings.updated', 'settings', '1', ['changed' => $changed]);
+    }
 
     $reload = $conn->query("SELECT * FROM settings WHERE id=1");
     $page   = $reload->fetch(PDO::FETCH_ASSOC);

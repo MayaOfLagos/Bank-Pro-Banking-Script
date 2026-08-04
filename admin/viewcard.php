@@ -15,6 +15,13 @@ if (!$cardCheck) {
 if (isset($_POST['hold_card'])) {
     $stmt = $conn->prepare("UPDATE card SET card_status=:s WHERE seria_key=:k");
     $stmt->execute(['s' => 3, 'k' => $id]);
+    if (function_exists('audit_log')) {
+        audit_log('card.paused', 'card', (string)$id, [
+            'card_number' => $cardCheck['card_number'] ?? null,
+            'old_status'  => $cardCheck['card_status'] ?? null,
+            'new_status'  => 3,
+        ]);
+    }
     toast_alert('success', 'Card placed on hold', 'Done');
     header('Location:' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
     exit;
@@ -23,6 +30,13 @@ if (isset($_POST['hold_card'])) {
 if (isset($_POST['active_card'])) {
     $stmt = $conn->prepare("UPDATE card SET card_status=:s WHERE seria_key=:k");
     $stmt->execute(['s' => 1, 'k' => $id]);
+    if (function_exists('audit_log')) {
+        audit_log('card.activated', 'card', (string)$id, [
+            'card_number' => $cardCheck['card_number'] ?? null,
+            'old_status'  => $cardCheck['card_status'] ?? null,
+            'new_status'  => 1,
+        ]);
+    }
     toast_alert('success', 'Card activated', 'Done');
     header('Location:' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
     exit;

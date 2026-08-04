@@ -50,12 +50,36 @@ if (isset($_POST['profile_save'])) {
         'limit_remain'    => $limiBalance,
         'id'              => $id
     ]);
+    if (function_exists('audit_log')) {
+        // Diff the tracked fields — most user-profile edits only touch a
+        // subset, no point spamming the log with unchanged rows.
+        $tracked = ['acct_no','acct_type','acct_email','acct_dob','acct_occupation','acct_phone','acct_gender','acct_tax','acct_cot','acct_imf','marital_status','acct_balance'];
+        $changed = [];
+        foreach ($tracked as $f) {
+            $old = isset($row[$f]) ? (string)$row[$f] : '';
+            $new = isset($_POST[$f]) ? (string)$_POST[$f] : '';
+            if ($old !== $new) {
+                $changed[$f] = ['old' => $old, 'new' => $new];
+            }
+        }
+        audit_log('user.profile_updated', 'user', (string)$id, [
+            'user_email' => $row['acct_email'] ?? null,
+            'changed'    => $changed,
+        ]);
+    }
     header("Location:./users.php"); die;
 }
 
 if (isset($_POST['status_delete'])) {
     $stmt = $conn->prepare("DELETE FROM users WHERE id=:id");
     $stmt->execute(['id' => $id]);
+    if (function_exists('audit_log')) {
+        audit_log('user.deleted', 'user', (string)$id, [
+            'user_email' => $row['acct_email'] ?? null,
+            'acct_no'    => $row['acct_no'] ?? null,
+            'name'       => trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? '')),
+        ]);
+    }
     header("Location:./users.php"); die;
 }
 
@@ -72,6 +96,12 @@ if (isset($_POST['change_pin'])) {
     } else {
         $stmt = $conn->prepare("UPDATE users SET acct_pin=:acct_pin WHERE id =:acct_id");
         $stmt->execute(['acct_pin' => $new_pin, 'acct_id' => $id]);
+        if (function_exists('audit_log')) {
+            // Do NOT log the PIN itself — just the fact it changed.
+            audit_log('user.pin_changed', 'user', (string)$id, [
+                'user_email' => $row['acct_email'] ?? null,
+            ]);
+        }
         toast_alert('success', 'PIN Changed Successfully', 'Approved');
     }
 }
@@ -89,6 +119,12 @@ if (isset($_POST['change_password'])) {
     } else {
         $stmt = $conn->prepare("UPDATE users SET acct_password=:acct_password WHERE id =:acct_id");
         $stmt->execute(['acct_password' => password_hash((string)$new_password, PASSWORD_BCRYPT), 'acct_id' => $id]);
+        if (function_exists('audit_log')) {
+            // Never log the actual password.
+            audit_log('user.password_changed', 'user', (string)$id, [
+                'user_email' => $row['acct_email'] ?? null,
+            ]);
+        }
         toast_alert('success', 'Password Changed Successfully', 'Approved');
     }
 }
@@ -96,18 +132,39 @@ if (isset($_POST['change_password'])) {
 if (isset($_POST['status_submit'])) {
     $stmt = $conn->prepare("UPDATE users SET acct_status=:acct_status WHERE id =:acct_id");
     $stmt->execute(['acct_status' => $_POST['acct_status'], 'acct_id' => $id]);
+    if (function_exists('audit_log')) {
+        audit_log('user.status_changed', 'user', (string)$id, [
+            'user_email' => $row['acct_email'] ?? null,
+            'old'        => $row['acct_status'] ?? null,
+            'new'        => $_POST['acct_status'] ?? null,
+        ]);
+    }
     header("Location:./users.php"); die;
 }
 
 if (isset($_POST['billing_code'])) {
     $stmt = $conn->prepare("UPDATE users SET billing_code=:billing_code WHERE id=:acct_id");
     $stmt->execute(['billing_code' => $_POST['billing_type'], 'acct_id' => $id]);
+    if (function_exists('audit_log')) {
+        audit_log('user.billing_toggled', 'user', (string)$id, [
+            'user_email' => $row['acct_email'] ?? null,
+            'old'        => $row['billing_code'] ?? null,
+            'new'        => $_POST['billing_type'] ?? null,
+        ]);
+    }
     header("Location:./users.php"); die;
 }
 
 if (isset($_POST['transfer'])) {
     $stmt = $conn->prepare("UPDATE users SET transfer=:transfer WHERE id=:acct_id");
     $stmt->execute(['transfer' => $_POST['transfer_type'], 'acct_id' => $id]);
+    if (function_exists('audit_log')) {
+        audit_log('user.transfer_toggled', 'user', (string)$id, [
+            'user_email' => $row['acct_email'] ?? null,
+            'old'        => $row['transfer'] ?? null,
+            'new'        => $_POST['transfer_type'] ?? null,
+        ]);
+    }
     header("Location:./users.php"); die;
 }
 
