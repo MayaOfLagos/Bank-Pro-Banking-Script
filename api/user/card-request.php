@@ -10,6 +10,10 @@ if (in_array(strtolower((string)($user['acct_status'] ?? '')), ['hold', 'blocked
   api_json(403, ['ok' => false, 'message' => 'Card requests are unavailable for this account']);
 }
 
+if ((string)($user['can_request_card'] ?? '1') !== '1') {
+  api_json(403, ['ok' => false, 'message' => 'Card requests are disabled for this account.']);
+}
+
 $existingCard = $conn->prepare('SELECT 1 FROM card WHERE user_id=:user_id LIMIT 1');
 $existingCard->execute(['user_id' => $user['id']]);
 if ($existingCard->fetchColumn()) {

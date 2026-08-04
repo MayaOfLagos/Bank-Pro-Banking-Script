@@ -10,6 +10,10 @@ if ((string)($user['acct_status'] ?? 'hold') !== 'active') {
   api_json(403, ['ok' => false, 'message' => 'Account on hold']);
 }
 
+if ((string)($user['can_deposit'] ?? '1') !== '1') {
+  api_json(403, ['ok' => false, 'message' => 'Deposits are disabled for this account.']);
+}
+
 $amount = (float)api_field($_POST, 'amount', '0');
 $cryptoId = api_field($_POST, 'crypto_id', api_field($_POST, 'crypto_name'));
 $walletAddress = api_field($_POST, 'wallet_address');
