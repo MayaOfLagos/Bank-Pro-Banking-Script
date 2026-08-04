@@ -97,9 +97,70 @@ if ($country === '' || !country_is_known($country)) {
     auth_json(422, ['ok' => false, 'message' => 'Select a supported country.']);
 }
 
+// Country blocklist: admins set a comma-separated list of two-letter ISO
+// codes in admin/settings.php. Normalise the submitted country to an ISO
+// code (accepts both codes and legacy full names) then compare against a
+// whitelisted, upper-cased list. Uses a distinct message from the email
+// filter so a legit user in a blocked country understands what happened —
+// hiding it would just generate support tickets.
+$countryCode = country_code_from_value($country);
+$countryBlockRaw = (string)($settings['signup_country_blocklist'] ?? '');
+if ($countryBlockRaw !== '' && $countryCode !== '') {
+    $countryBlockList = [];
+    foreach (preg_split('/[\s,]+/', $countryBlockRaw) as $entry) {
+        $entry = strtoupper(trim((string)$entry));
+        if (preg_match('/^[A-Z]{2}$/', $entry)) {
+            $countryBlockList[$entry] = true;
+        }
+    }
+    if (isset($countryBlockList[$countryCode])) {
+        auth_json(422, ['ok' => false, 'message' => 'Signups from your country are not currently supported.']);
+    }
+}
+
 $emailNormalized = filter_var($email, FILTER_VALIDATE_EMAIL);
 if (!$emailNormalized) {
     auth_json(422, ['ok' => false, 'message' => 'Enter a valid email address.']);
+}
+
+// Email domain allow/block lists. Both are admin-configured comma-separated
+// lists of bare domains (no @, no scheme). Allowlist wins when both are
+// set: only addresses whose domain matches the allowlist survive, and even
+// among those the blocklist can still reject. Empty allowlist = allow all
+// except blocklist entries. We deliberately reuse the same generic
+// "cannot be used" message the duplicate-email path uses so probing the
+// endpoint can't reveal which specific list a domain lives on.
+$emailAtPos = strrpos($emailNormalized, '@');
+$emailDomain = $emailAtPos !== false ? strtolower(substr($emailNormalized, $emailAtPos + 1)) : '';
+
+$parseDomainList = static function (string $raw): array {
+    $out = [];
+    foreach (preg_split('/[\s,]+/', $raw) as $entry) {
+        $entry = strtolower(trim((string)$entry));
+        // Strip a leading @ in case the admin typed "@gmail.com".
+        if ($entry !== '' && $entry[0] === '@') {
+            $entry = substr($entry, 1);
+        }
+        // Reject obviously malformed entries — anything that isn't a
+        // domain-shaped string is silently dropped instead of blocking
+        // every signup because an admin left a stray comma.
+        if ($entry !== '' && preg_match('/^[a-z0-9.\-]+\.[a-z]{2,}$/', $entry)) {
+            $out[$entry] = true;
+        }
+    }
+    return $out;
+};
+
+$emailAllowlist = $parseDomainList((string)($settings['signup_email_allowlist'] ?? ''));
+$emailBlocklist = $parseDomainList((string)($settings['signup_email_blocklist'] ?? ''));
+
+if ($emailDomain !== '') {
+    if (!empty($emailAllowlist) && !isset($emailAllowlist[$emailDomain])) {
+        auth_json(422, ['ok' => false, 'message' => 'That email cannot be used for a new account.']);
+    }
+    if (isset($emailBlocklist[$emailDomain])) {
+        auth_json(422, ['ok' => false, 'message' => 'That email cannot be used for a new account.']);
+    }
 }
 
 $phoneDigits = preg_replace('/\D+/', '', $phone);
@@ -171,34 +232,59 @@ if (!in_array($defaultStatus, $allowedDefaultStatuses, true)) {
     $defaultStatus = 'hold';
 }
 
+// Admin-controlled starting balances/limits. Each value is clamped to
+// [0, DEFAULT_BALANCE_CAP] so a UI-side typo (or a legacy row containing
+// a negative or absurd number) can't silently ship a huge balance to
+// every new account. Cap intentionally matches the admin form's max
+// attribute — keep the two in sync if you raise it.
+$balanceCap = 10000000.00;
+$clampBalance = static function ($value) use ($balanceCap) {
+    $n = is_numeric($value) ? (float)$value : 0.0;
+    if ($n < 0)            { return 0.0; }
+    if ($n > $balanceCap)  { return $balanceCap; }
+    return $n;
+};
+$defaultBalance      = $clampBalance($settings['default_balance']       ?? 0);
+$defaultAvailBalance = $clampBalance($settings['default_avail_balance'] ?? 0);
+$defaultAcctLimit    = $clampBalance($settings['default_acct_limit']    ?? 0);
+$defaultLimitRemain  = $clampBalance($settings['default_limit_remain']  ?? 0);
+
 $insert = $conn->prepare(
     'INSERT INTO users (
         firstname, lastname, acct_email, acct_phone, acct_password,
         acct_no, acct_type, acct_currency, acct_status,
         country, acct_dob, acct_pin,
-        acct_balance, avail_balance, loan_balance, transfer, billing_code,
+        acct_balance, avail_balance, loan_balance,
+        acct_limit, limit_remain,
+        transfer, billing_code,
         password_changed_at, createdAt
     ) VALUES (
         :firstname, :lastname, :email, :phone, :password,
         :acct_no, :acct_type, :currency, :status,
         :country, :dob, :pin,
-        0, 0, 0, 1, 0,
+        :acct_balance, :avail_balance, 0,
+        :acct_limit, :limit_remain,
+        1, 0,
         NOW(), NOW()
     )'
 );
 $insert->execute([
-    'firstname' => $firstname,
-    'lastname'  => $lastname,
-    'email'     => $emailNormalized,
-    'phone'     => $phoneDigits,
-    'password'  => $hash,
-    'acct_no'   => $acctNo,
-    'acct_type' => $acctType,
-    'currency'  => $currency,
-    'status'    => $defaultStatus,
-    'country'   => $country,
-    'dob'       => $dob,
-    'pin'       => $pin,
+    'firstname'     => $firstname,
+    'lastname'      => $lastname,
+    'email'         => $emailNormalized,
+    'phone'         => $phoneDigits,
+    'password'      => $hash,
+    'acct_no'       => $acctNo,
+    'acct_type'     => $acctType,
+    'currency'      => $currency,
+    'status'        => $defaultStatus,
+    'country'       => $country,
+    'dob'           => $dob,
+    'pin'           => $pin,
+    'acct_balance'  => $defaultBalance,
+    'avail_balance' => $defaultAvailBalance,
+    'acct_limit'    => $defaultAcctLimit,
+    'limit_remain'  => $defaultLimitRemain,
 ]);
 
 // ─── Notify (best-effort — never fail signup because of mail issues) ───

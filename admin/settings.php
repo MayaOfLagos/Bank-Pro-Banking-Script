@@ -73,20 +73,71 @@ if (isset($_POST['save_settings'])) {
     // Capture the previous row so audit_log can diff old→new for each field.
     $prevSettings = $page ?: [];
 
-    $stmt = $conn->prepare("UPDATE settings SET url_name=:url_name, url_tel=:url_tel, about_us=:about_us, url_email=:url_email, livechat=:livechat, trans_limit_min=:trans_limit_min, trans_limit_max=:trans_limit_max, transfer=:transfer, billing_code=:billing_code, bank_deposit=:bank_deposit, registration_enabled=:registration_enabled, signup_default_status=:signup_default_status WHERE id=1");
+    // Signup starting balances/limits. Clamp to [0, 10_000_000] on the
+    // server side — the input has max=10000000 but a hand-crafted POST
+    // could bypass that.
+    $balanceCap = 10000000.00;
+    $clampSetting = static function ($value) use ($balanceCap) {
+        $n = is_numeric($value) ? (float)$value : 0.0;
+        if ($n < 0)           { return 0.0; }
+        if ($n > $balanceCap) { return $balanceCap; }
+        return $n;
+    };
+    $defaultBalance      = $clampSetting($_POST['default_balance']       ?? 0);
+    $defaultAvailBalance = $clampSetting($_POST['default_avail_balance'] ?? 0);
+    $defaultAcctLimit    = $clampSetting($_POST['default_acct_limit']    ?? 0);
+    $defaultLimitRemain  = $clampSetting($_POST['default_limit_remain']  ?? 0);
+
+    // Normalise the free-text domain/country lists before saving so the
+    // signup API doesn't have to defend against garbage rows.
+    $normaliseDomains = static function (string $raw): string {
+        $out = [];
+        foreach (preg_split('/[\s,]+/', $raw) as $entry) {
+            $entry = strtolower(trim((string)$entry));
+            if ($entry !== '' && $entry[0] === '@') {
+                $entry = substr($entry, 1);
+            }
+            if ($entry !== '' && preg_match('/^[a-z0-9.\-]+\.[a-z]{2,}$/', $entry)) {
+                $out[$entry] = true;
+            }
+        }
+        return implode(', ', array_keys($out));
+    };
+    $normaliseCountries = static function (string $raw): string {
+        $out = [];
+        foreach (preg_split('/[\s,]+/', $raw) as $entry) {
+            $entry = strtoupper(trim((string)$entry));
+            if (preg_match('/^[A-Z]{2}$/', $entry)) {
+                $out[$entry] = true;
+            }
+        }
+        return implode(', ', array_keys($out));
+    };
+    $emailBlocklist   = $normaliseDomains((string)($_POST['signup_email_blocklist']   ?? ''));
+    $emailAllowlist   = $normaliseDomains((string)($_POST['signup_email_allowlist']   ?? ''));
+    $countryBlocklist = $normaliseCountries((string)($_POST['signup_country_blocklist'] ?? ''));
+
+    $stmt = $conn->prepare("UPDATE settings SET url_name=:url_name, url_tel=:url_tel, about_us=:about_us, url_email=:url_email, livechat=:livechat, trans_limit_min=:trans_limit_min, trans_limit_max=:trans_limit_max, transfer=:transfer, billing_code=:billing_code, bank_deposit=:bank_deposit, registration_enabled=:registration_enabled, signup_default_status=:signup_default_status, default_balance=:default_balance, default_avail_balance=:default_avail_balance, default_acct_limit=:default_acct_limit, default_limit_remain=:default_limit_remain, signup_email_blocklist=:signup_email_blocklist, signup_email_allowlist=:signup_email_allowlist, signup_country_blocklist=:signup_country_blocklist WHERE id=1");
     $stmt->execute([
-        'url_name'              => $_POST['url_name'],
-        'url_tel'               => $_POST['url_tel'],
-        'about_us'              => $_POST['about_us'],
-        'url_email'             => $_POST['url_email'],
-        'livechat'              => $_POST['livechat'],
-        'trans_limit_min'       => $_POST['trans_limit_min'],
-        'trans_limit_max'       => $_POST['trans_limit_max'],
-        'transfer'              => $_POST['transfer'],
-        'billing_code'          => $_POST['billing_code'],
-        'bank_deposit'          => $_POST['bank_deposit'],
-        'registration_enabled'  => (int)($_POST['registration_enabled'] ?? 1),
-        'signup_default_status' => $defaultStatus,
+        'url_name'                 => $_POST['url_name'],
+        'url_tel'                  => $_POST['url_tel'],
+        'about_us'                 => $_POST['about_us'],
+        'url_email'                => $_POST['url_email'],
+        'livechat'                 => $_POST['livechat'],
+        'trans_limit_min'          => $_POST['trans_limit_min'],
+        'trans_limit_max'          => $_POST['trans_limit_max'],
+        'transfer'                 => $_POST['transfer'],
+        'billing_code'             => $_POST['billing_code'],
+        'bank_deposit'             => $_POST['bank_deposit'],
+        'registration_enabled'     => (int)($_POST['registration_enabled'] ?? 1),
+        'signup_default_status'    => $defaultStatus,
+        'default_balance'          => $defaultBalance,
+        'default_avail_balance'    => $defaultAvailBalance,
+        'default_acct_limit'       => $defaultAcctLimit,
+        'default_limit_remain'     => $defaultLimitRemain,
+        'signup_email_blocklist'   => $emailBlocklist   !== '' ? $emailBlocklist   : null,
+        'signup_email_allowlist'   => $emailAllowlist   !== '' ? $emailAllowlist   : null,
+        'signup_country_blocklist' => $countryBlocklist !== '' ? $countryBlocklist : null,
     ]);
     toast_alert('success', 'Settings updated successfully', 'Approved');
 
@@ -96,6 +147,8 @@ if (isset($_POST['save_settings'])) {
         'url_name', 'url_tel', 'about_us', 'url_email', 'livechat',
         'trans_limit_min', 'trans_limit_max', 'transfer', 'billing_code', 'bank_deposit',
         'registration_enabled', 'signup_default_status',
+        'default_balance', 'default_avail_balance', 'default_acct_limit', 'default_limit_remain',
+        'signup_email_blocklist', 'signup_email_allowlist', 'signup_country_blocklist',
     ];
     $changed = [];
     foreach ($trackedFields as $field) {
@@ -251,6 +304,63 @@ if (isset($_POST['save_settings'])) {
                                     </div>
                                 </div>
                             </div>
+                            <h6 class="mt-3">Signup defaults</h6>
+                            <p class="text-muted small">Written into the new user row when someone completes /register. Cap: 10,000,000 per field. Leave at 0 to keep accounts empty until an admin funds them.</p>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Starting balance</label>
+                                        <input type="number" step="0.01" min="0" max="10000000" name="default_balance" class="form-control" value="<?= htmlspecialchars((string)($page['default_balance'] ?? '0.00')) ?>">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Starting available (pending) balance</label>
+                                        <input type="number" step="0.01" min="0" max="10000000" name="default_avail_balance" class="form-control" value="<?= htmlspecialchars((string)($page['default_avail_balance'] ?? '0.00')) ?>">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Starting account limit</label>
+                                        <input type="number" step="0.01" min="0" max="10000000" name="default_acct_limit" class="form-control" value="<?= htmlspecialchars((string)($page['default_acct_limit'] ?? '0.00')) ?>">
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Starting limit remaining</label>
+                                        <input type="number" step="0.01" min="0" max="10000000" name="default_limit_remain" class="form-control" value="<?= htmlspecialchars((string)($page['default_limit_remain'] ?? '0.00')) ?>">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h6 class="mt-3">Email domain filters</h6>
+                            <p class="text-muted small">
+                                Comma- or space-separated bare domains (e.g. <code>gmail.com, tempmail.com</code>).
+                                <strong>Allowlist wins</strong>: if you set an allowlist, ONLY addresses whose domain is on it can register — everyone else is rejected. Leave allowlist empty to allow all except entries on the blocklist. Both lists reject with the same generic message so probing can't leak which list caught the address.
+                            </p>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Email allowlist</label>
+                                        <textarea name="signup_email_allowlist" class="form-control" rows="3" placeholder="e.g. yourbank.com, corp.example"><?= htmlspecialchars((string)($page['signup_email_allowlist'] ?? '')) ?></textarea>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Email blocklist</label>
+                                        <textarea name="signup_email_blocklist" class="form-control" rows="3" placeholder="e.g. tempmail.com, mailinator.com"><?= htmlspecialchars((string)($page['signup_email_blocklist'] ?? '')) ?></textarea>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <h6 class="mt-3">Country blocklist</h6>
+                            <p class="text-muted small">Two-letter ISO codes, comma-separated (e.g. <code>RU, IR, KP</code>). Signups from these countries will be rejected with a specific "not supported" message. Full country names are also accepted at signup, so the check normalises to the ISO code before comparing.</p>
+                            <div class="form-group">
+                                <textarea name="signup_country_blocklist" class="form-control" rows="2" placeholder="e.g. RU, IR, KP"><?= htmlspecialchars((string)($page['signup_country_blocklist'] ?? '')) ?></textarea>
+                            </div>
+
                             <div class="form-group">
                                 <label>Tawk.to Livechat URL</label>
                                 <input type="text" name="livechat" class="form-control" value="<?= htmlspecialchars($page['livechat']) ?>">

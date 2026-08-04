@@ -130,16 +130,36 @@ if (isset($_POST['change_password'])) {
 }
 
 if (isset($_POST['status_submit'])) {
-    $stmt = $conn->prepare("UPDATE users SET acct_status=:acct_status WHERE id =:acct_id");
-    $stmt->execute(['acct_status' => $_POST['acct_status'], 'acct_id' => $id]);
-    if (function_exists('audit_log')) {
-        audit_log('user.status_changed', 'user', (string)$id, [
-            'user_email' => $row['acct_email'] ?? null,
-            'old'        => $row['acct_status'] ?? null,
-            'new'        => $_POST['acct_status'] ?? null,
+    // Whitelist status values so a hand-crafted POST can't stash arbitrary
+    // strings in acct_status — login gating uses exact-string comparison in
+    // _bootstrap.php and an unknown value would silently lock the user out.
+    $allowedStatus = ['active', 'hold', 'pending', 'suspended', 'blocked', 'inactive'];
+    $newStatus = strtolower(trim((string)($_POST['acct_status'] ?? '')));
+    if (!in_array($newStatus, $allowedStatus, true)) {
+        toast_alert('error', 'Unknown status value', 'Rejected');
+    } else {
+        $rawReason = (string)($_POST['acct_status_reason'] ?? '');
+        $reason = trim($rawReason);
+        if (strlen($reason) > 2000) {
+            $reason = substr($reason, 0, 2000);
+        }
+        $oldStatus = $row['acct_status'] ?? null;
+        $stmt = $conn->prepare("UPDATE users SET acct_status=:acct_status, acct_status_reason=:acct_status_reason, acct_status_changed_at=NOW() WHERE id =:acct_id");
+        $stmt->execute([
+            'acct_status'        => $newStatus,
+            'acct_status_reason' => $reason !== '' ? $reason : null,
+            'acct_id'            => $id,
         ]);
+        if (function_exists('audit_log')) {
+            audit_log('user.status_changed', 'user', (string)$id, [
+                'user_email' => $row['acct_email'] ?? null,
+                'old'        => $oldStatus,
+                'new'        => $newStatus,
+                'reason'     => $reason !== '' ? $reason : null,
+            ]);
+        }
+        header("Location:./users.php"); die;
     }
-    header("Location:./users.php"); die;
 }
 
 if (isset($_POST['billing_code'])) {
@@ -313,13 +333,28 @@ if (isset($_POST['force_logout_user'])) {
                         <div class="row">
                             <div class="col-md-4">
                                 <form method="post">
-                                    <p>Status: <span class="badge badge-info"><?= ucwords($row['acct_status']) ?></span></p>
+                                    <p>Status: <span class="badge badge-info"><?= htmlspecialchars(ucwords((string)$row['acct_status'])) ?></span></p>
+                                    <?php if (!empty($row['acct_status_reason']) || !empty($row['acct_status_changed_at'])): ?>
+                                        <p class="small text-muted mb-2">
+                                            <?php if (!empty($row['acct_status_changed_at'])): ?>
+                                                <strong>Last change:</strong> <?= htmlspecialchars((string)$row['acct_status_changed_at']) ?><br>
+                                            <?php endif; ?>
+                                            <?php if (!empty($row['acct_status_reason'])): ?>
+                                                <strong>Reason:</strong> <?= nl2br(htmlspecialchars((string)$row['acct_status_reason'])) ?>
+                                            <?php endif; ?>
+                                        </p>
+                                    <?php endif; ?>
                                     <div class="form-group">
                                         <select name="acct_status" class="form-control" required>
-                                            <option value="">Select</option>
-                                            <option value="active">Active</option>
-                                            <option value="hold">Hold</option>
+                                            <?php $curStatus = strtolower((string)$row['acct_status']); ?>
+                                            <?php foreach (['active','hold','pending','suspended','blocked','inactive'] as $optVal): ?>
+                                                <option value="<?= $optVal ?>" <?= $curStatus === $optVal ? 'selected' : '' ?>><?= ucfirst($optVal) ?></option>
+                                            <?php endforeach; ?>
                                         </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="small mb-1">Reason / note (optional but recommended when suspending or blocking)</label>
+                                        <textarea name="acct_status_reason" class="form-control" rows="2" maxlength="2000" placeholder="e.g. flagged for suspicious activity 2026-08-04"></textarea>
                                     </div>
                                     <button class="btn btn-primary btn-block" name="status_submit">Update Status</button>
                                 </form>
