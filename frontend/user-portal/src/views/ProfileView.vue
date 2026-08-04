@@ -69,15 +69,32 @@ const subtitle = computed(() => {
   return parts.length ? parts.join(' · ') : 'Banking client'
 })
 
-const infoRows = computed(() => [
-  { label: 'Account number', value: profile.value.acct_no || '—', mono: true },
-  { label: 'Account type', value: profile.value.acct_type || '—' },
-  { label: 'Currency', value: currencyText.value },
-  { label: 'Email', value: profile.value.email || '—' },
-  { label: 'Phone', value: profile.value.phone || '—' },
-  { label: 'Country', value: countryDisplay.value },
-  ...(profile.value.acct_dob ? [{ label: 'Date of birth', value: profile.value.acct_dob }] : []),
-])
+// Prettify server-stored keys ('prefer_not_to_say' → 'Prefer not to say').
+function humanize(value) {
+  if (!value) return ''
+  return String(value)
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+const infoRows = computed(() => {
+  const p = profile.value
+  const optional = (label, value, extra = {}) => (value ? [{ label, value, ...extra }] : [])
+  return [
+    { label: 'Account number', value: p.acct_no || '—', mono: true },
+    { label: 'Account type', value: p.acct_type || '—' },
+    { label: 'Currency', value: currencyText.value },
+    { label: 'Email', value: p.email || '—' },
+    { label: 'Phone', value: p.phone || '—' },
+    ...optional('Date of birth', p.acct_dob),
+    ...optional('Gender', humanize(p.acct_gender)),
+    ...optional('Marital status', humanize(p.marital_status)),
+    ...optional('Occupation', p.acct_occupation),
+    { label: 'Country', value: countryDisplay.value },
+    ...optional('State / Region', p.state),
+    ...optional('Address', p.acct_address),
+  ]
+})
 
 // ─── Avatar upload (stays on this page — it's a display concern) ─────────
 function onAvatarPicked(event) {
