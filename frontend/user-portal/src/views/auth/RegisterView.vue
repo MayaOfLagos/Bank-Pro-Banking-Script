@@ -14,6 +14,18 @@
     <p class="auth-subheading">{{ stepMeta.subtitle }}</p>
 
     <form class="auth-form" @submit.prevent="onNext">
+      <!-- Honeypot: legitimate users never see or fill this. Any bot that
+           auto-fills every input in the DOM triggers a silent server-side
+           reject. tabindex=-1 + aria-hidden keeps it out of a11y trees. -->
+      <input
+        v-model="hp"
+        type="text"
+        name="hp_website"
+        tabindex="-1"
+        autocomplete="off"
+        aria-hidden="true"
+        style="position:absolute;left:-9999px;top:-9999px;opacity:0;pointer-events:none;height:0;width:0;"
+      />
       <!-- ─── Step 1 · About you ─── -->
       <template v-if="step === 1">
         <div class="reg-row">
@@ -214,6 +226,7 @@ const toast = useToast()
 const site = useSiteStore()
 
 const step = ref(1)
+const hp = ref('') // honeypot — real users never touch this
 const showPw = ref(false)
 const showConfirm = ref(false)
 const showPin = ref(false)
@@ -332,6 +345,7 @@ const submit = async () => {
       confirm_password: confirmPassword.value,
       pin: pin.value,
       terms_accepted: termsAccepted.value,
+      hp_website: hp.value,
     })
     if (!data?.ok) throw new Error(data?.message || 'Sign-up failed')
     toast.success(data?.message || 'Account created — check your email once approved.')

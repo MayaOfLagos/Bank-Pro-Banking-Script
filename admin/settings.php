@@ -63,18 +63,27 @@ if (isset($_POST['test_email'])) {
 }
 
 if (isset($_POST['save_settings'])) {
-    $stmt = $conn->prepare("UPDATE settings SET url_name=:url_name, url_tel=:url_tel, about_us=:about_us, url_email=:url_email, livechat=:livechat, trans_limit_min=:trans_limit_min, trans_limit_max=:trans_limit_max, transfer=:transfer, billing_code=:billing_code, bank_deposit=:bank_deposit WHERE id=1");
+    // Whitelist signup_default_status so the value written to the DB is
+    // always something the register endpoint will accept.
+    $allowedDefault = ['hold', 'active', 'pending'];
+    $defaultStatus = in_array($_POST['signup_default_status'] ?? '', $allowedDefault, true)
+        ? $_POST['signup_default_status']
+        : 'hold';
+
+    $stmt = $conn->prepare("UPDATE settings SET url_name=:url_name, url_tel=:url_tel, about_us=:about_us, url_email=:url_email, livechat=:livechat, trans_limit_min=:trans_limit_min, trans_limit_max=:trans_limit_max, transfer=:transfer, billing_code=:billing_code, bank_deposit=:bank_deposit, registration_enabled=:registration_enabled, signup_default_status=:signup_default_status WHERE id=1");
     $stmt->execute([
-        'url_name'        => $_POST['url_name'],
-        'url_tel'         => $_POST['url_tel'],
-        'about_us'        => $_POST['about_us'],
-        'url_email'       => $_POST['url_email'],
-        'livechat'        => $_POST['livechat'],
-        'trans_limit_min' => $_POST['trans_limit_min'],
-        'trans_limit_max' => $_POST['trans_limit_max'],
-        'transfer'        => $_POST['transfer'],
-        'billing_code'    => $_POST['billing_code'],
-        'bank_deposit'    => $_POST['bank_deposit'],
+        'url_name'              => $_POST['url_name'],
+        'url_tel'               => $_POST['url_tel'],
+        'about_us'              => $_POST['about_us'],
+        'url_email'             => $_POST['url_email'],
+        'livechat'              => $_POST['livechat'],
+        'trans_limit_min'       => $_POST['trans_limit_min'],
+        'trans_limit_max'       => $_POST['trans_limit_max'],
+        'transfer'              => $_POST['transfer'],
+        'billing_code'          => $_POST['billing_code'],
+        'bank_deposit'          => $_POST['bank_deposit'],
+        'registration_enabled'  => (int)($_POST['registration_enabled'] ?? 1),
+        'signup_default_status' => $defaultStatus,
     ]);
     toast_alert('success', 'Settings updated successfully', 'Approved');
 
@@ -190,6 +199,32 @@ if (isset($_POST['save_settings'])) {
                                 <div class="col-md-3"><div class="form-group"><label>Transfer</label><select name="transfer" class="form-control"><option value="1" <?= $page['transfer']=='1'?'selected':'' ?>>Active</option><option value="0" <?= $page['transfer']=='0'?'selected':'' ?>>Inactive</option></select></div></div>
                                 <div class="col-md-3"><div class="form-group"><label>Billing</label><select name="billing_code" class="form-control"><option value="1" <?= $page['billing_code']=='1'?'selected':'' ?>>Active</option><option value="0" <?= $page['billing_code']=='0'?'selected':'' ?>>Inactive</option></select></div></div>
                                 <div class="col-md-3"><div class="form-group"><label>Bank Deposit</label><select name="bank_deposit" class="form-control"><option value="1" <?= $page['bank_deposit']=='1'?'selected':'' ?>>Active</option><option value="0" <?= $page['bank_deposit']=='0'?'selected':'' ?>>Inactive</option></select></div></div>
+                            </div>
+
+                            <hr>
+                            <h5>New signups</h5>
+                            <p class="text-muted small">Controls the customer register page. Turning "Allow signups" off hides the page and rejects every register API call.</p>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Allow signups</label>
+                                        <select name="registration_enabled" class="form-control">
+                                            <option value="1" <?= (int)($page['registration_enabled'] ?? 1) === 1 ? 'selected' : '' ?>>Open — anyone can register</option>
+                                            <option value="0" <?= (int)($page['registration_enabled'] ?? 1) === 0 ? 'selected' : '' ?>>Closed — /register redirects to /login</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label>Default status for new accounts</label>
+                                        <select name="signup_default_status" class="form-control">
+                                            <?php $sds = (string)($page['signup_default_status'] ?? 'hold'); ?>
+                                            <option value="hold"    <?= $sds === 'hold'    ? 'selected' : '' ?>>Hold — must approve before user can sign in (recommended)</option>
+                                            <option value="pending" <?= $sds === 'pending' ? 'selected' : '' ?>>Pending — same as Hold, kept for legacy naming</option>
+                                            <option value="active"  <?= $sds === 'active'  ? 'selected' : '' ?>>Active — user can sign in immediately (skips review)</option>
+                                        </select>
+                                    </div>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label>Tawk.to Livechat URL</label>

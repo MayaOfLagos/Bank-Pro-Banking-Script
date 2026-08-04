@@ -5,12 +5,48 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     auth_json(405, ['ok' => false, 'message' => 'Method not allowed']);
 }
 
+// Kill switch — admin can turn off new signups from admin/settings.php.
+// Rejected BEFORE any DB write / rate-limit row so a disabled endpoint
+// leaves zero trace beyond the response.
+if ((int)($settings['registration_enabled'] ?? 1) !== 1) {
+    auth_json(403, ['ok' => false, 'message' => 'New account registration is currently closed. Try again later.']);
+}
+
 // Reject if the caller is already signed in.
 if (!empty($_SESSION['acct_no']) || !empty($_SESSION['login'])) {
     auth_json(409, ['ok' => false, 'message' => 'Already signed in']);
 }
 
 $payload = auth_payload();
+
+// Honeypot: the form MUST send the "hp_website" key empty. Anything
+// filled in almost certainly came from a spam bot script auto-filling
+// every input; reject with the same "closed" message so bots can't
+// distinguish honeypot rejection from a hard block.
+if (isset($payload['hp_website']) && trim((string)$payload['hp_website']) !== '') {
+    auth_json(403, ['ok' => false, 'message' => 'New account registration is currently closed. Try again later.']);
+}
+
+// Per-IP rate limit: max 5 successful-or-attempted registrations per IP
+// per hour. Prevents credential-stuffing / mass-signup floods without
+// needing an external captcha.
+$ipAddress = trim((string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'));
+$rateCheck = $conn->prepare('SELECT COUNT(*) FROM register_attempts WHERE ip_address = :ip AND attempted_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)');
+$rateCheck->execute(['ip' => $ipAddress]);
+if ((int)$rateCheck->fetchColumn() >= 5) {
+    auth_json(429, ['ok' => false, 'message' => 'Too many signup attempts from this network. Wait an hour and try again.']);
+}
+$logAttempt = $conn->prepare('INSERT INTO register_attempts (ip_address) VALUES (:ip)');
+$logAttempt->execute(['ip' => $ipAddress]);
+
+// Hard payload cap: refuse absurd oversized bodies before we spend CPU
+// running validation regex on them.
+foreach ($payload as $key => $value) {
+    if (is_string($value) && strlen($value) > 500) {
+        auth_json(413, ['ok' => false, 'message' => 'One or more fields is too long.']);
+    }
+}
+
 // terms_accepted skipped here — auth_require treats a `false` bool as
 // "empty" and would fire a misleading "missing field" error. Validated
 // separately below with a helpful message.
@@ -124,6 +160,17 @@ if ($acctNo === null) {
 // ─── Insert ────────────────────────────────────────────────────────────
 $hash = password_hash($password, PASSWORD_BCRYPT);
 
+// Default status is admin-controlled — 'hold' keeps the review-first
+// posture (safe default), but ops teams that trust their vetting can
+// flip it to 'active' for instant onboarding. Whitelist against a known
+// set so an admin can't accidentally save a value that later blocks
+// login for other reasons.
+$allowedDefaultStatuses = ['hold', 'active', 'pending'];
+$defaultStatus = strtolower(trim((string)($settings['signup_default_status'] ?? 'hold')));
+if (!in_array($defaultStatus, $allowedDefaultStatuses, true)) {
+    $defaultStatus = 'hold';
+}
+
 $insert = $conn->prepare(
     'INSERT INTO users (
         firstname, lastname, acct_email, acct_phone, acct_password,
@@ -148,7 +195,7 @@ $insert->execute([
     'acct_no'   => $acctNo,
     'acct_type' => $acctType,
     'currency'  => $currency,
-    'status'    => 'hold',
+    'status'    => $defaultStatus,
     'country'   => $country,
     'dob'       => $dob,
     'pin'       => $pin,
@@ -160,7 +207,7 @@ try {
     $userMsg = $sendMail->regMsgUser(
         $fullName,
         $acctNo,
-        'hold',
+        $defaultStatus,
         $emailNormalized,
         $phoneDigits,
         $acctType,
@@ -184,12 +231,18 @@ try {
     error_log('[register] mail send failed: ' . $e->getMessage());
 }
 
+// Status-aware confirmation message so instant-active accounts don't
+// wait for an email that will never come.
+$confirmation = $defaultStatus === 'active'
+    ? 'Account created — you can sign in now.'
+    : 'Account created. It is pending review — you\'ll get an email once approved.';
+
 auth_json(201, [
     'ok' => true,
-    'message' => 'Account created. It is pending review — you\'ll get an email once approved.',
+    'message' => $confirmation,
     'data' => [
         'acct_no' => $acctNo,
-        'acct_status' => 'hold',
+        'acct_status' => $defaultStatus,
         'next_route' => '/login',
     ],
 ]);

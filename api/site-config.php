@@ -13,7 +13,12 @@ require_once __DIR__ . '/../include/branding.php';
 require_once __DIR__ . '/_security.php';
 
 header('Content-Type: application/json; charset=utf-8');
-header('Cache-Control: public, max-age=60');
+// No client-side caching — the SPA relies on this response for admin
+// toggles (registration_enabled, brand overrides). A stale cached copy
+// would leave the SPA out of step for up to the cache window every time
+// an admin flips a setting.
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
 
 if (!in_array(strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET'), ['GET', 'HEAD'], true)) {
     http_response_code(405);
@@ -23,7 +28,7 @@ if (!in_array(strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET'), ['GET', 'HEAD'], 
 }
 
 $conn = dbConnect();
-$stmt = $conn->prepare("SELECT image, favicon, about_us, url_name, url_tel, url_email FROM settings WHERE id='1' LIMIT 1");
+$stmt = $conn->prepare("SELECT image, favicon, about_us, url_name, url_tel, url_email, registration_enabled FROM settings WHERE id='1' LIMIT 1");
 $stmt->execute();
 $settings = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
@@ -55,6 +60,10 @@ echo json_encode([
         'favicon_url' => $faviconUrl,
         'support_email' => (string)($settings['url_email'] ?? WEB_EMAIL),
         'support_phone' => (string)($settings['url_tel'] ?? ''),
+        // Admin toggle — when false, the SPA hides the register link
+        // and the /register route guards to /login. The register API
+        // enforces the same flag server-side (defence in depth).
+        'registration_enabled' => (int)($settings['registration_enabled'] ?? 1) === 1,
         // UX hint for the register wizard's country dropdown. Empty when
         // we can't resolve it — client will fall back to browser Intl.
         'detected_country_code' => $detectedCountry,

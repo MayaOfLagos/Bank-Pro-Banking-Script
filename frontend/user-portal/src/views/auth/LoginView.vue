@@ -71,7 +71,7 @@
     </form>
 
     <template #footer>
-      <p class="auth-footer-note">
+      <p v-if="site.registrationEnabled" class="auth-footer-note">
         New to {{ site.brandName }}?
         <RouterLink to="/register">Create an account</RouterLink>
       </p>

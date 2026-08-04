@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useSiteStore } from '../stores/site'
 
 const DashboardView = () => import('../views/DashboardView.vue')
 const WireTransferView = () => import('../views/WireTransferView.vue')
@@ -54,6 +55,18 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
+  const site = useSiteStore()
+
+  // Admin killed registration — bounce /register visitors to /login.
+  // Force a live re-fetch of site-config so an admin flip is reflected
+  // on the very next navigation (the store's boot-time value would
+  // otherwise be stale until a full reload).
+  if (to.name === 'register') {
+    await site.load(true).catch(() => {})
+    if (!site.registrationEnabled) {
+      return '/login'
+    }
+  }
 
   // First navigation refreshes from the server; subsequent ones trust cached
   // state. The 401 interceptor resets the store, so a stale-cached

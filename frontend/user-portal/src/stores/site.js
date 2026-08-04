@@ -15,34 +15,59 @@ export const useSiteStore = defineStore('site', () => {
   const supportEmail = ref('')
   const supportPhone = ref('')
   const detectedCountryCode = ref('')
+  const registrationEnabled = ref(true)
   const loaded = ref(false)
   const loading = ref(false)
   const error = ref('')
 
+  // Shared promise for the current in-flight fetch. Lets concurrent
+  // callers wait for the same request instead of firing duplicates, AND
+  // lets a force=true caller properly wait for the racing non-force
+  // fetch to settle before it kicks its own (the old `if (loading) return`
+  // silently ate force=true calls that arrived during boot).
+  let inflight = null
+
   async function load(force = false) {
     if (loaded.value && !force) return
-    if (loading.value) return
-    loading.value = true
+    if (inflight) {
+      try { await inflight } catch {}
+      if (!force) return
+    }
+
     error.value = ''
+    loading.value = true
+    inflight = (async () => {
+      try {
+        const { data } = await client.get('/api/site-config.php')
+        if (!data?.ok) throw new Error(data?.message || 'Unable to load site config')
+        const d = data.data || {}
+        brandName.value = d.brand_name || brandName.value
+        tagline.value = d.tagline || tagline.value
+        logoUrl.value = d.logo_url || null
+        faviconUrl.value = d.favicon_url || faviconUrl.value
+        supportEmail.value = d.support_email || ''
+        supportPhone.value = d.support_phone || ''
+        detectedCountryCode.value = d.detected_country_code || ''
+        // Default to true if the field is missing (older API version) so
+        // the register link doesn't disappear until the admin explicitly
+        // turns it off.
+        registrationEnabled.value = d.registration_enabled !== false
+        if (d.csrf_token) setCsrfToken(d.csrf_token)
+        applyFavicon(faviconUrl.value)
+        applyDocumentTitle()
+        loaded.value = true
+      } catch (err) {
+        error.value = err?.response?.data?.message || err.message || 'Unable to load site config'
+        throw err
+      } finally {
+        loading.value = false
+      }
+    })()
+
     try {
-      const { data } = await client.get('/api/site-config.php')
-      if (!data?.ok) throw new Error(data?.message || 'Unable to load site config')
-      const d = data.data || {}
-      brandName.value = d.brand_name || brandName.value
-      tagline.value = d.tagline || tagline.value
-      logoUrl.value = d.logo_url || null
-      faviconUrl.value = d.favicon_url || faviconUrl.value
-      supportEmail.value = d.support_email || ''
-      supportPhone.value = d.support_phone || ''
-      detectedCountryCode.value = d.detected_country_code || ''
-      if (d.csrf_token) setCsrfToken(d.csrf_token)
-      applyFavicon(faviconUrl.value)
-      applyDocumentTitle()
-      loaded.value = true
-    } catch (err) {
-      error.value = err?.response?.data?.message || err.message || 'Unable to load site config'
+      await inflight
     } finally {
-      loading.value = false
+      inflight = null
     }
   }
 
@@ -80,6 +105,7 @@ export const useSiteStore = defineStore('site', () => {
     supportEmail,
     supportPhone,
     detectedCountryCode,
+    registrationEnabled,
     loaded,
     loading,
     error,
