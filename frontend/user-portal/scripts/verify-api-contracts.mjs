@@ -48,7 +48,7 @@ const resetApi = await readFile(resolve(projectDirectory, 'api/auth/reset-passwo
 const dashboardApi = await readFile(resolve(projectDirectory, 'api/user/dashboard.php'), 'utf8')
 const transferVerifyApi = await readFile(resolve(projectDirectory, 'api/user/transfer-verify-pin.php'), 'utf8')
 const contractChecks = [
-  ['password reset uses new_password on both sides', allSource.includes('new_password: form.password') && resetApi.includes("['email', 'reset_token', 'new_password']")],
+  ['password reset uses new_password on both sides', /new_password\s*:\s*formValues\.new_password/.test(allSource) && resetApi.includes("['email', 'reset_token', 'new_password']")],
   ['dashboard does not select or return a full card number', !dashboardApi.includes('card_number')],
   ['transfer verification consumes a specific pending transfer', transferVerifyApi.includes('pending_transfer_id') && transferVerifyApi.includes('DELETE FROM temp_trans') && transferVerifyApi.includes('FOR UPDATE')],
 ]
