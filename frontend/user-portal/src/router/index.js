@@ -11,6 +11,8 @@ const DomesticTransferView = () => import('../views/DomesticTransferView.vue')
 const WithdrawalsView = () => import('../views/WithdrawalsView.vue')
 const TicketsView = () => import('../views/TicketsView.vue')
 const ProfileView = () => import('../views/ProfileView.vue')
+const ProfileEditView = () => import('../views/ProfileEditView.vue')
+const SecurityView = () => import('../views/SecurityView.vue')
 const CardsView = () => import('../views/CardsView.vue')
 const LoansView = () => import('../views/LoansView.vue')
 const LoginView = () => import('../views/auth/LoginView.vue')
@@ -44,6 +46,8 @@ const router = createRouter({
     { path: '/loans', name: 'loans', component: LoansView, meta: { requiresAuth: true, title: 'Loans' } },
     { path: '/tickets', name: 'tickets', component: TicketsView, meta: { requiresAuth: true, title: 'Support' } },
     { path: '/profile', name: 'profile', component: ProfileView, meta: { requiresAuth: true, title: 'Profile' } },
+    { path: '/profile/edit', name: 'profile-edit', component: ProfileEditView, meta: { requiresAuth: true, title: 'Edit Personal Details' } },
+    { path: '/profile/security', name: 'profile-security', component: SecurityView, meta: { requiresAuth: true, title: 'Security' } },
     { path: '/transfer-verify', name: 'transfer-verify', component: TransferVerifyView, meta: { requiresAuth: true, title: 'Verify Transfer OTP' } },
     { path: '/transfer-cot', name: 'transfer-cot', component: TransferCotView, meta: { requiresAuth: true, title: 'COT Verification' } },
     { path: '/transfer-tax', name: 'transfer-tax', component: TransferTaxView, meta: { requiresAuth: true, title: 'TAX Verification' } },

@@ -1,21 +1,31 @@
 <script setup>
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { z } from 'zod'
+import {
+  ChevronLeftIcon, BanknotesIcon, UserIcon, BuildingLibraryIcon,
+  HashtagIcon, GlobeAltIcon, LockClosedIcon,
+  ExclamationTriangleIcon, ChatBubbleLeftEllipsisIcon,
+} from '@heroicons/vue/24/solid'
 import FormField from '../components/ui/FormField.vue'
 import ErrorState from '../components/ui/ErrorState.vue'
-import MoneyValue from '../components/ui/MoneyValue.vue'
 import { useTransferForm } from '../composables/useTransferForm'
 import {
-  moneyAmount,
-  nonEmptyString,
-  accountNumber,
-  swiftCode,
-  routingNumber,
+  moneyAmount, nonEmptyString, accountNumber, swiftCode, routingNumber,
 } from '../validation/schemas'
+import { countryList } from '../utils/countries'
+import { currencySymbol } from '../utils/currency'
+import { formatMoneyInline } from '../utils/format'
 
 const router = useRouter()
 
-const ACCOUNT_TYPES = ['Checking', 'Savings', 'Business Checking', 'Business Savings']
+// Matches the legacy /user/wire-transfer.php option list so admin reports
+// keep classifying transfers with the same vocabulary.
+const ACCOUNT_TYPES = [
+  'Savings', 'Current', 'Checking', 'Fixed Deposit',
+  'Non Resident', 'Online Banking', 'Domiciliary', 'Joint',
+]
+const COUNTRIES = countryList()
 
 const schema = z.object({
   amount: moneyAmount({ label: 'Amount' }),
@@ -30,244 +40,358 @@ const schema = z.object({
 })
 
 const {
-  loading,
-  canTransfer,
-  meta,
-  serverError,
-  defineField,
-  errors,
-  isSubmitting,
-  submit,
+  loading, canTransfer, meta, serverError,
+  defineField, errors, isSubmitting, submit,
 } = useTransferForm({
   metaEndpoint: '/api/user/wire-transfer-meta.php',
   submitEndpoint: '/api/user/wire-transfer-submit.php',
   schema,
   initialValues: {
-    amount: '',
-    acct_name: '',
-    bank_name: '',
-    acct_number: '',
-    acct_country: '',
-    acct_swift: '',
-    acct_routing: '',
-    acct_type: '',
-    acct_remarks: '',
+    amount: '', acct_name: '', bank_name: '', acct_number: '',
+    acct_country: '', acct_swift: '', acct_routing: '',
+    acct_type: '', acct_remarks: '',
   },
 })
 
 const [amount, amountAttrs] = defineField('amount')
 const [acctName, acctNameAttrs] = defineField('acct_name')
 const [bankName, bankNameAttrs] = defineField('bank_name')
-const [acctNumber, acctNumberAttrs] = defineField('acct_number')
+const [acctNumberField, acctNumberAttrs] = defineField('acct_number')
 const [acctCountry, acctCountryAttrs] = defineField('acct_country')
 const [acctSwift, acctSwiftAttrs] = defineField('acct_swift')
 const [acctRouting, acctRoutingAttrs] = defineField('acct_routing')
 const [acctType, acctTypeAttrs] = defineField('acct_type')
 const [acctRemarks, acctRemarksAttrs] = defineField('acct_remarks')
+
+// `meta` from useTransferForm is a `reactive` object, not a ref — access
+// keys directly (no `.value`) or the reads become undefined and the
+// balance falls back to 0.
+const currencyText = computed(() => meta.currency || currencySymbol(meta.acct_currency || 'USD'))
+const balanceDisplay = computed(() => `${currencyText.value}${formatMoneyInline(meta.acct_balance ?? 0, { trimTrailingZero: true })}`)
+// Show the limit hint whenever the account has one configured (finite
+// value). Depleted state (≤ 0) renders with a warning so the user
+// knows the transfer will bounce before they hit Continue.
+const hasLimit = computed(() => Number.isFinite(meta.limit_remain))
+const limitDepleted = computed(() => hasLimit.value && meta.limit_remain <= 0)
+const limitDisplay = computed(() => {
+  const value = Math.max(0, meta.limit_remain)
+  return `${currencyText.value}${formatMoneyInline(value, { trimTrailingZero: true })}`
+})
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#080d18] pb-28">
-    <!-- Header -->
-    <div class="bg-gradient-to-b from-[#0d1b38] to-[#080d18] px-5 pt-12 pb-6">
-      <p class="text-slate-400 text-sm">International banking</p>
-      <h1 class="text-2xl font-bold text-white mt-1">Wire Transfer</h1>
-    </div>
+  <div class="page">
+    <div class="content">
+      <header class="header">
+        <button type="button" class="back" aria-label="Go back" @click="router.back()">
+          <ChevronLeftIcon class="back-icon" aria-hidden="true" />
+        </button>
+        <div class="titles">
+          <h1 class="title">Wire transfer</h1>
+          <p class="subtitle">Send money internationally</p>
+        </div>
+      </header>
 
-    <template v-if="loading">
-      <div class="mx-4 mt-4 h-20 rounded-2xl bg-[#111827] animate-pulse"></div>
-      <div class="px-4 mt-4 space-y-4">
-        <div v-for="i in 7" :key="i" class="h-14 rounded-xl bg-[#111827] animate-pulse"></div>
-      </div>
-    </template>
+      <template v-if="loading">
+        <div class="skeleton skeleton-balance" />
+        <div class="skeleton skeleton-form" />
+      </template>
 
-    <template v-else>
-      <!-- Balance pill -->
-      <div class="bg-[#1a2436] rounded-2xl px-5 py-4 mx-4 mt-4 flex items-center justify-between">
-        <div>
-          <p class="text-slate-400 text-xs mb-0.5">Available balance</p>
-          <p class="text-white text-xl font-bold">
-            <MoneyValue :value="meta.acct_balance" :currency="meta.currency" />
+      <template v-else>
+        <section class="balance-card">
+          <div class="balance-copy">
+            <p class="balance-label">Available balance</p>
+            <p class="balance-amount">{{ balanceDisplay }}</p>
+            <p v-if="hasLimit" class="balance-limit" :class="{ 'balance-limit--depleted': limitDepleted }">
+              <template v-if="limitDepleted">
+                Transfer limit reached — contact support to raise it.
+              </template>
+              <template v-else>
+                Remaining transfer limit · <strong>{{ limitDisplay }}</strong>
+              </template>
+            </p>
+          </div>
+          <div class="balance-icon">
+            <BanknotesIcon aria-hidden="true" />
+          </div>
+        </section>
+
+        <section v-if="!canTransfer" class="restricted">
+          <div class="restricted-icon">
+            <ExclamationTriangleIcon aria-hidden="true" />
+          </div>
+          <h3 class="restricted-title">Wire transfers restricted</h3>
+          <p class="restricted-body">
+            International transfers are not enabled on this account.
+            Contact support to activate.
           </p>
-        </div>
-        <div class="h-10 w-10 rounded-full bg-blue-600/20 flex items-center justify-center">
-          <svg class="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253" />
-          </svg>
-        </div>
-      </div>
+          <button type="button" class="restricted-btn" @click="router.push('/tickets')">
+            Contact support
+          </button>
+        </section>
 
-      <!-- Restricted state -->
-      <div v-if="!canTransfer" class="mx-4 mt-4 bg-[#111827] rounded-2xl p-8 text-center">
-        <div class="h-14 w-14 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
-          <svg class="w-7 h-7 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-          </svg>
-        </div>
-        <h3 class="text-white font-semibold text-lg">Transfers Restricted</h3>
-        <p class="text-slate-400 text-sm mt-2 leading-relaxed max-w-xs mx-auto">
-          Your account is not currently enabled for wire transfers. Please contact support to activate international transfers.
-        </p>
-        <button
-          @click="router.push('/tickets')"
-          class="mt-5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl py-3 px-6 transition text-sm"
-        >
-          Contact Support
-        </button>
-      </div>
+        <form v-else class="form" @submit.prevent="submit">
+          <section class="form-card">
+            <FormField label="Amount" :error="errors.amount" required>
+              <template #default="{ id, describedBy }">
+                <div class="amount-input">
+                  <span class="amount-currency">{{ currencyText }}</span>
+                  <input
+                    :id="id" v-bind="amountAttrs" v-model="amount"
+                    type="number" step="0.01" inputmode="decimal" placeholder="0.00"
+                    :aria-describedby="describedBy"
+                    :aria-invalid="!!errors.amount || null"
+                    class="input input--amount"
+                  />
+                </div>
+              </template>
+            </FormField>
 
-      <!-- Transfer form -->
-      <form v-else @submit.prevent="submit" class="px-4 mt-4 space-y-4">
-        <FormField label="Transfer Amount" :error="errors.amount" required>
-          <template #default="{ id, describedBy }">
-            <input
-              :id="id"
-              v-bind="amountAttrs"
-              v-model="amount"
-              type="number"
-              step="0.01"
-              inputmode="decimal"
-              placeholder="0.00"
-              :aria-describedby="describedBy"
-              :aria-invalid="!!errors.amount || null"
-              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
-            />
-          </template>
-        </FormField>
+            <FormField label="Beneficiary name" :error="errors.acct_name" required>
+              <template #default="{ id, describedBy }">
+                <div class="input-wrap">
+                  <UserIcon class="input-icon" aria-hidden="true" />
+                  <input :id="id" v-bind="acctNameAttrs" v-model="acctName" type="text"
+                         autocomplete="name" placeholder="Full legal name"
+                         :aria-describedby="describedBy" :aria-invalid="!!errors.acct_name || null"
+                         class="input input--with-icon" />
+                </div>
+              </template>
+            </FormField>
 
-        <FormField label="Beneficiary Name" :error="errors.acct_name" required>
-          <template #default="{ id, describedBy }">
-            <input
-              :id="id"
-              v-bind="acctNameAttrs"
-              v-model="acctName"
-              type="text"
-              autocomplete="name"
-              placeholder="Full legal name"
-              :aria-describedby="describedBy"
-              :aria-invalid="!!errors.acct_name || null"
-              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
-            />
-          </template>
-        </FormField>
+            <FormField label="Bank name" :error="errors.bank_name" required>
+              <template #default="{ id, describedBy }">
+                <div class="input-wrap">
+                  <BuildingLibraryIcon class="input-icon" aria-hidden="true" />
+                  <input :id="id" v-bind="bankNameAttrs" v-model="bankName" type="text"
+                         placeholder="Receiving bank name"
+                         :aria-describedby="describedBy" :aria-invalid="!!errors.bank_name || null"
+                         class="input input--with-icon" />
+                </div>
+              </template>
+            </FormField>
 
-        <FormField label="Bank Name" :error="errors.bank_name" required>
-          <template #default="{ id, describedBy }">
-            <input
-              :id="id"
-              v-bind="bankNameAttrs"
-              v-model="bankName"
-              type="text"
-              placeholder="Receiving bank name"
-              :aria-describedby="describedBy"
-              :aria-invalid="!!errors.bank_name || null"
-              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
-            />
-          </template>
-        </FormField>
+            <FormField label="Account number / IBAN" :error="errors.acct_number" required>
+              <template #default="{ id, describedBy }">
+                <div class="input-wrap">
+                  <HashtagIcon class="input-icon" aria-hidden="true" />
+                  <input :id="id" v-bind="acctNumberAttrs" v-model="acctNumberField" type="text"
+                         placeholder="Account number or IBAN"
+                         :aria-describedby="describedBy" :aria-invalid="!!errors.acct_number || null"
+                         class="input input--with-icon input--mono" />
+                </div>
+              </template>
+            </FormField>
 
-        <FormField label="Account Number / IBAN" :error="errors.acct_number" required>
-          <template #default="{ id, describedBy }">
-            <input
-              :id="id"
-              v-bind="acctNumberAttrs"
-              v-model="acctNumber"
-              type="text"
-              placeholder="Account number or IBAN"
-              :aria-describedby="describedBy"
-              :aria-invalid="!!errors.acct_number || null"
-              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
-            />
-          </template>
-        </FormField>
+            <FormField label="Destination country" :error="errors.acct_country" required>
+              <template #default="{ id, describedBy }">
+                <div class="input-wrap">
+                  <GlobeAltIcon class="input-icon" aria-hidden="true" />
+                  <select :id="id" v-bind="acctCountryAttrs" v-model="acctCountry"
+                          :aria-describedby="describedBy" :aria-invalid="!!errors.acct_country || null"
+                          class="input input--with-icon">
+                    <option value="" disabled>Select destination country</option>
+                    <!-- Value is the full name (not the ISO code) so admin
+                         reports render a human-readable destination
+                         alongside legacy records. -->
+                    <option v-for="c in COUNTRIES" :key="c.code" :value="c.name">{{ c.name }}</option>
+                  </select>
+                </div>
+              </template>
+            </FormField>
 
-        <FormField label="Destination Country" :error="errors.acct_country" required>
-          <template #default="{ id, describedBy }">
-            <input
-              :id="id"
-              v-bind="acctCountryAttrs"
-              v-model="acctCountry"
-              type="text"
-              autocomplete="country-name"
-              placeholder="e.g. United States"
-              :aria-describedby="describedBy"
-              :aria-invalid="!!errors.acct_country || null"
-              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
-            />
-          </template>
-        </FormField>
+            <div class="pair">
+              <FormField label="SWIFT / BIC" hint="Optional" :error="errors.acct_swift">
+                <template #default="{ id, describedBy }">
+                  <div class="input-wrap">
+                    <LockClosedIcon class="input-icon" aria-hidden="true" />
+                    <input :id="id" v-bind="acctSwiftAttrs" v-model="acctSwift" type="text"
+                           placeholder="e.g. CHASUS33"
+                           :aria-describedby="describedBy" :aria-invalid="!!errors.acct_swift || null"
+                           class="input input--with-icon input--mono" />
+                  </div>
+                </template>
+              </FormField>
 
-        <FormField label="SWIFT / BIC Code" hint="Optional" :error="errors.acct_swift">
-          <template #default="{ id, describedBy }">
-            <input
-              :id="id"
-              v-bind="acctSwiftAttrs"
-              v-model="acctSwift"
-              type="text"
-              placeholder="e.g. CHASUS33"
-              :aria-describedby="describedBy"
-              :aria-invalid="!!errors.acct_swift || null"
-              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
-            />
-          </template>
-        </FormField>
+              <FormField label="Routing / ABA" hint="Optional" :error="errors.acct_routing">
+                <template #default="{ id, describedBy }">
+                  <div class="input-wrap">
+                    <HashtagIcon class="input-icon" aria-hidden="true" />
+                    <input :id="id" v-bind="acctRoutingAttrs" v-model="acctRouting" type="text"
+                           inputmode="numeric" placeholder="9 digits"
+                           :aria-describedby="describedBy" :aria-invalid="!!errors.acct_routing || null"
+                           class="input input--with-icon input--mono" />
+                  </div>
+                </template>
+              </FormField>
+            </div>
 
-        <FormField label="Routing / ABA Number" hint="Optional" :error="errors.acct_routing">
-          <template #default="{ id, describedBy }">
-            <input
-              :id="id"
-              v-bind="acctRoutingAttrs"
-              v-model="acctRouting"
-              type="text"
-              inputmode="numeric"
-              placeholder="9-digit ABA routing number"
-              :aria-describedby="describedBy"
-              :aria-invalid="!!errors.acct_routing || null"
-              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
-            />
-          </template>
-        </FormField>
+            <FormField label="Account type" :error="errors.acct_type" required>
+              <template #default="{ id, describedBy }">
+                <div class="input-wrap">
+                  <BuildingLibraryIcon class="input-icon" aria-hidden="true" />
+                  <select :id="id" v-bind="acctTypeAttrs" v-model="acctType"
+                          :aria-describedby="describedBy" :aria-invalid="!!errors.acct_type || null"
+                          class="input input--with-icon">
+                    <option value="" disabled>Select account type</option>
+                    <option v-for="type in ACCOUNT_TYPES" :key="type" :value="type">{{ type }}</option>
+                  </select>
+                </div>
+              </template>
+            </FormField>
 
-        <FormField label="Account Type" :error="errors.acct_type" required>
-          <template #default="{ id, describedBy }">
-            <select
-              :id="id"
-              v-bind="acctTypeAttrs"
-              v-model="acctType"
-              :aria-describedby="describedBy"
-              :aria-invalid="!!errors.acct_type || null"
-              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-blue-500 text-sm appearance-none"
-            >
-              <option value="" disabled class="bg-[#1a2436]">Select account type</option>
-              <option v-for="type in ACCOUNT_TYPES" :key="type" :value="type" class="bg-[#1a2436]">{{ type }}</option>
-            </select>
-          </template>
-        </FormField>
+            <FormField label="Reference note" hint="Optional" :error="errors.acct_remarks">
+              <template #default="{ id, describedBy }">
+                <div class="input-wrap input-wrap--textarea">
+                  <ChatBubbleLeftEllipsisIcon class="input-icon input-icon--top" aria-hidden="true" />
+                  <textarea :id="id" v-bind="acctRemarksAttrs" v-model="acctRemarks" rows="3"
+                            placeholder="Payment purpose or memo"
+                            :aria-describedby="describedBy"
+                            class="input input--with-icon input--textarea"></textarea>
+                </div>
+              </template>
+            </FormField>
+          </section>
 
-        <FormField label="Transfer Remarks" hint="Optional" :error="errors.acct_remarks">
-          <template #default="{ id, describedBy }">
-            <textarea
-              :id="id"
-              v-bind="acctRemarksAttrs"
-              v-model="acctRemarks"
-              rows="3"
-              placeholder="Payment purpose or reference note"
-              :aria-describedby="describedBy"
-              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm resize-none"
-            ></textarea>
-          </template>
-        </FormField>
+          <ErrorState v-if="serverError" :message="serverError" compact />
 
-        <ErrorState v-if="serverError" :message="serverError" compact />
-
-        <button
-          type="submit"
-          :disabled="isSubmitting"
-          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl py-4 transition disabled:opacity-50 disabled:cursor-not-allowed mt-6"
-        >
-          {{ isSubmitting ? 'Processing...' : 'Initiate Wire Transfer' }}
-        </button>
-      </form>
-    </template>
+          <button type="submit" class="submit" :disabled="isSubmitting">
+            {{ isSubmitting ? 'Processing…' : 'Continue' }}
+          </button>
+        </form>
+      </template>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.page {
+  min-height: 100vh;
+  background: var(--bg-gradient);
+  padding: var(--space-5) var(--space-4) 7rem;
+}
+.content {
+  max-width: 30rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.header { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0 var(--space-1); }
+.back { width: 2.5rem; height: 2.5rem; border-radius: 0.7rem; border: 1px solid var(--border); background: transparent; color: var(--text-primary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.back:hover { background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
+.back:active { transform: scale(0.95); }
+.back-icon { width: 1.15rem; height: 1.15rem; }
+.title { font-size: 1.5rem; font-weight: 800; color: var(--text-primary); margin: 0; line-height: 1.1; }
+.subtitle { font-size: 0.8rem; color: var(--text-secondary); margin: 0.15rem 0 0; }
+
+.balance-card {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-3); padding: var(--space-4);
+  background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-card);
+}
+.balance-label {
+  font-size: 0.75rem; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 0.25rem;
+}
+.balance-amount { font-size: 1.6rem; font-weight: 800; color: var(--text-primary); margin: 0; letter-spacing: -0.01em; }
+.balance-limit { font-size: 0.75rem; color: var(--text-muted); margin: 0.35rem 0 0; }
+.balance-limit strong { color: var(--text-secondary); font-weight: 700; }
+.balance-limit--depleted { color: var(--warning-fg); font-weight: 600; }
+.balance-icon {
+  width: 2.75rem; height: 2.75rem; border-radius: var(--radius-pill);
+  background: var(--accent-tint); color: var(--accent-strong);
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.balance-icon > svg { width: 1.35rem; height: 1.35rem; }
+
+.restricted {
+  background: var(--surface); border-radius: var(--radius-lg); padding: var(--space-6);
+  box-shadow: var(--shadow-card); text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-3);
+}
+.restricted-icon {
+  width: 3rem; height: 3rem; border-radius: var(--radius-pill);
+  background: var(--danger-bg); color: var(--danger-fg);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.restricted-icon > svg { width: 1.5rem; height: 1.5rem; }
+.restricted-title { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin: 0; }
+.restricted-body { font-size: 0.9rem; color: var(--text-secondary); margin: 0; max-width: 20rem; line-height: 1.5; }
+.restricted-btn {
+  margin-top: var(--space-2); padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-pill); border: 1px solid var(--btn-outline-border);
+  background: var(--surface); color: var(--text-primary); font-weight: 600; cursor: pointer;
+}
+
+.form { display: flex; flex-direction: column; gap: var(--space-4); }
+.form-card {
+  background: var(--surface); border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-4); box-shadow: var(--shadow-card);
+  display: flex; flex-direction: column; gap: var(--space-4);
+}
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+@media (max-width: 480px) { .pair { grid-template-columns: 1fr; } }
+
+.amount-input {
+  display: flex; align-items: stretch;
+  border-radius: var(--radius-md); background: var(--surface-muted);
+  border: 1px solid transparent; overflow: hidden;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.amount-input:focus-within {
+  border-color: var(--accent); background: var(--surface);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.amount-currency {
+  padding: 0.85rem 0.95rem; color: var(--text-secondary); font-weight: 700;
+  background: transparent; border-right: 1px solid var(--border);
+  display: inline-flex; align-items: center;
+}
+.input--amount {
+  border: none; background: transparent; flex: 1; padding-left: 0.85rem;
+  font-size: 1.15rem; font-weight: 700; color: var(--text-primary);
+}
+
+.input-wrap { position: relative; display: flex; align-items: center; }
+.input-wrap--textarea { align-items: flex-start; }
+.input {
+  width: 100%; padding: 0.85rem 1rem;
+  border-radius: var(--radius-md); border: 1px solid transparent;
+  background: var(--surface-muted); color: var(--text-primary);
+  font-size: 0.95rem; font-family: inherit; outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.input:focus {
+  border-color: var(--accent); background: var(--surface);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.input--mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; letter-spacing: 0.02em; font-size: 0.9rem; }
+.input--textarea { resize: none; padding-top: 0.85rem; }
+.input-icon {
+  position: absolute; left: 0.95rem; top: 50%; transform: translateY(-50%);
+  width: 1.25rem; height: 1.25rem; color: var(--text-primary); pointer-events: none;
+}
+.input-icon--top { top: 0.95rem; transform: none; }
+.input--with-icon { padding-left: 2.75rem; }
+
+.submit {
+  width: 100%; height: 3.1rem; padding: 0 var(--space-4);
+  border-radius: var(--radius-pill); border: 1px solid transparent;
+  background: var(--btn-primary-bg); color: var(--btn-primary-fg);
+  font-weight: 700; font-size: 0.95rem; font-family: inherit;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  transition: transform 0.08s ease, opacity 0.15s ease;
+}
+.submit:hover:not(:disabled) { opacity: 0.92; }
+.submit:active:not(:disabled) { transform: scale(0.98); }
+.submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.skeleton {
+  border-radius: var(--radius-lg); background: var(--surface-muted);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+.skeleton-balance { height: 5.5rem; }
+.skeleton-form { height: 28rem; }
+@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.85; } }
+</style>

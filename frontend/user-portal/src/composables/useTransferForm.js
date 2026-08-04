@@ -17,7 +17,7 @@ export function useTransferForm({ metaEndpoint, submitEndpoint, schema, initialV
 
   const loading = ref(true)
   const canTransfer = ref(false)
-  const meta = reactive({ acct_balance: '0.00', currency: '$' })
+  const meta = reactive({ acct_balance: 0, limit_remain: 0, currency: '$' })
   const serverError = ref('')
 
   const { defineField, handleSubmit, errors, isSubmitting, values } = useValidatedForm(schema, {
@@ -29,7 +29,10 @@ export function useTransferForm({ metaEndpoint, submitEndpoint, schema, initialV
       const { data } = await client.get(metaEndpoint)
       if (data?.ok) {
         canTransfer.value = Boolean(data.data.can_transfer)
-        meta.acct_balance = data.data.acct_balance ?? '0.00'
+        meta.acct_balance = Number(data.data.acct_balance) || 0
+        // Some deployments never set limit_remain (defaults null) — treat
+        // missing as "no cap enforced" so the form doesn't wrongly block.
+        meta.limit_remain = data.data.limit_remain != null ? Number(data.data.limit_remain) : Infinity
         meta.currency = data.data.currency ?? '$'
       }
     } catch {

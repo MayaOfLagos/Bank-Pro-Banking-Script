@@ -22,6 +22,8 @@ const canonicalRoutes = [
   '/loans',
   '/tickets',
   '/profile',
+  '/profile/edit',
+  '/profile/security',
   '/transfer-verify',
   '/transfer-cot',
   '/transfer-tax',

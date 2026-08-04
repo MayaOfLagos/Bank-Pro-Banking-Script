@@ -1,52 +1,28 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
+import { useToast } from 'vue-toastification'
+import {
+  ChevronLeftIcon, CameraIcon, ChevronRightIcon,
+  ArrowRightOnRectangleIcon, PencilSquareIcon, ShieldCheckIcon,
+} from '@heroicons/vue/24/solid'
 import client from '../api/client'
 import { authApi } from '../api/auth'
+import { merchantInitials } from '../utils/format'
+import { currencySymbol } from '../utils/currency'
+import { countryName } from '../utils/countries'
+import ErrorState from '../components/ui/ErrorState.vue'
 
 const router = useRouter()
+const toast = useToast()
 
 const loading = ref(true)
 const error = ref('')
+const profile = ref({})
 
-const profile = ref({
-  full_name: '',
-  firstname: '',
-  lastname: '',
-  email: '',
-  phone: '',
-  acct_no: '',
-  acct_type: '',
-  acct_status: '',
-  acct_currency: '',
-  image: ''
-})
-
-// Edit form state
-const editFirst = ref('')
-const editLast = ref('')
-const editPhone = ref('')
-const saving = ref(false)
-const saveError = ref('')
-const saveSuccess = ref(false)
-
-// Logout state
+const avatarFile = ref(null)
+const uploadingAvatar = ref(false)
 const loggingOut = ref(false)
-
-const avatarSrc = computed(() => profile.value.image || null)
-
-const initials = computed(() => {
-  const f = String(profile.value.firstname || '').charAt(0).toUpperCase()
-  const l = String(profile.value.lastname || '').charAt(0).toUpperCase()
-  return f + l || '?'
-})
-
-const statusBadgeClass = computed(() => {
-  const s = String(profile.value.acct_status ?? '').toLowerCase()
-  if (s === 'active') return 'bg-emerald-500/20 text-emerald-400'
-  if (s === 'suspended' || s === 'blocked') return 'bg-red-500/20 text-red-400'
-  return 'bg-slate-500/20 text-slate-400'
-})
 
 async function loadProfile() {
   loading.value = true
@@ -54,36 +30,80 @@ async function loadProfile() {
   try {
     const { data } = await client.get('/api/user/profile.php')
     if (!data?.ok) throw new Error(data?.message || 'Unable to load profile')
-    profile.value = { ...profile.value, ...data.data }
-    editFirst.value = data.data.firstname ?? ''
-    editLast.value = data.data.lastname ?? ''
-    editPhone.value = data.data.phone ?? ''
+    profile.value = data.data || {}
   } catch (err) {
-    error.value = err?.response?.data?.message || err.message
+    error.value = err?.response?.data?.message || err.message || 'Unable to load profile'
   } finally {
     loading.value = false
   }
 }
 
-async function handleSave() {
-  saving.value = true
-  saveError.value = ''
-  saveSuccess.value = false
+const initials = computed(() => {
+  const name = `${profile.value.firstname || ''} ${profile.value.lastname || ''}`.trim()
+  return name ? merchantInitials(name) : '?'
+})
+
+const statusLabel = computed(() => profile.value.acct_status || '')
+const statusKind = computed(() => {
+  const s = String(statusLabel.value).toLowerCase()
+  if (s === 'active') return 'active'
+  if (s === 'hold' || s === 'pending' || s === 'processing') return 'paused'
+  if (s === 'suspended' || s === 'blocked' || s === 'inactive') return 'hold'
+  return 'unknown'
+})
+
+const currencyText = computed(() => {
+  const code = profile.value.acct_currency || ''
+  const sym = currencySymbol(code)
+  return code ? `${code} · ${sym}` : (sym || '—')
+})
+
+const countryDisplay = computed(() => {
+  const raw = profile.value.country
+  if (!raw) return '—'
+  return countryName(raw) !== raw ? countryName(raw) : raw
+})
+
+const subtitle = computed(() => {
+  const parts = [profile.value.acct_type, profile.value.acct_currency].filter(Boolean)
+  return parts.length ? parts.join(' · ') : 'Banking client'
+})
+
+const infoRows = computed(() => [
+  { label: 'Account number', value: profile.value.acct_no || '—', mono: true },
+  { label: 'Account type', value: profile.value.acct_type || '—' },
+  { label: 'Currency', value: currencyText.value },
+  { label: 'Email', value: profile.value.email || '—' },
+  { label: 'Phone', value: profile.value.phone || '—' },
+  { label: 'Country', value: countryDisplay.value },
+  ...(profile.value.acct_dob ? [{ label: 'Date of birth', value: profile.value.acct_dob }] : []),
+])
+
+// ─── Avatar upload (stays on this page — it's a display concern) ─────────
+function onAvatarPicked(event) {
+  const file = event.target?.files?.[0]
+  if (!file) return
+  avatarFile.value = file
+  uploadAvatar()
+}
+
+async function uploadAvatar() {
+  if (!avatarFile.value) return
+  uploadingAvatar.value = true
   try {
-    const { data } = await client.post('/api/user/profile.php', {
-      action: 'update',
-      firstname: editFirst.value,
-      lastname: editLast.value,
-      phone: editPhone.value
+    const form = new FormData()
+    form.append('image', avatarFile.value)
+    const { data } = await client.post('/api/user/profile-image.php', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     })
-    if (!data?.ok) throw new Error(data?.message || 'Update failed.')
-    saveSuccess.value = true
+    if (!data?.ok) throw new Error(data?.message || 'Upload failed')
+    toast.success('Profile photo updated.')
     await loadProfile()
-    setTimeout(() => { saveSuccess.value = false }, 3000)
   } catch (err) {
-    saveError.value = err?.response?.data?.message || err.message
+    toast.error(err?.response?.data?.message || err.message || 'Could not upload photo.')
   } finally {
-    saving.value = false
+    uploadingAvatar.value = false
+    avatarFile.value = null
   }
 }
 
@@ -100,127 +120,185 @@ onMounted(loadProfile)
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#080d18] pb-28">
-    <!-- Skeleton -->
-    <template v-if="loading">
-      <div class="bg-gradient-to-b from-[#0d1b38] to-[#080d18] px-5 pt-12 pb-8">
-        <div class="flex flex-col items-center">
-          <div class="h-20 w-20 rounded-full bg-[#1a2436] animate-pulse mb-3"></div>
-          <div class="h-5 w-36 bg-[#1a2436] animate-pulse rounded-lg mb-2"></div>
-          <div class="h-4 w-24 bg-[#1a2436] animate-pulse rounded-lg"></div>
-        </div>
-      </div>
-      <div class="mx-4 mt-4 space-y-3">
-        <div v-for="i in 4" :key="i" class="h-14 rounded-xl bg-[#111827] animate-pulse"></div>
-      </div>
-    </template>
-
-    <!-- Error -->
-    <div v-else-if="error" class="mx-4 mt-20 bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-2xl px-5 py-4">
-      {{ error }}
-    </div>
-
-    <template v-else>
-      <!-- Gradient hero with avatar -->
-      <div class="bg-gradient-to-b from-[#0d1b38] to-[#080d18] px-5 pt-12 pb-8">
-        <div class="flex flex-col items-center">
-          <!-- Avatar -->
-          <div class="h-20 w-20 rounded-full bg-blue-600 flex items-center justify-center text-2xl font-bold text-white mb-3 overflow-hidden ring-4 ring-blue-600/30">
-            <img v-if="avatarSrc" :src="avatarSrc" class="w-full h-full object-cover" alt="Profile avatar" />
-            <span v-else>{{ initials }}</span>
-          </div>
-          <h1 class="text-xl font-bold text-white">{{ profile.full_name || '—' }}</h1>
-          <p class="text-slate-400 text-sm mt-1">{{ profile.acct_type || 'Banking Client' }}</p>
-          <!-- Status badge -->
-          <span class="mt-2 rounded-full px-3 py-1 text-xs font-medium capitalize" :class="statusBadgeClass">
-            {{ profile.acct_status || 'unknown' }}
-          </span>
-        </div>
-      </div>
-
-      <!-- Account info (read-only) -->
-      <div class="bg-[#111827] rounded-2xl mx-4 mt-4 divide-y divide-[#1e2d44]">
-        <div class="px-4 py-3.5 flex justify-between items-center">
-          <span class="text-slate-400 text-sm">Account No</span>
-          <span class="text-white text-sm font-mono">{{ profile.acct_no || '—' }}</span>
-        </div>
-        <div class="px-4 py-3.5 flex justify-between items-center">
-          <span class="text-slate-400 text-sm">Account Type</span>
-          <span class="text-white text-sm">{{ profile.acct_type || '—' }}</span>
-        </div>
-        <div class="px-4 py-3.5 flex justify-between items-center">
-          <span class="text-slate-400 text-sm">Currency</span>
-          <span class="text-white text-sm">{{ profile.acct_currency || '—' }}</span>
-        </div>
-        <div class="px-4 py-3.5 flex justify-between items-center">
-          <span class="text-slate-400 text-sm">Email</span>
-          <span class="text-white text-sm truncate max-w-[55%] text-right">{{ profile.email || '—' }}</span>
-        </div>
-      </div>
-
-      <!-- Edit section -->
-      <div class="px-4 mt-6">
-        <h2 class="text-white font-semibold mb-4">Edit details</h2>
-
-        <div class="space-y-4">
-          <div>
-            <label class="block text-xs text-slate-400 mb-1.5">First Name</label>
-            <input
-              v-model="editFirst"
-              type="text"
-              placeholder="First name"
-              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
-            />
-          </div>
-
-          <div>
-            <label class="block text-xs text-slate-400 mb-1.5">Last Name</label>
-            <input
-              v-model="editLast"
-              type="text"
-              placeholder="Last name"
-              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
-            />
-          </div>
-
-          <div>
-            <label class="block text-xs text-slate-400 mb-1.5">Phone Number</label>
-            <input
-              v-model="editPhone"
-              type="tel"
-              placeholder="+1 555 000 0000"
-              class="w-full bg-[#1a2436] border border-[#1e2d44] rounded-xl px-4 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
-            />
-          </div>
-
-          <!-- Save feedback -->
-          <div v-if="saveSuccess" class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm rounded-xl px-4 py-3">
-            Profile updated successfully.
-          </div>
-          <div v-if="saveError" class="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl px-4 py-3">
-            {{ saveError }}
-          </div>
-
-          <button
-            @click="handleSave"
-            :disabled="saving"
-            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-2xl py-4 transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {{ saving ? 'Saving...' : 'Save Changes' }}
-          </button>
-        </div>
-      </div>
-
-      <!-- Logout -->
-      <div class="px-4 mt-4">
-        <button
-          @click="handleLogout"
-          :disabled="loggingOut"
-          class="mx-0 bg-red-500/10 border border-red-500/20 text-red-400 rounded-2xl py-4 text-center font-semibold w-full transition hover:bg-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {{ loggingOut ? 'Signing out...' : 'Sign Out' }}
+  <div class="page">
+    <div class="content">
+      <header class="header">
+        <button type="button" class="back" aria-label="Go back" @click="router.back()">
+          <ChevronLeftIcon class="back-icon" aria-hidden="true" />
         </button>
-      </div>
-    </template>
+        <div class="titles">
+          <h1 class="title">Profile</h1>
+          <p class="subtitle">Your account at a glance</p>
+        </div>
+      </header>
+
+      <template v-if="loading">
+        <div class="skeleton skeleton-hero" />
+        <div class="skeleton skeleton-card" />
+        <div class="skeleton skeleton-card-sm" />
+      </template>
+
+      <ErrorState v-else-if="error" :message="error" />
+
+      <template v-else>
+        <section class="hero">
+          <label class="avatar-wrap" :aria-busy="uploadingAvatar">
+            <div class="avatar">
+              <img v-if="profile.image" :src="profile.image" :alt="`${profile.firstname || 'You'}'s avatar`" />
+              <span v-else>{{ initials }}</span>
+            </div>
+            <span class="avatar-upload" :class="{ 'avatar-upload--busy': uploadingAvatar }">
+              <CameraIcon class="avatar-upload-icon" aria-hidden="true" />
+            </span>
+            <input
+              type="file"
+              accept="image/png,image/jpeg"
+              class="avatar-input"
+              :disabled="uploadingAvatar"
+              @change="onAvatarPicked"
+            />
+          </label>
+          <h2 class="name">{{ profile.full_name || 'Your account' }}</h2>
+          <p class="hero-sub">{{ subtitle }}</p>
+          <span v-if="statusLabel" class="status-badge" :class="`status-badge--${statusKind}`">
+            <span class="status-dot"></span>{{ statusLabel }}
+          </span>
+        </section>
+
+        <section class="card" aria-label="Account details">
+          <div class="rows">
+            <div v-for="(row, i) in infoRows" :key="row.label + i" class="row">
+              <span class="row-label">{{ row.label }}</span>
+              <span class="row-value" :class="{ 'row-value--mono': row.mono }">{{ row.value }}</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Manage section — replaces the inline forms with links to
+             dedicated pages. Personal details live at /profile/edit,
+             password + PIN at /profile/security. -->
+        <nav class="card manage-card" aria-label="Account management">
+          <RouterLink to="/profile/edit" class="manage-row">
+            <span class="manage-icon manage-icon--accent">
+              <PencilSquareIcon aria-hidden="true" />
+            </span>
+            <span class="manage-body">
+              <span class="manage-title">Personal details</span>
+              <span class="manage-sub">Update your name and phone</span>
+            </span>
+            <ChevronRightIcon class="manage-chev" aria-hidden="true" />
+          </RouterLink>
+
+          <RouterLink to="/profile/security" class="manage-row">
+            <span class="manage-icon manage-icon--muted">
+              <ShieldCheckIcon aria-hidden="true" />
+            </span>
+            <span class="manage-body">
+              <span class="manage-title">Security</span>
+              <span class="manage-sub">Change password and transaction PIN</span>
+            </span>
+            <ChevronRightIcon class="manage-chev" aria-hidden="true" />
+          </RouterLink>
+        </nav>
+
+        <button
+          type="button"
+          class="signout"
+          :disabled="loggingOut"
+          @click="handleLogout"
+        >
+          <ArrowRightOnRectangleIcon class="signout-icon" aria-hidden="true" />
+          {{ loggingOut ? 'Signing out…' : 'Sign out' }}
+        </button>
+      </template>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.page { min-height: 100vh; background: var(--bg-gradient); padding: var(--space-5) var(--space-4) 7rem; }
+.content { max-width: 30rem; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-4); }
+.header { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0 var(--space-1); }
+.back { width: 2.5rem; height: 2.5rem; border-radius: 0.7rem; border: 1px solid var(--border); background: transparent; color: var(--text-primary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.back:hover { background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
+.back:active { transform: scale(0.95); }
+.back-icon { width: 1.15rem; height: 1.15rem; }
+.title { font-size: 1.5rem; font-weight: 800; color: var(--text-primary); margin: 0; line-height: 1.1; }
+.subtitle { font-size: 0.8rem; color: var(--text-secondary); margin: 0.15rem 0 0; }
+
+.hero { background: var(--surface); border-radius: var(--radius-lg); padding: var(--space-6) var(--space-4); box-shadow: var(--shadow-card); display: flex; flex-direction: column; align-items: center; gap: var(--space-3); text-align: center; }
+.avatar-wrap { position: relative; width: 5.5rem; height: 5.5rem; cursor: pointer; }
+.avatar { width: 100%; height: 100%; border-radius: var(--radius-pill); background: var(--card-gradient-debit); color: var(--text-on-accent); display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.4rem; overflow: hidden; box-shadow: 0 10px 24px -8px color-mix(in srgb, var(--accent-strong) 60%, transparent); }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-upload { position: absolute; right: -0.2rem; bottom: -0.2rem; width: 2rem; height: 2rem; border-radius: var(--radius-pill); background: var(--surface); border: 2px solid var(--surface); color: var(--text-primary); display: inline-flex; align-items: center; justify-content: center; box-shadow: var(--shadow-card); transition: transform 0.15s ease; }
+.avatar-wrap:hover .avatar-upload { transform: scale(1.05); }
+.avatar-upload--busy { opacity: 0.5; }
+.avatar-upload-icon { width: 1rem; height: 1rem; }
+.avatar-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.name { font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0.2rem 0 0; line-height: 1.2; }
+.hero-sub { color: var(--text-secondary); font-size: 0.85rem; margin: 0; }
+
+.status-badge { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.7rem; border-radius: var(--radius-pill); font-size: 0.75rem; font-weight: 600; background: var(--surface-muted); color: var(--text-primary); text-transform: capitalize; }
+.status-dot { width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--text-secondary); }
+.status-badge--active { background: rgba(16, 185, 129, 0.12); color: var(--success-fg); }
+.status-badge--active .status-dot { background: var(--success-fg); }
+.status-badge--paused { background: rgba(180, 83, 9, 0.12); color: var(--warning-fg); }
+.status-badge--paused .status-dot { background: var(--warning-fg); }
+.status-badge--hold { background: var(--danger-bg); color: var(--danger-fg); }
+.status-badge--hold .status-dot { background: var(--danger-fg); }
+
+.card { background: var(--surface); border-radius: var(--radius-lg); padding: var(--space-5) var(--space-4); box-shadow: var(--shadow-card); display: flex; flex-direction: column; gap: var(--space-3); }
+.rows { display: flex; flex-direction: column; }
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-4); padding: var(--space-3) 0; }
+.row + .row { border-top: 1px solid var(--divider); }
+.row-label { color: var(--text-secondary); font-size: 0.85rem; flex-shrink: 0; }
+.row-value { color: var(--text-primary); font-size: 0.9rem; font-weight: 600; text-align: right; min-width: 0; word-break: break-word; }
+.row-value--mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; letter-spacing: 0.02em; }
+
+/* Manage links — tap-friendly rows with icon, title+sub, and chevron. */
+.manage-card { padding: var(--space-2) var(--space-4); gap: 0; }
+.manage-row {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) 0;
+  text-decoration: none; color: inherit;
+  transition: background-color 0.15s ease;
+  border-radius: var(--radius-md);
+  margin: 0 calc(var(--space-2) * -1); padding-inline: var(--space-2);
+}
+.manage-row + .manage-row { border-top: 1px solid var(--divider); }
+.manage-row:hover { background: color-mix(in srgb, var(--text-primary) 4%, transparent); }
+.manage-row:active { transform: scale(0.995); }
+.manage-icon {
+  width: 2.5rem; height: 2.5rem; border-radius: var(--radius-md);
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.manage-icon--accent { background: var(--accent-tint); color: var(--accent-strong); }
+.manage-icon--muted { background: var(--surface-muted); color: var(--text-primary); }
+.manage-icon > svg { width: 1.35rem; height: 1.35rem; }
+.manage-body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.manage-title { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); }
+.manage-sub { font-size: 0.75rem; color: var(--text-secondary); }
+.manage-chev { width: 1.1rem; height: 1.1rem; color: var(--text-secondary); flex-shrink: 0; }
+
+.signout {
+  width: 100%; height: 3rem; padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg); color: var(--danger-fg);
+  font-weight: 600; font-size: 0.9rem; font-family: inherit;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+  transition: transform 0.08s ease, background-color 0.15s ease;
+}
+.signout:hover:not(:disabled) { background: color-mix(in srgb, var(--danger-fg) 18%, transparent); }
+.signout:active:not(:disabled) { transform: scale(0.98); }
+.signout:disabled { opacity: 0.5; cursor: not-allowed; }
+.signout-icon { width: 1.15rem; height: 1.15rem; }
+
+.skeleton { border-radius: var(--radius-lg); background: var(--surface-muted); animation: pulse 1.6s ease-in-out infinite; }
+.skeleton-hero { height: 12rem; }
+.skeleton-card { height: 14rem; }
+.skeleton-card-sm { height: 8rem; }
+@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.85; } }
+</style>
