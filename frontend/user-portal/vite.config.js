@@ -37,12 +37,18 @@ export default defineConfig(({ command }) => ({
     emptyOutDir: true,
     cssCodeSplit: false,
     sourcemap: false,
+    // The hash in the entry filename is the cache-buster, and user-app.php
+    // resolves it through this manifest. A fixed app.js needed a ?v= query
+    // instead, but lazy chunks import the entry as "../app.js" — so the two
+    // spellings became two ES module records and the browser instantiated
+    // Vue, the router and Pinia twice on every hard load.
+    manifest: 'manifest.json',
     rollupOptions: {
       output: {
-        entryFileNames: 'app.js',
+        entryFileNames: 'app-[hash].js',
         chunkFileNames: 'chunks/[name]-[hash].js',
         assetFileNames: (assetInfo) => {
-          if (assetInfo.name && assetInfo.name.endsWith('.css')) return 'app.css'
+          if (assetInfo.name && assetInfo.name.endsWith('.css')) return 'app-[hash].css'
           return 'assets/[name]-[hash][extname]'
         }
       }

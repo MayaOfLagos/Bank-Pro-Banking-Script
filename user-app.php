@@ -93,9 +93,36 @@ if (in_array($requestPath, $publicRoutes, true)) {
     exit;
 }
 
-$javascriptPath = __DIR__ . '/assets/user-app/app.js';
-$stylesheetPath = __DIR__ . '/assets/user-app/app.css';
-if (!is_file($javascriptPath) || filesize($javascriptPath) === 0 || !is_file($stylesheetPath) || filesize($stylesheetPath) === 0) {
+// Vite writes the hashed entry filenames here at build time. Reading them
+// back means the <script> tag and the "../app-<hash>.js" import inside every
+// lazy chunk are the same URL, so the bundle is fetched and evaluated once.
+$assetDirectory = __DIR__ . '/assets/user-app';
+$manifest = is_file($assetDirectory . '/manifest.json')
+    ? json_decode((string)file_get_contents($assetDirectory . '/manifest.json'), true)
+    : null;
+// cssCodeSplit is off, so the one stylesheet is its own manifest record
+// rather than an entry dependency. Match on shape, not on a source filename.
+$javascriptFile = '';
+$stylesheetFile = '';
+foreach (is_array($manifest) ? $manifest : [] as $record) {
+    if (!is_array($record) || empty($record['file'])) {
+        continue;
+    }
+    $file = (string)$record['file'];
+    if (!empty($record['isEntry']) && substr($file, -3) === '.js') {
+        $javascriptFile = $file;
+    } elseif (substr($file, -4) === '.css') {
+        $stylesheetFile = $file;
+    }
+}
+
+$assetsUsable = true;
+foreach ([$javascriptFile, $stylesheetFile] as $assetFile) {
+    if ($assetFile === '' || !is_file($assetDirectory . '/' . $assetFile) || filesize($assetDirectory . '/' . $assetFile) === 0) {
+        $assetsUsable = false;
+    }
+}
+if (!$assetsUsable) {
     http_response_code(503);
     header('Content-Type: text/plain; charset=utf-8');
     echo 'The customer portal assets are unavailable. Run the Vue production build before serving this route.';
@@ -108,7 +135,6 @@ $stmt->execute();
 $settings = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 $appName = (string)($settings['url_name'] ?? WEB_TITLE);
 $pageTitle = $routeTitles[$requestPath];
-$assetVersion = (string)max((int)filemtime($javascriptPath), (int)filemtime($stylesheetPath));
 $favicon = resolve_favicon($settings, __DIR__);
 $faviconHref = $favicon['href'];
 $faviconType = $favicon['type'];
@@ -125,10 +151,10 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-sr
   <meta name="application-name" content="<?= htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') ?>" />
   <title><?= htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') ?> - <?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?></title>
   <link rel="icon" type="<?= htmlspecialchars($faviconType, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($faviconHref, ENT_QUOTES, 'UTF-8') ?>" />
-  <link rel="stylesheet" href="/assets/user-app/app.css?v=<?= rawurlencode($assetVersion) ?>" />
+  <link rel="stylesheet" href="/assets/user-app/<?= htmlspecialchars($stylesheetFile, ENT_QUOTES, 'UTF-8') ?>" />
 </head>
 <body>
   <div id="app"></div>
-  <script type="module" src="/assets/user-app/app.js?v=<?= rawurlencode($assetVersion) ?>"></script>
+  <script type="module" src="/assets/user-app/<?= htmlspecialchars($javascriptFile, ENT_QUOTES, 'UTF-8') ?>"></script>
 </body>
 </html>
