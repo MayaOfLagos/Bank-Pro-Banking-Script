@@ -16,6 +16,8 @@ $routeTitles = [
     '/pin' => 'PIN Verification',
     '/reset-password' => 'Reset Password',
     '/update-password' => 'Update Password',
+    '/terms' => 'Terms of Service',
+    '/privacy' => 'Privacy Policy',
     '/dashboard' => 'Dashboard',
     '/transactions' => 'Transactions',
     '/deposits' => 'Deposits',
@@ -52,10 +54,16 @@ if (!isset($routeTitles[$requestPath])) {
 
 $guestOnlyRoutes = ['/login', '/register', '/reset-password', '/update-password'];
 $pendingPinRoutes = ['/pin'];
+// Public informational pages — readable regardless of auth state so a
+// visitor can review /terms and /privacy from the register wizard before
+// they have an account.
+$publicRoutes = ['/terms', '/privacy'];
 $isAuthenticated = !empty($_SESSION['acct_no']);
 $isPendingPin = !empty($_SESSION['login']);
 
-if (in_array($requestPath, $guestOnlyRoutes, true)) {
+if (in_array($requestPath, $publicRoutes, true)) {
+    // No auth gate — every visitor may read the legal copy.
+} elseif (in_array($requestPath, $guestOnlyRoutes, true)) {
     if ($isAuthenticated) {
         header('Location: /dashboard');
         exit;

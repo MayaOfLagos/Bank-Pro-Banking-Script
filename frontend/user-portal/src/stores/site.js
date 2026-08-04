@@ -16,6 +16,11 @@ export const useSiteStore = defineStore('site', () => {
   const supportPhone = ref('')
   const detectedCountryCode = ref('')
   const registrationEnabled = ref(true)
+  // Admin-editable legal copy, mirrored into /terms and /privacy via
+  // v-html. Defaults to empty so the pages render a "not published yet"
+  // fallback until the admin fills the CMS textareas.
+  const termsOfServiceHtml = ref('')
+  const privacyPolicyHtml = ref('')
   const loaded = ref(false)
   const loading = ref(false)
   const error = ref('')
@@ -52,6 +57,8 @@ export const useSiteStore = defineStore('site', () => {
         // the register link doesn't disappear until the admin explicitly
         // turns it off.
         registrationEnabled.value = d.registration_enabled !== false
+        termsOfServiceHtml.value = typeof d.terms_of_service_html === 'string' ? d.terms_of_service_html : ''
+        privacyPolicyHtml.value = typeof d.privacy_policy_html === 'string' ? d.privacy_policy_html : ''
         if (d.csrf_token) setCsrfToken(d.csrf_token)
         applyFavicon(faviconUrl.value)
         applyDocumentTitle()
@@ -106,6 +113,8 @@ export const useSiteStore = defineStore('site', () => {
     supportPhone,
     detectedCountryCode,
     registrationEnabled,
+    termsOfServiceHtml,
+    privacyPolicyHtml,
     loaded,
     loading,
     error,

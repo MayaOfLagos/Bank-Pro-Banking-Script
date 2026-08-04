@@ -12,6 +12,8 @@ $vueRoutes = [
     '/pin',
     '/reset-password',
     '/update-password',
+    '/terms',
+    '/privacy',
     '/dashboard',
     '/transactions',
     '/deposits',
