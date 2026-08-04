@@ -51,6 +51,28 @@ function country_name(string $code): string
     return $map[strtoupper($code)]['name'] ?? $code;
 }
 
+/**
+ * Resolve either an ISO code or a legacy full name to a canonical ISO code.
+ * Returns '' when nothing matches — callers can then decide whether that
+ * should fall through as "unknown" or be rejected outright. Kept separate
+ * from country_is_known() because that helper is used for validation
+ * (yes/no) whereas we need the code itself for blocklist comparison.
+ */
+function country_code_from_value(string $value): string
+{
+    if ($value === '') return '';
+    $upper = strtoupper($value);
+    if (isset(countries_map()[$upper])) {
+        return $upper;
+    }
+    foreach (countries_map() as $code => $row) {
+        if (strcasecmp($row['name'], $value) === 0) {
+            return $code;
+        }
+    }
+    return '';
+}
+
 function account_types(): array
 {
     static $list = null;
