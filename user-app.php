@@ -30,6 +30,7 @@ $routeTitles = [
     '/profile' => 'Profile',
     '/profile/edit' => 'Edit Personal Details',
     '/profile/security' => 'Security',
+    '/profile/manager' => 'Account Manager',
     '/transfer-verify' => 'Verify Transfer',
     '/transfer-cot' => 'COT Verification',
     '/transfer-tax' => 'TAX Verification',

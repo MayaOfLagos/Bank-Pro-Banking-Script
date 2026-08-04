@@ -5,6 +5,7 @@ import { useToast } from 'vue-toastification'
 import {
   ChevronLeftIcon, CameraIcon, ChevronRightIcon,
   ArrowRightOnRectangleIcon, PencilSquareIcon, ShieldCheckIcon,
+  UserGroupIcon, WalletIcon, LifebuoyIcon,
 } from '@heroicons/vue/24/solid'
 import client from '../api/client'
 import { authApi } from '../api/auth'
@@ -191,9 +192,10 @@ onMounted(loadProfile)
           </div>
         </section>
 
-        <!-- Manage section — replaces the inline forms with links to
-             dedicated pages. Personal details live at /profile/edit,
-             password + PIN at /profile/security. -->
+        <!-- This page is the "More" destination in the bottom nav, so it
+             carries the entry points that bar has no room for. Loans and
+             Support are otherwise unreachable from the mobile UI. -->
+        <p class="group-label">Account</p>
         <nav class="card manage-card" aria-label="Account management">
           <RouterLink to="/profile/edit" class="manage-row">
             <span class="manage-icon manage-icon--accent">
@@ -213,6 +215,42 @@ onMounted(loadProfile)
             <span class="manage-body">
               <span class="manage-title">Security</span>
               <span class="manage-sub">Change password and transaction PIN</span>
+            </span>
+            <ChevronRightIcon class="manage-chev" aria-hidden="true" />
+          </RouterLink>
+
+          <RouterLink to="/profile/manager" class="manage-row">
+            <span class="manage-icon manage-icon--muted">
+              <UserGroupIcon aria-hidden="true" />
+            </span>
+            <span class="manage-body">
+              <span class="manage-title">Account manager</span>
+              <span class="manage-sub">Your dedicated point of contact</span>
+            </span>
+            <ChevronRightIcon class="manage-chev" aria-hidden="true" />
+          </RouterLink>
+        </nav>
+
+        <p class="group-label">Services</p>
+        <nav class="card manage-card" aria-label="Services">
+          <RouterLink to="/loans" class="manage-row">
+            <span class="manage-icon manage-icon--accent">
+              <WalletIcon aria-hidden="true" />
+            </span>
+            <span class="manage-body">
+              <span class="manage-title">Loans</span>
+              <span class="manage-sub">Apply for and track your loans</span>
+            </span>
+            <ChevronRightIcon class="manage-chev" aria-hidden="true" />
+          </RouterLink>
+
+          <RouterLink to="/tickets" class="manage-row">
+            <span class="manage-icon manage-icon--muted">
+              <LifebuoyIcon aria-hidden="true" />
+            </span>
+            <span class="manage-body">
+              <span class="manage-title">Support</span>
+              <span class="manage-sub">Message our team about your account</span>
             </span>
             <ChevronRightIcon class="manage-chev" aria-hidden="true" />
           </RouterLink>
@@ -273,6 +311,7 @@ onMounted(loadProfile)
 .row-value--mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; letter-spacing: 0.02em; }
 
 /* Manage links — tap-friendly rows with icon, title+sub, and chevron. */
+.group-label { font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em; margin: var(--space-2) 0 calc(var(--space-3) * -1); padding-inline: var(--space-2); }
 .manage-card { padding: var(--space-2) var(--space-4); gap: 0; }
 .manage-row {
   display: flex; align-items: center; gap: var(--space-3);

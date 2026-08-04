@@ -26,6 +26,7 @@ $vueRoutes = [
     '/profile',
     '/profile/edit',
     '/profile/security',
+    '/profile/manager',
     '/transfer-verify',
     '/transfer-cot',
     '/transfer-tax',
