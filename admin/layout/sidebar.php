@@ -9,7 +9,7 @@ $open = function ($pages) use ($currentPage) {
 $usersPages    = ['users.php', 'reguser.php', 'funduser.php', 'transfer.php', 'view_users.php'];
 $txPages       = ['credit_debit_trans.php', 'withdraw-trans.php', 'wire-trans.php', 'crypto-transaction.php', 'domestic-trans.php', 'loan-trans.php', 'view-trans.php', 'view-domtrans.php', 'viewwire-trans.php', 'viewcrypto-trans.php', 'viewloan-trans.php', 'viewwithdraw.php', 'edit-trans.php'];
 $cardPages     = ['cards.php', 'viewcard.php'];
-$settingsPages = ['profile.php', 'crypto-currrency.php', 'deposits.php', 'settings.php'];
+$settingsPages = ['profile.php', 'crypto-currrency.php', 'deposits.php', 'settings.php', 'auth_policy.php'];
 ?>
 <!-- Main Sidebar Container -->
 <aside class="main-sidebar sidebar-dark-primary elevation-4">
@@ -93,6 +93,7 @@ $settingsPages = ['profile.php', 'crypto-currrency.php', 'deposits.php', 'settin
                         <li class="nav-item"><a href="./crypto-currrency.php" class="nav-link <?= $active('crypto-currrency.php') ?>"><i class="far fa-circle nav-icon"></i><p>Deposit Method</p></a></li>
                         <li class="nav-item"><a href="./deposits.php" class="nav-link <?= $active('deposits.php') ?>"><i class="far fa-circle nav-icon"></i><p>Virtual Deposit</p></a></li>
                         <li class="nav-item"><a href="./settings.php" class="nav-link <?= $active('settings.php') ?>"><i class="far fa-circle nav-icon"></i><p>Site Settings</p></a></li>
+                        <li class="nav-item"><a href="./auth_policy.php" class="nav-link <?= $active('auth_policy.php') ?>"><i class="far fa-circle nav-icon"></i><p>Auth-flow Policy</p></a></li>
                     </ul>
                 </li>
 

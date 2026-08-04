@@ -110,6 +110,25 @@ if (isset($_POST['transfer'])) {
     $stmt->execute(['transfer' => $_POST['transfer_type'], 'acct_id' => $id]);
     header("Location:./users.php"); die;
 }
+
+// Force-logout: stamps users.sessions_invalidated_at = NOW(). The next
+// authenticated API call this user makes will fail the check in
+// api/user/_bootstrap.php (auth_flow_session_invalidated_for()) and
+// tear down the session with a 401. Existing sessions where
+// session_started_at >= NOW() (unlikely, but possible under clock skew)
+// still survive — the check is strictly "started before cutoff".
+if (isset($_POST['force_logout_user'])) {
+    $stmt = $conn->prepare("UPDATE users SET sessions_invalidated_at = NOW() WHERE id = :id");
+    $stmt->execute(['id' => $id]);
+    toast_alert('success', 'User signed out of all active sessions. Their next request will require re-authentication.', 'Sessions revoked');
+    // Re-read so the on-page timestamp reflects the new value below.
+    $refresh = $conn->prepare("SELECT sessions_invalidated_at FROM users WHERE id = :id LIMIT 1");
+    $refresh->execute(['id' => $id]);
+    $refreshed = $refresh->fetch(PDO::FETCH_ASSOC);
+    if ($refreshed && isset($refreshed['sessions_invalidated_at'])) {
+        $row['sessions_invalidated_at'] = $refreshed['sessions_invalidated_at'];
+    }
+}
 ?>
 
 <section class="content-header">
@@ -248,6 +267,34 @@ if (isset($_POST['transfer'])) {
                                 </form>
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">Session control</h3></div>
+                    <div class="card-body">
+                        <?php
+                            $sessionsInvalidatedAt = isset($row['sessions_invalidated_at']) ? (string)$row['sessions_invalidated_at'] : '';
+                        ?>
+                        <p class="mb-2">
+                            Force this user out of every device they're currently signed in on. The next
+                            request their browser makes will be rejected with a 401 and they'll be sent
+                            back to the sign-in screen.
+                        </p>
+                        <?php if ($sessionsInvalidatedAt !== ''): ?>
+                            <p class="text-muted small mb-3">
+                                Last forced sign-out:
+                                <strong><?= htmlspecialchars($sessionsInvalidatedAt) ?></strong>
+                            </p>
+                        <?php else: ?>
+                            <p class="text-muted small mb-3">No forced sign-outs on record for this user.</p>
+                        <?php endif; ?>
+                        <form method="post" onsubmit="return confirm('Sign this user out of every active session? Their next request will require sign-in.')">
+                            <button type="submit" name="force_logout_user" class="btn btn-warning">
+                                <i class="fas fa-sign-out-alt"></i>
+                                Sign this user out of all sessions
+                            </button>
+                        </form>
                     </div>
                 </div>
 
