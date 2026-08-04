@@ -48,6 +48,7 @@
   RewriteRule ^profile/(edit|security|manager)$ user-app.php [L,QSA]
   # Dynamic detail routes owned by the Vue SPA.
   RewriteRule ^transactions/(?:(?:transaction|deposit|wire|domestic|withdrawal)/)?[0-9]+$ user-app.php [L,QSA]
+  RewriteRule ^loans/LOAN-[0-9A-Fa-f]{12}$ user-app.php [L,QSA]
 
   # Preserve extensionless URLs for existing public PHP and HTML pages.
   RewriteCond %{REQUEST_FILENAME} !-f

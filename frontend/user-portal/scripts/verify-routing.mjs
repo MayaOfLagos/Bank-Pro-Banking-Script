@@ -26,6 +26,7 @@ const canonicalRoutes = [
   '/profile',
   '/profile/edit',
   '/profile/security',
+  '/profile/manager',
   '/transfer-verify',
   '/transfer-cot',
   '/transfer-tax',
@@ -122,6 +123,39 @@ if (missingRoutes.length) {
   throw new Error(`Canonical customer routes are out of sync:\n${missingRoutes.join('\n')}`)
 }
 
+// Dynamic detail routes never appear as literal paths, so the loop above
+// cannot see them. Each shell spells its own matcher differently; check for
+// the fragment unique to each so a route added to one but not the rest fails
+// the build rather than 404ing only on hard load.
+const dynamicRoutes = [
+  {
+    name: 'transaction detail',
+    userApp: '/transactions/',
+    devRouter: '/transactions/',
+    apache: '^transactions/',
+    vue: "path: '/transactions/:"
+  },
+  {
+    name: 'loan detail',
+    userApp: '/loans/LOAN-',
+    devRouter: '/loans/LOAN-',
+    apache: '^loans/LOAN-',
+    vue: "path: '/loans/:"
+  }
+]
+
+const missingDynamic = []
+for (const route of dynamicRoutes) {
+  if (!userAppSource.includes(route.userApp)) missingDynamic.push(`user-app.php: ${route.name}`)
+  if (!developmentRouterSource.includes(route.devRouter)) missingDynamic.push(`router.php: ${route.name}`)
+  if (!apacheSource.includes(route.apache)) missingDynamic.push(`.htaccess: ${route.name}`)
+  if (!vueRouterSource.includes(route.vue)) missingDynamic.push(`Vue router: ${route.name}`)
+}
+
+if (missingDynamic.length) {
+  throw new Error(`Dynamic detail routes are out of sync:\n${missingDynamic.join('\n')}`)
+}
+
 if (!apacheSource.includes('user-app.php') || !apacheSource.includes('R=301')) {
   throw new Error('.htaccess must contain the Vue handoff and permanent legacy redirects')
 }
@@ -152,6 +186,7 @@ if (vueRouterSource.includes('/profile-center')) {
 
 console.log(
   `Verified ${canonicalRoutes.length} canonical Vue routes, ` +
+  `${dynamicRoutes.length} dynamic detail routes, ` +
   `${retiredFiles.length} retired files, ${retiredDirectories.length} retired directories, ` +
   'and the preserved source-only user/ reference'
 )

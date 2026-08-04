@@ -16,6 +16,7 @@ const SecurityView = () => import('../views/SecurityView.vue')
 const AccountManagerView = () => import('../views/AccountManagerView.vue')
 const CardsView = () => import('../views/CardsView.vue')
 const LoansView = () => import('../views/LoansView.vue')
+const LoanDetailView = () => import('../views/LoanDetailView.vue')
 const LoginView = () => import('../views/auth/LoginView.vue')
 const RegisterView = () => import('../views/auth/RegisterView.vue')
 const PinView = () => import('../views/auth/PinView.vue')
@@ -50,6 +51,7 @@ const router = createRouter({
     { path: '/withdrawals', name: 'withdrawals', component: WithdrawalsView, meta: { requiresAuth: true, title: 'Withdrawals' } },
     { path: '/cards', name: 'cards', component: CardsView, meta: { requiresAuth: true, title: 'Cards' } },
     { path: '/loans', name: 'loans', component: LoansView, meta: { requiresAuth: true, title: 'Loans' } },
+    { path: '/loans/:reference(LOAN-[0-9A-Fa-f]{12})', name: 'loan-detail', component: LoanDetailView, meta: { requiresAuth: true, title: 'Loan' } },
     { path: '/tickets', name: 'tickets', component: TicketsView, meta: { requiresAuth: true, title: 'Support' } },
     { path: '/profile', name: 'profile', component: ProfileView, meta: { requiresAuth: true, title: 'Profile' } },
     { path: '/profile/edit', name: 'profile-edit', component: ProfileEditView, meta: { requiresAuth: true, title: 'Edit Personal Details' } },

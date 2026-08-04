@@ -48,6 +48,10 @@ if (preg_match('#^/transactions/(?:(?:transaction|deposit|wire|domestic|withdraw
     $requestPath = '/transactions';
 }
 
+if (preg_match('#^/loans/LOAN-[0-9A-Fa-f]{12}$#', $requestPath)) {
+    $requestPath = '/loans';
+}
+
 if (!isset($routeTitles[$requestPath])) {
     http_response_code(404);
     header('Content-Type: text/plain; charset=utf-8');

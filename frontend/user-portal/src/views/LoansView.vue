@@ -3,7 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import {
-  ChevronLeftIcon, BanknotesIcon, PlusIcon, ClockIcon,
+  ChevronLeftIcon, ChevronRightIcon, BanknotesIcon, PlusIcon, ClockIcon,
   DocumentTextIcon, CalendarDaysIcon, ChartPieIcon,
 } from '@heroicons/vue/24/solid'
 import client from '../api/client'
@@ -63,8 +63,11 @@ function statusKind(status) {
   return 'unknown'
 }
 
+// Categorise from the applicant's own stated purpose. `loan_message` is the
+// admin's reply and is empty until review, so reading it here left every
+// pending loan tagged "Personal".
 function categoryFor(loan) {
-  const raw = String(loan.loan_message || loan.description || '').toLowerCase()
+  const raw = String(loan.loan_remarks || '').toLowerCase()
   if (/mortgage|home|property|house/.test(raw)) return 'mortgage'
   if (/car|auto|vehicle/.test(raw)) return 'auto'
   if (/student|tuition|school|education/.test(raw)) return 'student'
@@ -104,6 +107,8 @@ function openModal() {
 async function submitLoanRequest() {
   const amt = Number(modalAmount.value) || 0
   if (amt <= 0) { toast.error('Enter a loan amount.'); return }
+  // loans-submit.php rejects an empty purpose, matching legacy user/loan.php.
+  if (!modalDescription.value.trim()) { toast.error('Describe what this loan will fund.'); return }
   submitting.value = true
   try {
     const { data } = await client.post('/api/user/loans-submit.php', {
@@ -178,7 +183,12 @@ async function submitLoanRequest() {
 
         <!-- Loan list -->
         <section v-if="loans.length" class="list" aria-label="Loan applications">
-          <div v-for="loan in loans" :key="loan.loan_id" class="loan-card">
+          <RouterLink
+            v-for="loan in loans"
+            :key="loan.loan_id"
+            :to="`/loans/${loan.loan_reference_id}`"
+            class="loan-card"
+          >
             <div class="loan-head">
               <div class="loan-category">
                 <span class="loan-category-tag">{{ categoryLabel(loan) }}</span>
@@ -192,24 +202,16 @@ async function submitLoanRequest() {
               </span>
             </div>
 
-            <p class="loan-amount">{{ amountDisplay(loan) }}</p>
-
-            <div v-if="loan.interest_rate || loan.duration" class="loan-meta">
-              <span v-if="loan.interest_rate">
-                <span class="loan-meta-label">Rate</span>
-                <strong>{{ loan.interest_rate }}%</strong>
-              </span>
-              <span v-if="loan.duration">
-                <span class="loan-meta-label">Duration</span>
-                <strong>{{ loan.duration }}</strong>
-              </span>
+            <div class="loan-amount-row">
+              <p class="loan-amount">{{ amountDisplay(loan) }}</p>
+              <ChevronRightIcon class="loan-chev" aria-hidden="true" />
             </div>
 
             <p v-if="loan.loan_message" class="loan-message">
               <DocumentTextIcon class="loan-message-icon" aria-hidden="true" />
               {{ loan.loan_message }}
             </p>
-          </div>
+          </RouterLink>
         </section>
 
         <!-- Empty state -->
@@ -249,7 +251,7 @@ async function submitLoanRequest() {
           </div>
 
           <div class="field">
-            <label class="label" for="loan-purpose">Purpose <span class="hint-optional">Optional</span></label>
+            <label class="label" for="loan-purpose">Purpose</label>
             <textarea
               id="loan-purpose" v-model="modalDescription"
               rows="4" placeholder="Briefly describe what this loan will fund…"
@@ -262,7 +264,7 @@ async function submitLoanRequest() {
             <button type="button" class="btn btn--outlined" :disabled="submitting" @click="showModal = false">
               Cancel
             </button>
-            <button type="button" class="btn btn--filled" :disabled="submitting || !modalAmount" @click="submitLoanRequest">
+            <button type="button" class="btn btn--filled" :disabled="submitting || !modalAmount || !modalDescription.trim()" @click="submitLoanRequest">
               {{ submitting ? 'Submitting…' : 'Submit request' }}
             </button>
           </div>
@@ -352,7 +354,12 @@ async function submitLoanRequest() {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.08s ease, box-shadow 0.15s ease;
 }
+.loan-card:hover { box-shadow: var(--shadow-lift); }
+.loan-card:active { transform: scale(0.99); }
 .loan-head {
   display: flex;
   align-items: flex-start;
@@ -376,6 +383,7 @@ async function submitLoanRequest() {
   font-size: 0.75rem; color: var(--text-secondary);
 }
 .loan-date-icon { width: 0.9rem; height: 0.9rem; }
+.loan-amount-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .loan-amount {
   font-size: 1.5rem;
   font-weight: 800;
@@ -383,14 +391,7 @@ async function submitLoanRequest() {
   margin: 0;
   letter-spacing: -0.01em;
 }
-.loan-meta {
-  display: flex; gap: var(--space-4);
-  font-size: 0.85rem; color: var(--text-secondary);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--divider);
-}
-.loan-meta strong { color: var(--text-primary); font-weight: 700; }
-.loan-meta-label { display: block; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 0.15rem; }
+.loan-chev { width: 1.1rem; height: 1.1rem; color: var(--text-muted); flex-shrink: 0; }
 .loan-message {
   display: flex; gap: 0.5rem; align-items: flex-start;
   font-size: 0.85rem; color: var(--text-secondary);
@@ -473,7 +474,6 @@ async function submitLoanRequest() {
 
 .field { display: flex; flex-direction: column; gap: 0.4rem; }
 .label { font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
-.hint-optional { color: var(--text-muted); text-transform: none; letter-spacing: 0; font-weight: 500; margin-left: 0.35rem; }
 
 .amount-input {
   display: flex; align-items: stretch;

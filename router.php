@@ -124,7 +124,8 @@ if ($path !== '/' && (is_file($absolute) || is_dir($absolute))) {
 }
 
 if (in_array($normalizedPath, $vueRoutes, true)
-    || preg_match('#^/transactions/(?:(?:transaction|deposit|wire|domestic|withdrawal)/)?\d+$#', $normalizedPath)) {
+    || preg_match('#^/transactions/(?:(?:transaction|deposit|wire|domestic|withdrawal)/)?\d+$#', $normalizedPath)
+    || preg_match('#^/loans/LOAN-[0-9A-Fa-f]{12}$#', $normalizedPath)) {
     require $root . '/user-app.php';
     return true;
 }

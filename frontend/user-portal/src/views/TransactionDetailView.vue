@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronLeftIcon, ArrowDownIcon } from '@heroicons/vue/24/solid'
+import { ChevronLeftIcon, ArrowDownIcon, PrinterIcon } from '@heroicons/vue/24/solid'
 import client from '../api/client'
 import ErrorState from '../components/ui/ErrorState.vue'
 import { formatMoney, coerceNumber, merchantInitials } from '../utils/format'
@@ -85,6 +85,10 @@ const timeLabel = computed(() => {
   return Number.isNaN(full.getTime()) ? String(raw) : full.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 })
 
+function printReceipt() {
+  window.print()
+}
+
 // `extra` carries the fields that only make sense for one source — SWIFT and
 // routing for a wire, destination wallet for a crypto withdrawal, and so on.
 const detailRows = computed(() => [
@@ -102,7 +106,7 @@ const detailRows = computed(() => [
   <div class="page">
     <div class="content">
       <header class="header">
-        <button type="button" class="back" aria-label="Go back" @click="router.back()">
+        <button type="button" class="back no-print" aria-label="Go back" @click="router.back()">
           <ChevronLeftIcon class="back-icon" aria-hidden="true" />
         </button>
         <div class="titles">
@@ -158,7 +162,11 @@ const detailRows = computed(() => [
           </div>
         </section>
 
-        <div class="actions">
+        <div class="actions no-print">
+          <button type="button" class="action" @click="printReceipt">
+            <PrinterIcon class="action-icon" aria-hidden="true" />
+            Print receipt
+          </button>
           <button type="button" class="action" @click="router.push('/tickets')">
             Report an issue
           </button>
@@ -376,6 +384,8 @@ const detailRows = computed(() => [
 .actions {
   display: flex;
   justify-content: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 .action {
   padding: 0.75rem 1.5rem;
@@ -386,7 +396,11 @@ const detailRows = computed(() => [
   font-weight: 600;
   cursor: pointer;
   font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
 }
+.action-icon { width: 1.1rem; height: 1.1rem; }
 .action:hover {
   background: color-mix(in srgb, var(--text-primary) 4%, var(--surface));
 }

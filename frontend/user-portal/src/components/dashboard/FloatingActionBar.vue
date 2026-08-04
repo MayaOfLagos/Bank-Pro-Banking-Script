@@ -53,7 +53,7 @@ const activeKey = computed(() => {
 </script>
 
 <template>
-  <nav class="bar" aria-label="Primary">
+  <nav class="bar no-print" aria-label="Primary">
     <RouterLink
       v-for="item in items"
       :key="item.key"

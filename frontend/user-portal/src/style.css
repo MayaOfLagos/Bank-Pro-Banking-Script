@@ -554,3 +554,50 @@ body {
 .auth-strength-label--fair { color: var(--warning-fg); }
 .auth-strength-label--good,
 .auth-strength-label--strong { color: var(--success-fg); }
+
+/*
+ * Print — the transaction and loan detail views double as receipts.
+ *
+ * Repainting the tokens rather than the components means a dark-theme user
+ * gets black-on-white instead of white-on-white, and every token-driven
+ * component follows without needing its own print rules. The !important
+ * flags are load-bearing: component styles are scoped, so `.page[data-v-x]`
+ * outranks a bare `.page` here.
+ */
+@media print {
+  :root,
+  :root[data-theme="dark"] {
+    --bg: #ffffff;
+    --bg-gradient: none;
+    --surface: #ffffff;
+    --surface-muted: #ffffff;
+    --border: #d4d4dd;
+    --divider: #d4d4dd;
+    --shadow-card: none;
+    --shadow-lift: none;
+    --text-primary: #000000;
+    --text-secondary: #333333;
+    --text-muted: #555555;
+  }
+
+  @page { margin: 16mm; }
+
+  body { background: #ffffff; }
+
+  .no-print { display: none !important; }
+
+  .page {
+    min-height: auto !important;
+    padding: 0 !important;
+    background: none !important;
+  }
+  .content { max-width: none !important; }
+
+  .hero,
+  .card,
+  .detail-card {
+    box-shadow: none !important;
+    border: 1px solid #d4d4dd;
+    break-inside: avoid;
+  }
+}
