@@ -1,8 +1,20 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
+require_once __DIR__ . '/../../include/auth_flow.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     auth_json(405, ['ok' => false, 'message' => 'Method not allowed']);
+}
+
+// IP allow/block-list check runs BEFORE credentials are checked so a
+// banned IP gets zero signal about whether an account exists — makes
+// credential-stuffing from a known-bad IP pointless.
+$loginIpCheck = auth_flow_ip_allowed($conn, auth_flow_client_ip());
+if (!$loginIpCheck['allowed']) {
+    auth_json(403, [
+        'ok' => false,
+        'message' => auth_flow_ip_denied_message(),
+    ]);
 }
 
 if (!empty($_SESSION['acct_no'])) {
@@ -86,6 +98,11 @@ auth_send_login_email($user, $device, $ipAddress, $nowDate, $appName, $appUrl, $
 session_regenerate_id(true);
 $_SESSION['login'] = (string)$user['acct_no'];
 $_SESSION['pw_snapshot'] = time();
+// session_started_at is the anchor for the admin-forced-logout check in
+// api/user/_bootstrap.php. Stamp it here so any session created AFTER
+// an admin hit "sign this user out of all sessions" survives — the
+// invalidation cutoff is only for sessions started before it.
+$_SESSION['session_started_at'] = time();
 unset($_SESSION['acct_no']);
 
 auth_json(200, [

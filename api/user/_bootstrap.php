@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../session.php';
 require_once __DIR__ . '/../../include/config.php';
 require_once __DIR__ . '/../../include/currency.php';
+require_once __DIR__ . '/../../include/auth_flow.php';
 require_once __DIR__ . '/../_security.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -37,6 +38,18 @@ if ($pwChangedAt > 0 && $pwChangedAt > $pwSnapshot) {
     session_unset();
     session_destroy();
     api_json(401, ['ok' => false, 'message' => 'Session invalidated. Sign in again.']);
+}
+
+// Parallel check: an admin can force this user out of every active
+// session by stamping users.sessions_invalidated_at = NOW() from the
+// per-user view. Any session that was started before that cutoff dies
+// on its next authenticated API call. Sessions born AFTER the cutoff
+// survive — because session_started_at was stamped later at login.
+$sessionStartedAt = (int)($_SESSION['session_started_at'] ?? 0);
+if (auth_flow_session_invalidated_for($conn, (int)$user['id'], $sessionStartedAt)) {
+    session_unset();
+    session_destroy();
+    api_json(401, ['ok' => false, 'message' => 'Session ended by administrator. Sign in again.']);
 }
 
 $settingsStmt = $conn->prepare("SELECT * FROM settings WHERE id='1' LIMIT 1");
