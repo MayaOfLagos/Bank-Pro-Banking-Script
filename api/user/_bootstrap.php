@@ -56,6 +56,28 @@ $settingsStmt = $conn->prepare("SELECT * FROM settings WHERE id='1' LIMIT 1");
 $settingsStmt->execute();
 $settings = $settingsStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
+// Login already refuses a non-active account, so this only fires when an
+// admin holds an account mid-session. Money-movement endpoints each carry
+// their own 403, but this catches the ones that don't — and anything added
+// later, which is the failure mode worth guarding.
+//
+// Reads deliberately stay open: the customer still needs to see their
+// balances, the hold banner, and the support contact to get it lifted.
+// Every mutation in api/user/ is POST-only, so gating on method blocks all
+// of them without an allowlist that would rot.
+$accountBlockMessage = auth_account_block_message($user);
+$isReadRequest = in_array(strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')), ['GET', 'HEAD', 'OPTIONS'], true);
+if ($accountBlockMessage !== null && !$isReadRequest) {
+    api_json(403, [
+        'ok' => false,
+        'message' => $accountBlockMessage,
+        'data' => [
+            'account_hold' => true,
+            'acct_status' => auth_account_status($user),
+        ],
+    ]);
+}
+
 /**
  * Kept for back-compat — every user API endpoint calls this to convert
  * users.acct_currency into a display symbol. Now delegates to the shared

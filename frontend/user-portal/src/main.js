@@ -7,6 +7,7 @@ import { registerAuthHandlers, setCsrfToken } from './api/client'
 import { useAuthStore } from './stores/auth'
 import { useProfileStore } from './stores/profile'
 import { useSettingsStore } from './stores/settings'
+import { useAccountStatusStore } from './stores/accountStatus'
 import { useSiteStore } from './stores/site'
 import { applyThemeAtBoot } from './composables/useTheme'
 import 'vue-toastification/dist/index.css'
@@ -30,23 +31,35 @@ app.use(Toast, {
 	newestOnTop: true
 })
 
-// Wire global 401/419/429/500 handling once the app is ready. The handlers
-// live here rather than in api/client.js so they can lean on Pinia + the
-// router + toast without pulling those into the axios module.
+// Wire global 401/403/419/429/500 handling once the app is ready. The
+// handlers live here rather than in api/client.js so they can lean on
+// Pinia + the router + toast without pulling those into the axios module.
 const toast = useToast()
 const authStore = useAuthStore()
 const profileStore = useProfileStore()
 const settingsStore = useSettingsStore()
+const accountStatusStore = useAccountStatusStore()
 settingsStore.hydrateFromDocument()
 
 registerAuthHandlers({
 	unauthorized: (message) => {
 		authStore.reset()
 		profileStore.reset()
+		accountStatusStore.reset()
 		toast.error(message || 'Session expired. Sign in again.')
 		if (router.currentRoute.value.path !== '/login') {
 			router.push('/login')
 		}
+	},
+	accountHold: () => {
+		// The hold landed after this page loaded, so re-read the status to
+		// raise the banner instead of leaving the customer with a lone
+		// error on a screen that still looks fully operational.
+		//
+		// Deliberately silent: the 403 still rejects, and every caller
+		// already surfaces the message itself — views toast it, composables
+		// expose it as an inline error. Toasting here too showed it twice.
+		accountStatusStore.refresh()
 	},
 	securityTokenExpired: () => {
 		toast.error('Security token expired. Refresh the page and try again.')

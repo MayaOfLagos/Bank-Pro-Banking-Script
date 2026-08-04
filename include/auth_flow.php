@@ -225,3 +225,45 @@ function auth_flow_session_invalidated_for(PDO $conn, int $userId, int $sessionS
     // A session started at-or-after the invalidation cutoff survives.
     return $sessionStartedAt < $cutoff;
 }
+
+/**
+ * Login is only allowed when acct_status is 'active'. Every other value —
+ * 'hold' (pending admin review, set on signup), 'suspended', 'blocked',
+ * 'inactive' — gets a status-specific message so the user knows what to
+ * do. Returns null when the account is cleared to sign in.
+ *
+ * Kept case-insensitive because legacy admin panels sometimes write
+ * capitalised values ("Hold" vs "hold").
+ *
+ * Lives here rather than in api/auth/_bootstrap.php so the mid-session
+ * gate in api/user/_bootstrap.php refuses accounts on exactly the same
+ * terms the login gate does, with identical wording.
+ */
+function auth_account_block_message(array $user): ?string {
+    $status = auth_account_status($user);
+    if ($status === 'active') {
+        return null;
+    }
+    if ($status === 'hold' || $status === 'pending') {
+        return 'Your account is pending review. You\'ll receive an email once it\'s approved.';
+    }
+    if ($status === 'suspended') {
+        return 'Your account has been suspended. Contact support to restore access.';
+    }
+    if ($status === 'blocked' || $status === 'banned') {
+        return 'Your account has been blocked. Contact support if you believe this is a mistake.';
+    }
+    if ($status === 'inactive' || $status === 'closed' || $status === 'deactivated') {
+        return 'This account is not active. Contact support to reactivate.';
+    }
+    return 'Your account can\'t sign in right now. Contact support.';
+}
+
+/**
+ * Normalised acct_status. A missing or NULL column reads as 'active' —
+ * the column is nullable with an 'active' default, so treating absence as
+ * a block would lock out any legacy row that predates it.
+ */
+function auth_account_status(array $user): string {
+    return strtolower(trim((string)($user['acct_status'] ?? 'active')));
+}

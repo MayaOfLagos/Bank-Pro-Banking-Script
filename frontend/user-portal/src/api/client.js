@@ -5,6 +5,7 @@ let onUnauthorized = null
 let onSecurityTokenExpired = null
 let onRateLimited = null
 let onServerError = null
+let onAccountHold = null
 
 const client = axios.create({
   baseURL: '/',
@@ -35,6 +36,11 @@ client.interceptors.response.use(
 
     if (status === 401 && typeof onUnauthorized === 'function') {
       onUnauthorized(message)
+    } else if (status === 403 && error?.response?.data?.data?.account_hold && typeof onAccountHold === 'function') {
+      // Only the account_hold flag routes here. Other 403s (a disabled
+      // feature toggle, a card already issued) are the view's business and
+      // must keep reaching its own catch block.
+      onAccountHold(message)
     } else if (status === 419 && typeof onSecurityTokenExpired === 'function') {
       onSecurityTokenExpired(message)
     } else if (status === 429 && typeof onRateLimited === 'function') {
@@ -58,11 +64,12 @@ export function getCsrfToken() {
 // The auth/toast handlers live outside this module (they depend on Pinia +
 // vue-router + vue-toastification which we don't want to import here to keep
 // this file dependency-light). main.js installs them at startup.
-export function registerAuthHandlers({ unauthorized, securityTokenExpired, rateLimited, serverError } = {}) {
+export function registerAuthHandlers({ unauthorized, securityTokenExpired, rateLimited, serverError, accountHold } = {}) {
   onUnauthorized = unauthorized || null
   onSecurityTokenExpired = securityTokenExpired || null
   onRateLimited = rateLimited || null
   onServerError = serverError || null
+  onAccountHold = accountHold || null
 }
 
 export default client
