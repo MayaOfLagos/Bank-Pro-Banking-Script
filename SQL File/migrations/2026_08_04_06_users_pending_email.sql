@@ -8,11 +8,40 @@
 --   pending_email_attempts — verification tries against the current OTP;
 --                            5 fails invalidate the request and force a resend
 --
--- Runs cleanly against MySQL 5.7 / MariaDB 10.3+ (cPanel-friendly). Uses
--- IF NOT EXISTS on ALTER so re-running is a no-op on hosts that were
--- migrated manually.
-ALTER TABLE `users`
-    ADD COLUMN IF NOT EXISTS `pending_email` VARCHAR(200) DEFAULT NULL AFTER `acct_email`,
-    ADD COLUMN IF NOT EXISTS `pending_email_otp` VARCHAR(6) DEFAULT NULL AFTER `pending_email`,
-    ADD COLUMN IF NOT EXISTS `pending_email_expires` DATETIME DEFAULT NULL AFTER `pending_email_otp`,
-    ADD COLUMN IF NOT EXISTS `pending_email_attempts` INT NOT NULL DEFAULT 0 AFTER `pending_email_expires`;
+-- Written with a PREPARE/EXECUTE guard around each ADD COLUMN so this
+-- file is safe to re-run and portable across MySQL 5.7 / 8+ and MariaDB
+-- (older MySQL does not support `ADD COLUMN IF NOT EXISTS`).
+
+SET @db := DATABASE();
+
+SET @sql := (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'users' AND COLUMN_NAME = 'pending_email') = 0,
+    'ALTER TABLE `users` ADD COLUMN `pending_email` VARCHAR(200) DEFAULT NULL AFTER `acct_email`',
+    'SELECT 1'
+));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'users' AND COLUMN_NAME = 'pending_email_otp') = 0,
+    'ALTER TABLE `users` ADD COLUMN `pending_email_otp` VARCHAR(6) DEFAULT NULL AFTER `pending_email`',
+    'SELECT 1'
+));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'users' AND COLUMN_NAME = 'pending_email_expires') = 0,
+    'ALTER TABLE `users` ADD COLUMN `pending_email_expires` DATETIME DEFAULT NULL AFTER `pending_email_otp`',
+    'SELECT 1'
+));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @sql := (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = @db AND TABLE_NAME = 'users' AND COLUMN_NAME = 'pending_email_attempts') = 0,
+    'ALTER TABLE `users` ADD COLUMN `pending_email_attempts` INT NOT NULL DEFAULT 0 AFTER `pending_email_expires`',
+    'SELECT 1'
+));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
