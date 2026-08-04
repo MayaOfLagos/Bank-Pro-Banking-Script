@@ -13,12 +13,13 @@ const transaction = ref(null)
 const loading = ref(true)
 const error = ref('')
 
-async function load(id) {
+async function load(id, source) {
   loading.value = true
   error.value = ''
   transaction.value = null
   try {
-    const { data } = await client.get(`/api/user/transaction.php?id=${encodeURIComponent(id)}`)
+    const query = `id=${encodeURIComponent(id)}&source=${encodeURIComponent(source || 'transaction')}`
+    const { data } = await client.get(`/api/user/transaction.php?${query}`)
     if (!data?.ok) throw new Error(data?.message || 'Unable to load transaction')
     transaction.value = data.data
   } catch (err) {
@@ -32,9 +33,9 @@ async function load(id) {
   }
 }
 
-onMounted(() => load(route.params.id))
-watch(() => route.params.id, (id) => {
-  if (id) load(id)
+onMounted(() => load(route.params.id, route.params.source))
+watch(() => [route.params.id, route.params.source], ([id, source]) => {
+  if (id) load(id, source)
 })
 
 const tx = computed(() => transaction.value || {})
@@ -84,17 +85,17 @@ const timeLabel = computed(() => {
   return Number.isNaN(full.getTime()) ? String(raw) : full.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
 })
 
-const detailRows = computed(() => {
-  const rows = [
-    { label: 'Type', value: tx.value.type_label || (isCredit.value ? 'Credit' : 'Debit') },
-    { label: 'Reference', value: tx.value.reference_id || tx.value.refrence_id || '—', mono: true },
-    { label: isCredit.value ? 'From' : 'To', value: tx.value.sender_name || '—' },
-    { label: 'Description', value: tx.value.description || '—' },
-    { label: 'Date', value: dateLabel.value || '—' },
-    { label: 'Time', value: timeLabel.value || '—' },
-  ]
-  return rows
-})
+// `extra` carries the fields that only make sense for one source — SWIFT and
+// routing for a wire, destination wallet for a crypto withdrawal, and so on.
+const detailRows = computed(() => [
+  { label: 'Type', value: tx.value.type_label || (isCredit.value ? 'Credit' : 'Debit') },
+  { label: 'Reference', value: tx.value.reference_id || tx.value.refrence_id || '—', mono: true },
+  { label: isCredit.value ? 'From' : 'To', value: tx.value.sender_name || '—' },
+  { label: 'Description', value: tx.value.description || '—' },
+  ...(tx.value.extra || []),
+  { label: 'Date', value: dateLabel.value || '—' },
+  { label: 'Time', value: timeLabel.value || '—' },
+])
 </script>
 
 <template>

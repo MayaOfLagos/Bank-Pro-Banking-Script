@@ -43,7 +43,7 @@ $requestPath = $requestPath === '//' ? '/' : $requestPath;
 
 // Dynamic detail routes: the SPA owns the exact rendering; the PHP shell
 // only needs to resolve a page title for the initial <head>.
-if (preg_match('#^/transactions/\d+$#', $requestPath)) {
+if (preg_match('#^/transactions/(?:(?:transaction|deposit|wire|domestic|withdrawal)/)?\d+$#', $requestPath)) {
     $requestPath = '/transactions';
 }
 

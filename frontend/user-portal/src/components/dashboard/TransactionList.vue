@@ -2,6 +2,7 @@
 import { RouterLink } from 'vue-router'
 import { ChevronRightIcon } from '@heroicons/vue/24/outline'
 import TransactionItem from './TransactionItem.vue'
+import { ledgerDetailPath } from '../../utils/ledger'
 
 defineProps({
   transactions: { type: Array, default: () => [] },
@@ -26,10 +27,10 @@ defineProps({
     <div v-else class="rows">
       <TransactionItem
         v-for="(tx, i) in transactions"
-        :key="tx.trans_id ?? tx.id ?? i"
+        :key="tx.id ?? tx.trans_id ?? i"
         :transaction="tx"
         :currency="currency"
-        :to="tx.trans_id ? `/transactions/${tx.trans_id}` : null"
+        :to="ledgerDetailPath(tx)"
       />
     </div>
   </section>

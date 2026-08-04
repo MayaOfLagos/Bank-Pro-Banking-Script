@@ -6,6 +6,7 @@ import client from '../api/client'
 import TransactionItem from '../components/dashboard/TransactionItem.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
 import ErrorState from '../components/ui/ErrorState.vue'
+import { ledgerDetailPath } from '../utils/ledger'
 
 const router = useRouter()
 const route = useRoute()
@@ -14,26 +15,28 @@ const loading = ref(true)
 const error = ref('')
 const transactions = ref([])
 
-const TABS = ['All', 'Credits', 'Debits']
-// /deposits mounts this same view pre-filtered to Credits, with a
-// deposit-oriented page title/subtitle. Meta-driven so the routing table
-// stays the single source of truth.
+// The feed merges five sources, so filters cover both direction (In/Out) and
+// instrument (Transfers/Withdrawals) — legacy split these across five pages.
+const TABS = ['All', 'In', 'Out', 'Transfers', 'Withdrawals']
+const TAB_FILTERS = {
+  In: (t) => Number(t.trans_type) === 1,
+  Out: (t) => Number(t.trans_type) === 2,
+  Transfers: (t) => t.source === 'wire' || t.source === 'domestic',
+  Withdrawals: (t) => t.source === 'withdrawal',
+}
+
 const initialTab = TABS.includes(route.meta?.defaultTab) ? route.meta.defaultTab : 'All'
 const activeTab = ref(initialTab)
 const pageTitle = computed(() => route.meta?.pageTitle || 'Activity')
 const pageSubtitle = computed(() => route.meta?.pageSubtitle || 'All account movement')
 
-// Re-sync the active tab when the user navigates between /transactions and
-// /deposits without a full remount (router keeps the component alive).
 watch(() => route.meta?.defaultTab, (val) => {
   activeTab.value = TABS.includes(val) ? val : 'All'
 })
 
 const filteredRows = computed(() => {
-  const tab = activeTab.value
-  if (tab === 'Credits') return transactions.value.filter((t) => Number(t.trans_type) === 1)
-  if (tab === 'Debits') return transactions.value.filter((t) => Number(t.trans_type) === 2)
-  return transactions.value
+  const predicate = TAB_FILTERS[activeTab.value]
+  return predicate ? transactions.value.filter(predicate) : transactions.value
 })
 
 /**
@@ -159,10 +162,10 @@ onMounted(loadTransactions)
           <div class="rows">
             <TransactionItem
               v-for="(tx, i) in group.rows"
-              :key="tx.trans_id ?? tx.id ?? i"
+              :key="tx.id ?? tx.trans_id ?? i"
               :transaction="tx"
               :currency="currency"
-              :to="tx.trans_id ? `/transactions/${tx.trans_id}` : null"
+              :to="ledgerDetailPath(tx)"
             />
           </div>
         </section>

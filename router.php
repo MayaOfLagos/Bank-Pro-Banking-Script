@@ -123,7 +123,7 @@ if ($path !== '/' && (is_file($absolute) || is_dir($absolute))) {
 }
 
 if (in_array($normalizedPath, $vueRoutes, true)
-    || preg_match('#^/transactions/\d+$#', $normalizedPath)) {
+    || preg_match('#^/transactions/(?:(?:transaction|deposit|wire|domestic|withdrawal)/)?\d+$#', $normalizedPath)) {
     require $root . '/user-app.php';
     return true;
 }

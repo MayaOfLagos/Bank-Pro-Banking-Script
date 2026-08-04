@@ -42,6 +42,7 @@ const router = createRouter({
     { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { requiresAuth: true, title: 'Dashboard' } },
     { path: '/transactions', name: 'transactions', component: TransactionsView, meta: { requiresAuth: true, title: 'Transactions' } },
     { path: '/transactions/:id(\\d+)', name: 'transaction-detail', component: TransactionDetailView, meta: { requiresAuth: true, title: 'Transaction' } },
+    { path: '/transactions/:source(transaction|deposit|wire|domestic|withdrawal)/:id(\\d+)', name: 'ledger-detail', component: TransactionDetailView, meta: { requiresAuth: true, title: 'Transaction' } },
     { path: '/deposits', name: 'deposits', component: DepositView, meta: { requiresAuth: true, title: 'Deposit' } },
     { path: '/wire-transfer', name: 'wire-transfer', component: WireTransferView, meta: { requiresAuth: true, title: 'Wire Transfer' } },
     { path: '/domestic-transfer', name: 'domestic-transfer', component: DomesticTransferView, meta: { requiresAuth: true, title: 'Domestic Transfer' } },
