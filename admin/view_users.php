@@ -110,6 +110,36 @@ if (isset($_POST['transfer'])) {
     $stmt->execute(['transfer' => $_POST['transfer_type'], 'acct_id' => $id]);
     header("Location:./users.php"); die;
 }
+
+// Feature-access save. Only responds to authenticated admin POSTs. The four
+// toggle checkboxes are absent from $_POST when unchecked (browser default)
+// so we normalise every value to 1/0 before hitting a single prepared
+// statement — no partial updates and no way to smuggle non-boolean values.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['feature_access_save'])) {
+    $flags = [
+        'transfer'         => !empty($_POST['feature_transfer']) ? 1 : 0,
+        'can_deposit'      => !empty($_POST['feature_can_deposit']) ? 1 : 0,
+        'can_withdraw'     => !empty($_POST['feature_can_withdraw']) ? 1 : 0,
+        'can_request_card' => !empty($_POST['feature_can_request_card']) ? 1 : 0,
+    ];
+    $stmt = $conn->prepare(
+        "UPDATE users SET transfer=:transfer, can_deposit=:can_deposit, " .
+        "can_withdraw=:can_withdraw, can_request_card=:can_request_card WHERE id=:acct_id"
+    );
+    $stmt->execute($flags + ['acct_id' => $id]);
+    header("Location:./view_users.php?id=" . $id . "&feature_saved=1");
+    die;
+}
+
+// Refetch the row after mutating the feature toggles so the rendered
+// checkboxes reflect the just-saved state without a manual reload.
+$featureSaved = isset($_GET['feature_saved']) && $_GET['feature_saved'] === '1';
+$featureFlags = [
+    'transfer'         => (int)($row['transfer'] ?? 1) === 1,
+    'can_deposit'      => (int)($row['can_deposit'] ?? 1) === 1,
+    'can_withdraw'     => (int)($row['can_withdraw'] ?? 1) === 1,
+    'can_request_card' => (int)($row['can_request_card'] ?? 1) === 1,
+];
 ?>
 
 <section class="content-header">
@@ -249,6 +279,45 @@ if (isset($_POST['transfer'])) {
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Feature access</h3>
+                    </div>
+                    <form method="post">
+                        <div class="card-body">
+                            <?php if ($featureSaved): ?>
+                                <div class="alert alert-success">Feature toggles updated.</div>
+                            <?php endif; ?>
+                            <p class="text-muted mb-3">Uncheck a box to block that action for this customer. Server endpoints honour these flags immediately.</p>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="custom-control custom-switch mb-2">
+                                        <input type="checkbox" class="custom-control-input" id="feature_transfer" name="feature_transfer" value="1" <?= $featureFlags['transfer'] ? 'checked' : '' ?>>
+                                        <label class="custom-control-label" for="feature_transfer">Wire / domestic transfers</label>
+                                    </div>
+                                    <div class="custom-control custom-switch mb-2">
+                                        <input type="checkbox" class="custom-control-input" id="feature_can_deposit" name="feature_can_deposit" value="1" <?= $featureFlags['can_deposit'] ? 'checked' : '' ?>>
+                                        <label class="custom-control-label" for="feature_can_deposit">Deposits (crypto / bank)</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="custom-control custom-switch mb-2">
+                                        <input type="checkbox" class="custom-control-input" id="feature_can_withdraw" name="feature_can_withdraw" value="1" <?= $featureFlags['can_withdraw'] ? 'checked' : '' ?>>
+                                        <label class="custom-control-label" for="feature_can_withdraw">Withdrawals</label>
+                                    </div>
+                                    <div class="custom-control custom-switch mb-2">
+                                        <input type="checkbox" class="custom-control-input" id="feature_can_request_card" name="feature_can_request_card" value="1" <?= $featureFlags['can_request_card'] ? 'checked' : '' ?>>
+                                        <label class="custom-control-label" for="feature_can_request_card">Card requests</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-primary" name="feature_access_save" value="1">Save feature access</button>
+                        </div>
+                    </form>
                 </div>
 
                 <div class="row">

@@ -202,7 +202,13 @@ api_json(200, [
             'card_status' => (int)($card['card_status'] ?? 0),
         ] : null,
         'quick_actions' => [
+            // Each toggle reflects the admin-controlled column on users. The
+            // SPA hides quick-action buttons when a flag is false so the
+            // customer never sees a control the backend will just 403.
             'can_transfer' => (string)($user['transfer'] ?? '1') === '1' && (string)($user['acct_status'] ?? 'hold') === 'active',
+            'can_deposit' => (string)($user['can_deposit'] ?? '1') === '1',
+            'can_withdraw' => (string)($user['can_withdraw'] ?? '1') === '1',
+            'can_request_card' => (string)($user['can_request_card'] ?? '1') === '1',
             'has_card' => $card !== null,
         ],
     ]

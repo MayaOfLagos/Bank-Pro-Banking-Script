@@ -17,6 +17,10 @@ if ((string)($user['acct_status'] ?? '') !== 'active') {
   api_json(403, ['ok' => false, 'message' => 'Withdrawals are unavailable for this account']);
 }
 
+if ((string)($user['can_withdraw'] ?? '1') !== '1') {
+  api_json(403, ['ok' => false, 'message' => 'Withdrawals are disabled for this account.']);
+}
+
 if ($amount <= 0) api_json(422, ['ok' => false, 'message' => 'Invalid amount']);
 if ($amount > (float)($user['acct_balance'] ?? 0)) api_json(422, ['ok' => false, 'message' => 'Insufficient Balance']);
 
