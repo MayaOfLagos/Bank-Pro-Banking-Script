@@ -10,12 +10,16 @@ if (!$_SESSION['admin']) {
     die;
 }
 
+require_once __DIR__ . '/../../include/branding.php';
+
 $sql = "SELECT * FROM settings WHERE id ='1'";
 $stmt = $conn->prepare($sql);
 $stmt->execute();
 $page = $stmt->fetch(PDO::FETCH_ASSOC);
 
 $title       = $page['url_name'];
+$adminFavicon = resolve_favicon($page ?: [], __DIR__ . '/../..');
+$adminLogoUrl = resolve_logo_url($page ?: [], __DIR__ . '/../..');
 $pageTitle   = $title;
 $BANK_PHONE  = $page['url_tel'];
 
@@ -38,7 +42,7 @@ $currentPage = basename($_SERVER['PHP_SELF']);
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= htmlspecialchars($pageTitle) ?> - Admin Dashboard</title>
 
-    <link rel="icon" type="image/x-icon" href="../assets/img/favicon.ico"/>
+    <link rel="icon" type="<?= htmlspecialchars($adminFavicon['type']) ?>" href="<?= htmlspecialchars($adminFavicon['href']) ?>"/>
 
     <!-- Google Font: Source Sans Pro -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
@@ -57,6 +61,37 @@ $currentPage = basename($_SERVER['PHP_SELF']);
     <link rel="stylesheet" href="./plugins/toastr/toastr.min.css">
     <!-- Theme style -->
     <link rel="stylesheet" href="./dist/css/adminlte.min.css">
+
+    <!-- Brand overrides: disband AdminLTE's circular logo wrapper + drop
+         the wordmark next to it so the admin-uploaded logo can breathe
+         the same way the customer portal login does. -->
+    <style>
+      .brand-link.brand-link--logo-only {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.85rem 0.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .brand-link.brand-link--logo-only .brand-image-free {
+        max-height: 46px;
+        max-width: 80%;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        opacity: 1;
+        margin: 0;
+        border-radius: 0;
+        box-shadow: none;
+        float: none;
+      }
+      .brand-link.brand-link--logo-only .brand-text-fallback {
+        color: #fff;
+        font-weight: 500;
+        font-size: 1.05rem;
+        letter-spacing: 0.01em;
+      }
+    </style>
 </head>
 <body class="hold-transition sidebar-mini layout-fixed">
 <div class="wrapper">

@@ -37,3 +37,8 @@ admin/admin.zip
 /scripts/
 frontend/user-portal/server.log*
 *.log.txt
+
+# Read-only mirror of the pre-Vue legacy repo for design-reference lookups.
+# Never committed — every file inside is considered dead ballast unless
+# consciously ported into the active tree.
+/.legacy-reference/

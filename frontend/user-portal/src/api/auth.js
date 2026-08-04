@@ -11,5 +11,6 @@ export const authApi = {
   forgotPassword: (payload) => client.post('/api/auth/forgot-password.php', payload),
   validateResetToken: (params) => client.get('/api/auth/reset-token-validate.php', { params }),
   resetPassword: (payload) => client.post('/api/auth/reset-password.php', payload),
+  register: (payload) => client.post('/api/auth/register.php', payload),
   logout: () => client.post('/api/auth/logout.php')
 }

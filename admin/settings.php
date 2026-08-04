@@ -16,6 +16,33 @@ if (isset($_POST['upload_picture']) && isset($_FILES['image']) && $_FILES['image
     }
 }
 
+if (isset($_POST['upload_favicon']) && isset($_FILES['favicon']) && $_FILES['favicon']['name']) {
+    $file = $_FILES['favicon'];
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    $allowed = ['ico', 'png', 'svg', 'jpg', 'jpeg'];
+    $folder = "../assets/settings/";
+    if (!in_array($ext, $allowed, true)) {
+        toast_alert('error', 'Favicon must be .ico, .png, .svg, .jpg, or .jpeg', 'Invalid');
+    } elseif ($file['size'] > 2 * 1024 * 1024) {
+        toast_alert('error', 'Favicon must be smaller than 2 MB', 'Too large');
+    } else {
+        // Standardise the on-disk name so repeated uploads always overwrite
+        // the current favicon instead of piling up.
+        $name = 'favicon.' . $ext;
+        $destination = $folder . $name;
+        if (!is_dir($folder)) {
+            @mkdir($folder, 0775, true);
+        }
+        if (move_uploaded_file($file['tmp_name'], $destination)) {
+            $stmt = $conn->prepare("UPDATE settings SET favicon=:favicon WHERE id='1'");
+            $stmt->execute(['favicon' => $name]);
+            toast_alert('success', 'Favicon uploaded successfully', 'Thanks!');
+        } else {
+            toast_alert('error', 'Failed to save favicon', 'Upload error');
+        }
+    }
+}
+
 if (isset($_POST['test_email'])) {
     $to       = trim($_POST['test_email_to'] ?? WEB_EMAIL);
     $subject  = "[SMTP TEST] " . ($pageTitle ?? 'Bank Admin');
@@ -83,6 +110,25 @@ if (isset($_POST['save_settings'])) {
                                 <input type="file" name="image" class="form-control-file" accept="image/*">
                             </div>
                             <button class="btn btn-primary btn-block" name="upload_picture">Upload Logo</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="card card-info card-outline">
+                    <div class="card-header"><h3 class="card-title">Favicon</h3></div>
+                    <div class="card-body text-center">
+                        <?php $faviconName = trim((string)($page['favicon'] ?? '')); ?>
+                        <?php if ($faviconName !== '' && is_file('../assets/settings/' . $faviconName)): ?>
+                            <img src="../assets/settings/<?= htmlspecialchars($faviconName) ?>" alt="favicon" class="mb-3" style="max-height:64px; max-width:64px; image-rendering:auto;">
+                        <?php else: ?>
+                            <p class="text-muted small mb-3">No favicon uploaded yet.</p>
+                        <?php endif; ?>
+                        <form method="post" enctype="multipart/form-data">
+                            <div class="form-group">
+                                <input type="file" name="favicon" class="form-control-file" accept=".ico,.png,.svg,image/x-icon,image/png,image/svg+xml">
+                            </div>
+                            <button class="btn btn-info btn-block" name="upload_favicon">Upload Favicon</button>
+                            <p class="small text-muted mt-2 mb-0">Recommended: 32×32 or 64×64 <code>.ico</code>/<code>.png</code>. Max 2&nbsp;MB.</p>
                         </form>
                     </div>
                 </div>

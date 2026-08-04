@@ -52,7 +52,22 @@ if (!password_verify($acctPassword, (string)$user['acct_password'])) {
     ]);
 }
 
+// Password checks out — reset the failed-attempts counter before we
+// evaluate any policy gates. Credentials were valid; a status block
+// is a separate matter.
 security_reset_verify_attempts($conn, (int)$user['id']);
+
+// Policy gate: account must be 'active' to advance to PIN. Rejecting
+// here means a held / suspended / blocked user never reaches the PIN
+// page and never gets a partial "pending_pin" session.
+$blockMessage = auth_account_block_message($user);
+if ($blockMessage !== null) {
+    auth_json(403, [
+        'ok' => false,
+        'message' => $blockMessage,
+        'data' => ['acct_status' => (string)($user['acct_status'] ?? '')],
+    ]);
+}
 
 $device = $_SERVER['HTTP_USER_AGENT'] ?? 'Unknown device';
 $ipAddress = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';

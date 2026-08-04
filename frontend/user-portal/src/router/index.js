@@ -13,6 +13,7 @@ const ProfileView = () => import('../views/ProfileView.vue')
 const CardsView = () => import('../views/CardsView.vue')
 const LoansView = () => import('../views/LoansView.vue')
 const LoginView = () => import('../views/auth/LoginView.vue')
+const RegisterView = () => import('../views/auth/RegisterView.vue')
 const PinView = () => import('../views/auth/PinView.vue')
 const ForgotPasswordView = () => import('../views/auth/ForgotPasswordView.vue')
 const UpdatePasswordView = () => import('../views/auth/UpdatePasswordView.vue')
@@ -27,6 +28,7 @@ const router = createRouter({
   routes: [
     { path: '/', redirect: '/dashboard' },
     { path: '/login', name: 'login', component: LoginView, meta: { authPage: true, guestOnly: true } },
+    { path: '/register', name: 'register', component: RegisterView, meta: { authPage: true, guestOnly: true, title: 'Create Account' } },
     { path: '/pin', name: 'pin', component: PinView, meta: { authPage: true, requiresPendingPin: true } },
     { path: '/reset-password', name: 'reset-password', component: ForgotPasswordView, meta: { authPage: true, guestOnly: true } },
     { path: '/update-password', name: 'update-password', component: UpdatePasswordView, meta: { authPage: true, guestOnly: true } },

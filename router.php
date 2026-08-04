@@ -8,6 +8,7 @@ $root = __DIR__;
 
 $vueRoutes = [
     '/login',
+    '/register',
     '/pin',
     '/reset-password',
     '/update-password',
@@ -102,7 +103,7 @@ if ($normalizedPath === '/user' || strncmp($normalizedPath, '/user/', 6) === 0) 
 }
 
 if ($normalizedPath === '/signup' || strncmp($normalizedPath, '/signup/', 8) === 0) {
-    $permanentRedirect('/login');
+    $permanentRedirect('/register');
 }
 
 // Removed theme bundles must return a real 404 instead of the public homepage.

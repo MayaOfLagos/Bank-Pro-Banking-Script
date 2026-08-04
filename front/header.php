@@ -4,6 +4,7 @@
 
 require __DIR__."/../include/loginFunction.php";
 require_once __DIR__."/../session.php";
+require_once __DIR__."/../include/branding.php";
 // require_once("/include/UserFunction.php");
 
 $sql = "SELECT * FROM settings WHERE id ='1'";
@@ -11,6 +12,7 @@ $stmt = $conn->prepare($sql);
 $stmt->execute();
 
 $page = $stmt->fetch(PDO::FETCH_ASSOC);
+$frontFavicon = resolve_favicon($page ?: [], __DIR__ . '/..');
 
 $title = $page['url_name'];
 
@@ -51,8 +53,9 @@ $sendMail = new emailMessage();
 <!-- Fonts -->
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@100;500;600;700;900&amp;family=Libre+Baskerville:wght@400;700&amp;family=Work+Sans:wght@100;200;300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet" />
 
-<!-- Add site Favicon -->
-<link rel="icon" href="<?= $web_url ?>/front/images/favicon.png" type="image/x-icon" />
+<!-- Site favicon (admin-uploaded via /admin/settings.php → falls back to
+     legacy assets/settings/favicon.png → generic /assets/img/favicon.ico) -->
+<link rel="icon" type="<?= htmlspecialchars($frontFavicon['type']) ?>" href="<?= htmlspecialchars($frontFavicon['href']) ?>" />
 
 
 <script src="https://code.jquery.com/jquery-3.6.1.min.js"></script>

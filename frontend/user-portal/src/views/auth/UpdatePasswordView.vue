@@ -1,10 +1,11 @@
 <template>
   <AuthShell>
     <h2 class="auth-heading">New password</h2>
-    <p class="auth-subheading">Set a new secure password for your account</p>
+    <p class="auth-subheading">Choose a strong password you haven't used before.</p>
 
-    <div v-if="tokenLoading" class="loading-spinner">
-      <div class="spinner"></div>
+    <div v-if="tokenLoading" class="update-loading">
+      <div class="update-spinner" aria-hidden="true"></div>
+      <p class="update-loading-text">Verifying reset link…</p>
     </div>
 
     <ErrorState v-else-if="!tokenValid && serverError" :message="serverError" compact />
@@ -13,25 +14,27 @@
       <FormField label="New password" :error="errors.new_password" required>
         <template #default="{ id, describedBy }">
           <div class="auth-input-wrap">
+            <LockClosedIcon class="auth-input-icon" aria-hidden="true" />
             <input
               :id="id"
               v-bind="newPasswordAttrs"
               v-model="newPassword"
               :type="showPassword ? 'text' : 'password'"
               autocomplete="new-password"
-              placeholder="Enter new password"
+              placeholder="At least 8 characters"
               :aria-describedby="describedBy"
               :aria-invalid="!!errors.new_password || null"
-              class="auth-input auth-input--with-toggle"
+              class="auth-input auth-input--with-icon auth-input--with-toggle"
             />
             <button
               type="button"
               @click="showPassword = !showPassword"
               :aria-label="showPassword ? 'Hide password' : 'Show password'"
+              :aria-pressed="showPassword"
               class="auth-toggle"
             >
-              <EyeIcon v-if="!showPassword" class="auth-toggle-icon" />
-              <EyeSlashIcon v-else class="auth-toggle-icon" />
+              <EyeIcon v-if="!showPassword" class="auth-toggle-icon" aria-hidden="true" />
+              <EyeSlashIcon v-else class="auth-toggle-icon" aria-hidden="true" />
             </button>
           </div>
         </template>
@@ -52,6 +55,7 @@
       <FormField label="Confirm password" :error="errors.confirm_password" required>
         <template #default="{ id, describedBy }">
           <div class="auth-input-wrap">
+            <LockClosedIcon class="auth-input-icon" aria-hidden="true" />
             <input
               :id="id"
               v-bind="confirmPasswordAttrs"
@@ -61,16 +65,17 @@
               placeholder="Re-enter new password"
               :aria-describedby="describedBy"
               :aria-invalid="!!errors.confirm_password || null"
-              class="auth-input auth-input--with-toggle"
+              class="auth-input auth-input--with-icon auth-input--with-toggle"
             />
             <button
               type="button"
               @click="showConfirm = !showConfirm"
               :aria-label="showConfirm ? 'Hide password' : 'Show password'"
+              :aria-pressed="showConfirm"
               class="auth-toggle"
             >
-              <EyeIcon v-if="!showConfirm" class="auth-toggle-icon" />
-              <EyeSlashIcon v-else class="auth-toggle-icon" />
+              <EyeIcon v-if="!showConfirm" class="auth-toggle-icon" aria-hidden="true" />
+              <EyeSlashIcon v-else class="auth-toggle-icon" aria-hidden="true" />
             </button>
           </div>
         </template>
@@ -79,12 +84,15 @@
       <ErrorState v-if="serverError" :message="serverError" compact />
 
       <button type="submit" :disabled="isSubmitting" class="auth-submit">
-        {{ isSubmitting ? 'Updating...' : 'Update password' }}
+        {{ isSubmitting ? 'Updating…' : 'Update password' }}
       </button>
     </form>
 
     <template #footer>
-      <RouterLink to="/login" class="auth-link">Back to sign in</RouterLink>
+      <p class="auth-footer-note">
+        Changed your mind?
+        <RouterLink to="/login">Back to sign in</RouterLink>
+      </p>
     </template>
   </AuthShell>
 </template>
@@ -92,7 +100,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
+import { EyeIcon, EyeSlashIcon, LockClosedIcon } from '@heroicons/vue/24/solid'
 import AuthShell from '../../components/auth/AuthShell.vue'
 import FormField from '../../components/ui/FormField.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
@@ -169,18 +177,25 @@ const onSubmit = handleSubmit(async (formValues) => {
 </script>
 
 <style scoped>
-.loading-spinner {
+.update-loading {
   display: flex;
-  justify-content: center;
-  padding: var(--space-5) 0;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) 0;
 }
-.spinner {
-  width: 2rem;
-  height: 2rem;
+.update-spinner {
+  width: 2.25rem;
+  height: 2.25rem;
   border-radius: var(--radius-pill);
-  border: 2px solid var(--border);
+  border: 3px solid var(--surface-muted);
   border-top-color: var(--accent);
-  animation: spin 0.8s linear infinite;
+  animation: update-spin 0.9s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+.update-loading-text {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin: 0;
+}
+@keyframes update-spin { to { transform: rotate(360deg); } }
 </style>

@@ -1,29 +1,33 @@
 <template>
   <AuthShell>
     <h2 class="auth-heading">Welcome back</h2>
-    <p class="auth-subheading">Sign in to your account</p>
+    <p class="auth-subheading">Sign in to continue to your account.</p>
 
     <form @submit.prevent="onSubmit" class="auth-form">
       <FormField label="Account number" :error="errors.acct_no" required>
         <template #default="{ id, describedBy }">
-          <input
-            :id="id"
-            v-bind="acctNoAttrs"
-            v-model="acctNo"
-            type="text"
-            inputmode="numeric"
-            autocomplete="username"
-            placeholder="Enter account number, username, or email"
-            :aria-describedby="describedBy"
-            :aria-invalid="!!errors.acct_no || null"
-            class="auth-input"
-          />
+          <div class="auth-input-wrap">
+            <UserIcon class="auth-input-icon" aria-hidden="true" />
+            <input
+              :id="id"
+              v-bind="acctNoAttrs"
+              v-model="acctNo"
+              type="text"
+              inputmode="numeric"
+              autocomplete="username"
+              placeholder="Account number, username, or email"
+              :aria-describedby="describedBy"
+              :aria-invalid="!!errors.acct_no || null"
+              class="auth-input auth-input--with-icon"
+            />
+          </div>
         </template>
       </FormField>
 
       <FormField label="Password" :error="errors.acct_password" required>
         <template #default="{ id, describedBy }">
           <div class="auth-input-wrap">
+            <LockClosedIcon class="auth-input-icon" aria-hidden="true" />
             <input
               :id="id"
               v-bind="passwordAttrs"
@@ -33,20 +37,25 @@
               placeholder="Enter password"
               :aria-describedby="describedBy"
               :aria-invalid="!!errors.acct_password || null"
-              class="auth-input auth-input--with-toggle"
+              class="auth-input auth-input--with-icon auth-input--with-toggle"
             />
             <button
               type="button"
               @click="showPassword = !showPassword"
               :aria-label="showPassword ? 'Hide password' : 'Show password'"
+              :aria-pressed="showPassword"
               class="auth-toggle"
             >
-              <EyeIcon v-if="!showPassword" class="auth-toggle-icon" />
-              <EyeSlashIcon v-else class="auth-toggle-icon" />
+              <EyeIcon v-if="!showPassword" class="auth-toggle-icon" aria-hidden="true" />
+              <EyeSlashIcon v-else class="auth-toggle-icon" aria-hidden="true" />
             </button>
           </div>
         </template>
       </FormField>
+
+      <div class="auth-inline-actions">
+        <RouterLink to="/reset-password" class="auth-link">Forgot password?</RouterLink>
+      </div>
 
       <ErrorState v-if="serverError" :message="serverError" compact />
 
@@ -57,12 +66,20 @@
       </p>
 
       <button type="submit" :disabled="isSubmitting" class="auth-submit">
-        {{ isSubmitting ? 'Signing in...' : 'Sign in' }}
+        {{ isSubmitting ? 'Signing in…' : 'Sign in' }}
       </button>
     </form>
 
     <template #footer>
-      <RouterLink to="/reset-password" class="auth-link">Forgot password?</RouterLink>
+      <p class="auth-footer-note">
+        New to {{ site.brandName }}?
+        <RouterLink to="/register">Create an account</RouterLink>
+      </p>
+      <p class="auth-footer-note auth-footer-note--muted">
+        Need help signing in?
+        <a v-if="site.supportEmail" :href="`mailto:${site.supportEmail}`">Contact support</a>
+        <RouterLink v-else to="/reset-password">Contact support</RouterLink>
+      </p>
     </template>
   </AuthShell>
 </template>
@@ -70,17 +87,19 @@
 <script setup>
 import { ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline'
+import { EyeIcon, EyeSlashIcon, UserIcon, LockClosedIcon } from '@heroicons/vue/24/solid'
 import AuthShell from '../../components/auth/AuthShell.vue'
 import FormField from '../../components/ui/FormField.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import { authApi } from '../../api/auth'
 import { useAuthStore } from '../../stores/auth'
+import { useSiteStore } from '../../stores/site'
 import { useValidatedForm } from '../../composables/useValidatedForm'
 import { loginSchema } from '../../validation/schemas'
 
 const router = useRouter()
 const auth = useAuthStore()
+const site = useSiteStore()
 
 const showPassword = ref(false)
 const serverError = ref('')

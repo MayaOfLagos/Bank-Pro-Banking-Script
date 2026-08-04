@@ -1,0 +1,9 @@
+[
+  { "code": "Savings",   "name": "Savings",   "description": "Everyday savings account" },
+  { "code": "Current",   "name": "Current",   "description": "Daily-use current / checking account" },
+  { "code": "Checking",  "name": "Checking",  "description": "Chequing account with unlimited transactions" },
+  { "code": "Business",  "name": "Business",  "description": "Operating account for a registered business" },
+  { "code": "Fixed",     "name": "Fixed Deposit", "description": "Locked-term deposit for higher interest" },
+  { "code": "Joint",     "name": "Joint",     "description": "Shared account for two or more holders" },
+  { "code": "Student",   "name": "Student",   "description": "Fee-free account for students" }
+]

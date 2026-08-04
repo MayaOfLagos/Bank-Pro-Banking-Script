@@ -17,12 +17,26 @@ if ($pin === '') {
     auth_json(422, ['ok' => false, 'message' => 'Enter your PIN']);
 }
 
-$stmt = $conn->prepare('SELECT id, acct_no, acct_pin FROM users WHERE acct_no = :acct_no LIMIT 1');
+$stmt = $conn->prepare('SELECT id, acct_no, acct_pin, acct_status FROM users WHERE acct_no = :acct_no LIMIT 1');
 $stmt->execute(['acct_no' => (string)$_SESSION['login']]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$user) {
     auth_json(404, ['ok' => false, 'message' => 'Account not found']);
+}
+
+// Same policy gate as login.php — an account that lost 'active' status
+// between login and PIN entry must not be able to complete auth. Wipe
+// the half-formed session and bounce back to /login.
+$blockMessage = auth_account_block_message($user);
+if ($blockMessage !== null) {
+    session_unset();
+    session_destroy();
+    auth_json(403, [
+        'ok' => false,
+        'message' => $blockMessage,
+        'data' => ['acct_status' => (string)$user['acct_status'], 'next_route' => '/login'],
+    ]);
 }
 
 security_enforce_verify_lock($conn, (int)$user['id'], 'auth_json');

@@ -201,49 +201,99 @@ body {
   background: var(--bg-gradient);
   color: var(--text-primary);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: var(--space-6) var(--space-5);
+  padding: var(--space-6) var(--space-4);
+  position: relative;
+  overflow: hidden;
+}
+/* Extra soft glow behind the card so the surface pops off the gradient. */
+.auth-shell__bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 40rem 30rem at 50% 30%, color-mix(in srgb, var(--accent) 12%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse 30rem 20rem at 80% 90%, color-mix(in srgb, var(--accent-strong) 8%, transparent) 0%, transparent 55%);
+  z-index: 0;
+}
+.auth-shell__frame {
+  width: 100%;
+  max-width: 26rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-4);
+  position: relative;
+  z-index: 1;
 }
 .auth-shell__brand {
   display: flex;
-  flex-direction: column;
+  justify-content: center;
   align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-2);
 }
+/* Icon-only fallback: keep the gradient tile so accounts without a logo
+   still get an identifiable brand mark. */
 .auth-shell__logo {
-  width: 3.5rem;
-  height: 3.5rem;
-  border-radius: var(--radius-md);
-  background: var(--accent);
+  width: 4rem;
+  height: 4rem;
+  border-radius: 1.1rem;
+  background: var(--card-gradient-debit);
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 10px 24px -8px color-mix(in srgb, var(--accent-strong) 60%, transparent);
+  overflow: hidden;
+}
+.auth-shell__logo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 25% 25%, color-mix(in srgb, #fff 22%, transparent), transparent 55%);
+  pointer-events: none;
 }
 .auth-shell__logo-icon {
-  width: 2rem;
-  height: 2rem;
+  width: 2.15rem;
+  height: 2.15rem;
   color: var(--text-on-accent);
 }
-.auth-shell__brand-name {
-  color: var(--text-primary);
-  font-weight: 700;
-  font-size: 1.25rem;
-  margin: 0;
+/* Admin-uploaded logo: no tile, no border, no background — the image
+   defines its own identity. Sized generously so it can breathe. */
+.auth-shell__logo-free {
+  max-width: 12rem;
+  max-height: 4.5rem;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
 }
 .auth-shell__card {
   width: 100%;
-  max-width: 24rem;
   background: var(--surface);
   border-radius: var(--radius-lg);
-  padding: var(--space-6);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow-card);
+  padding: var(--space-6) var(--space-5);
+  box-shadow: var(--shadow-lift);
 }
 .auth-shell__footer {
-  margin-top: var(--space-4);
+  text-align: center;
+}
+.auth-shell__footer:empty { display: none; }
+.auth-shell__trust {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin: var(--space-2) auto 0;
+  align-self: center;
+}
+.auth-shell__trust-icon {
+  width: 0.9rem;
+  height: 0.9rem;
+  color: var(--success-fg);
 }
 
 /*
@@ -251,10 +301,12 @@ body {
  * UpdatePasswordView don't each carry a copy of the same input + button CSS.
  */
 .auth-heading {
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: 1.6rem;
+  font-weight: 800;
   color: var(--text-primary);
-  margin: 0 0 0.25rem;
+  margin: 0 0 0.35rem;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
 }
 .auth-subheading {
   color: var(--text-secondary);
@@ -266,91 +318,162 @@ body {
   flex-direction: column;
   gap: var(--space-4);
 }
+.auth-field-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.5rem;
+}
 .auth-input {
   width: 100%;
   background: var(--surface-muted);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   color: var(--text-primary);
   border-radius: var(--radius-md);
-  padding: 0.85rem 1rem;
-  font-size: 0.9rem;
-  transition: border-color 0.15s ease;
+  padding: 0.95rem 1rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 .auth-input:focus {
   outline: none;
   border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 15%, transparent);
 }
 .auth-input::placeholder {
   color: var(--text-muted);
 }
 .auth-input--pin {
   text-align: center;
-  font-size: 1.5rem;
-  letter-spacing: 0.4em;
+  font-size: 1.75rem;
+  letter-spacing: 0.5em;
   font-weight: 700;
+  padding-inline: 1.75rem 0.75rem; /* offset the letter-spacing so text stays centred */
 }
 .auth-input-wrap {
   position: relative;
+  display: flex;
+  align-items: center;
+}
+.auth-input-icon {
+  position: absolute;
+  left: 0.95rem;
+  top: 50%;
+  transform: translateY(-50%);
+  /* Match the dashboard icon weight — OptionsList uses 1.35rem, floating
+     nav 1.25rem. Sit in between so it reads as bold without dominating
+     the input. */
+  width: 1.3rem;
+  height: 1.3rem;
+  color: var(--text-primary);
+  pointer-events: none;
+}
+.auth-input--with-icon {
+  padding-left: 2.85rem;
 }
 .auth-input--with-toggle {
-  padding-right: 2.5rem;
+  padding-right: 2.8rem;
 }
 .auth-toggle {
   position: absolute;
-  right: 0.75rem;
+  right: 0.65rem;
   top: 50%;
   transform: translateY(-50%);
   background: transparent;
   border: none;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 0.25rem;
+  padding: 0.4rem;
+  border-radius: var(--radius-sm);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 .auth-toggle:hover {
   color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
 }
 .auth-toggle-icon {
-  width: 1rem;
-  height: 1rem;
+  width: 1.15rem;
+  height: 1.15rem;
+}
+.auth-inline-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -0.25rem;
 }
 .auth-attempts {
   color: var(--warning-fg);
   font-size: 0.75rem;
   text-align: center;
   margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: color-mix(in srgb, var(--warning-fg) 10%, transparent);
+  border-radius: var(--radius-sm);
 }
+/* Mirrors the dashboard ActionButtons .btn + .btn--filled exactly (height,
+   padding, radius, weight, font-size, colors) so the auth CTA reads as the
+   same button family. Only difference: width:100% for the full-width
+   auth layout, and a subtle drop-shadow for depth in the airy card. */
 .auth-submit {
-  padding: 1rem;
+  width: 100%;
+  height: 3rem;
+  padding: 0 var(--space-4);
   border-radius: var(--radius-pill);
-  border: none;
+  border: 1px solid transparent;
   background: var(--btn-primary-bg);
   color: var(--btn-primary-fg);
   font-weight: 600;
   font-size: 0.9rem;
+  font-family: inherit;
   cursor: pointer;
-  transition: opacity 0.15s ease, transform 0.08s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  transition: transform 0.08s ease, opacity 0.15s ease;
+  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--btn-primary-bg) 70%, transparent);
+  margin-top: var(--space-2);
 }
 .auth-submit:hover:not(:disabled) {
-  opacity: 0.9;
+  opacity: 0.92;
 }
 .auth-submit:active:not(:disabled) {
-  transform: scale(0.99);
+  transform: scale(0.98);
 }
 .auth-submit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 .auth-link {
-  color: var(--accent);
-  font-size: 0.9rem;
+  color: var(--accent-strong);
+  font-size: 0.85rem;
+  font-weight: 600;
   text-decoration: none;
 }
 .auth-link:hover {
   text-decoration: underline;
 }
+.auth-footer-note {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+.auth-footer-note + .auth-footer-note {
+  margin-top: 0.4rem;
+}
+.auth-footer-note--muted {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.auth-footer-note a { color: var(--accent-strong); font-weight: 600; text-decoration: none; }
+.auth-footer-note a:hover { text-decoration: underline; }
 .auth-context {
   display: flex;
   align-items: center;

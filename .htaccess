@@ -22,8 +22,8 @@
   RewriteRule ^profile-center/?$ /profile [R=301,L,NE]
   RewriteRule ^p/forgot-password(?:\.php)?/?$ /reset-password [R=301,L,NE]
 
-  # Registration and the old customer tree are retired from the web runtime.
-  RewriteRule ^signup(?:/.*)?$ /login [R=301,L,NE]
+  # Legacy signup URLs redirect to the new Vue register wizard.
+  RewriteRule ^signup(?:/.*)?$ /register [R=301,L,NE]
   RewriteRule ^user/card(?:\.php)?/?$ /cards [R=301,L,NE]
   RewriteRule ^user/(?:loan|loan-transaction|viewloantrans)(?:\.php)?/?$ /loans [R=301,L,NE]
   RewriteRule ^user/(?:profile|edit-profile)(?:\.php)?/?$ /profile [R=301,L,NE]
@@ -44,7 +44,7 @@
 
   # Vue owns authentication and customer-facing routes through one PHP front controller.
   # Admin and public marketing routes continue to use their existing PHP entry points.
-  RewriteRule ^(login|pin|reset-password|update-password|dashboard|transactions|deposits|wire-transfer|domestic-transfer|withdrawals|cards|loans|tickets|profile|transfer-verify|transfer-cot|transfer-tax|transfer-imf|transfer-success)$ user-app.php [L,QSA]
+  RewriteRule ^(login|register|pin|reset-password|update-password|dashboard|transactions|deposits|wire-transfer|domestic-transfer|withdrawals|cards|loans|tickets|profile|transfer-verify|transfer-cot|transfer-tax|transfer-imf|transfer-success)$ user-app.php [L,QSA]
   # Dynamic detail routes owned by the Vue SPA.
   RewriteRule ^transactions/[0-9]+$ user-app.php [L,QSA]
 

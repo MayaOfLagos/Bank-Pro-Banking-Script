@@ -42,7 +42,6 @@ $update->execute([
     'token' => $token,
 ]);
 
-auth_send_sms_if_enabled($settings, (string)($user['acct_phone'] ?? ''), 'Security Alert: Password Changed');
 auth_send_password_changed_email($user, $appName, $mailer);
 
 auth_json(200, [

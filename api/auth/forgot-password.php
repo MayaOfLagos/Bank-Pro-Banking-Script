@@ -38,16 +38,17 @@ if (!$user) {
 }
 
 $token = bin2hex(random_bytes(16));
-$expiresAt = date('Y-m-d H:i:s', time() + 1800);
 
-$update = $conn->prepare('UPDATE users SET resettoken = :token, resettokenexp = :exp WHERE acct_email = :email');
+// Compute expiry in MySQL time (not PHP time) so the timezone matches
+// what NOW() will report during token validation. Previously PHP's date()
+// used its own timezone which drifted 1h from the MySQL server clock and
+// made reset tokens expire on issue.
+$update = $conn->prepare('UPDATE users SET resettoken = :token, resettokenexp = DATE_ADD(NOW(), INTERVAL 30 MINUTE) WHERE acct_email = :email');
 $update->execute([
     'token' => $token,
-    'exp' => $expiresAt,
     'email' => $email,
 ]);
 
-auth_send_sms_if_enabled($settings, (string)($user['acct_phone'] ?? ''), 'Alert: Password Reset');
 auth_send_reset_email($user, $token, $appName, $appUrl, $mailer);
 
 auth_json(200, $genericResponse);

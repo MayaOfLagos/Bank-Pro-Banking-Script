@@ -7,6 +7,7 @@ import { registerAuthHandlers, setCsrfToken } from './api/client'
 import { useAuthStore } from './stores/auth'
 import { useProfileStore } from './stores/profile'
 import { useSettingsStore } from './stores/settings'
+import { useSiteStore } from './stores/site'
 import { applyThemeAtBoot } from './composables/useTheme'
 import 'vue-toastification/dist/index.css'
 import './style.css'
@@ -64,7 +65,13 @@ authStore.$subscribe((_, state) => {
 	if (state.csrfToken) setCsrfToken(state.csrfToken)
 })
 
+const siteStore = useSiteStore()
+
 const bootstrap = async () => {
+	// Fetch admin-configured branding before mount so the first paint of
+	// pre-auth screens already shows the correct logo / brand name.
+	// Failure is non-fatal — the store keeps sensible defaults.
+	await siteStore.load().catch(() => {})
 	await router.isReady()
 	app.mount('#app')
 }

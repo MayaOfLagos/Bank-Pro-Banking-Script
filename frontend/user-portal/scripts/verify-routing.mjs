@@ -8,6 +8,7 @@ const projectDirectory = resolve(portalDirectory, '../..')
 
 const canonicalRoutes = [
   '/login',
+  '/register',
   '/pin',
   '/reset-password',
   '/update-password',

@@ -1,22 +1,25 @@
 <template>
   <AuthShell>
-    <h2 class="auth-heading">Reset password</h2>
-    <p class="auth-subheading">Enter your email to receive a reset link</p>
+    <h2 class="auth-heading">Forgot password?</h2>
+    <p class="auth-subheading">Enter the email on your account and we'll send you a reset link.</p>
 
     <form @submit.prevent="onSubmit" class="auth-form">
       <FormField label="Email address" :error="errors.email" required>
         <template #default="{ id, describedBy }">
-          <input
-            :id="id"
-            v-bind="emailAttrs"
-            v-model="email"
-            type="email"
-            placeholder="example@email.com"
-            autocomplete="email"
-            :aria-describedby="describedBy"
-            :aria-invalid="!!errors.email || null"
-            class="auth-input"
-          />
+          <div class="auth-input-wrap">
+            <EnvelopeIcon class="auth-input-icon" aria-hidden="true" />
+            <input
+              :id="id"
+              v-bind="emailAttrs"
+              v-model="email"
+              type="email"
+              placeholder="you@example.com"
+              autocomplete="email"
+              :aria-describedby="describedBy"
+              :aria-invalid="!!errors.email || null"
+              class="auth-input auth-input--with-icon"
+            />
+          </div>
         </template>
       </FormField>
 
@@ -36,7 +39,10 @@
     </form>
 
     <template #footer>
-      <RouterLink to="/login" class="auth-link">Back to sign in</RouterLink>
+      <p class="auth-footer-note">
+        Remembered it?
+        <RouterLink to="/login">Back to sign in</RouterLink>
+      </p>
     </template>
   </AuthShell>
 </template>
@@ -44,6 +50,7 @@
 <script setup>
 import { ref, computed, onBeforeUnmount } from 'vue'
 import { RouterLink } from 'vue-router'
+import { EnvelopeIcon } from '@heroicons/vue/24/solid'
 import AuthShell from '../../components/auth/AuthShell.vue'
 import FormField from '../../components/ui/FormField.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
@@ -64,7 +71,7 @@ const { defineField, handleSubmit, errors, isSubmitting } = useValidatedForm(for
 const [email, emailAttrs] = defineField('email')
 
 const buttonLabel = computed(() => {
-  if (isSubmitting.value) return 'Sending...'
+  if (isSubmitting.value) return 'Sending…'
   if (cooldown.value > 0) return `Resend in ${cooldown.value}s`
   return sent.value ? 'Resend link' : 'Send reset link'
 })

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../session.php';
 require_once __DIR__ . '/../../include/config.php';
+require_once __DIR__ . '/../../include/currency.php';
 require_once __DIR__ . '/../_security.php';
 
 header('Content-Type: application/json; charset=utf-8');
@@ -42,14 +43,21 @@ $settingsStmt = $conn->prepare("SELECT * FROM settings WHERE id='1' LIMIT 1");
 $settingsStmt->execute();
 $settings = $settingsStmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
+/**
+ * Kept for back-compat — every user API endpoint calls this to convert
+ * users.acct_currency into a display symbol. Now delegates to the shared
+ * currency_symbol() helper so every code in the JSON catalog resolves.
+ *
+ * Also fixes the CAD → "¢" bug the old switch had (CAD should be "$"),
+ * and translates the two legacy free-form values ("Euro", "Yuan") to
+ * canonical ISO codes before lookup.
+ */
 function user_currency_symbol(array $user): string {
-    $cur = $user['acct_currency'] ?? 'USD';
-    if ($cur === 'USD') return '$';
-    if ($cur === 'EUR' || $cur === 'Euro') return '€';
-    if ($cur === 'Yuan') return '¥';
-    if ($cur === 'GBP') return '£';
-    if ($cur === 'CAD') return '¢';
-    return '$';
+    $raw = trim((string)($user['acct_currency'] ?? 'USD'));
+    if ($raw === '') return '$';
+    $alias = ['Euro' => 'EUR', 'Yuan' => 'CNY'];
+    $code = $alias[$raw] ?? $raw;
+    return currency_symbol($code, '$');
 }
 
 function api_payload(): array {

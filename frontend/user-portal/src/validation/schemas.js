@@ -1,4 +1,7 @@
 import { z } from 'zod'
+import { currencyList } from '../utils/currency'
+import accountTypes from '../data/account-types.json'
+import countries from '../data/countries.json'
 
 // Reusable field schemas. Compose these into per-form schemas rather than
 // duplicating regex / length rules across views.
@@ -102,6 +105,82 @@ export const resetPasswordSchema = z
     confirm_password: z.string({ required_error: 'Confirm your new password' }),
   })
   .refine((d) => d.new_password === d.confirm_password, {
+    path: ['confirm_password'],
+    message: 'Passwords do not match',
+  })
+
+// Register wizard — one schema per step so `handleSubmit` per step doesn't
+// short-circuit until the whole form is valid at the very end.
+const nameField = z
+  .string({ required_error: 'Required' })
+  .trim()
+  .min(2, 'Must be at least 2 characters')
+  .max(50, 'Must be 50 characters or fewer')
+  .regex(/^[\p{L} .'-]+$/u, 'Only letters, spaces, and .-\'')
+
+const isoDate = z
+  .string({ required_error: 'Required' })
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter a valid date')
+
+const eighteenOrOlder = isoDate.refine((s) => {
+  const dob = new Date(s + 'T00:00:00')
+  if (Number.isNaN(dob.getTime())) return false
+  const today = new Date()
+  let age = today.getFullYear() - dob.getFullYear()
+  const m = today.getMonth() - dob.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age -= 1
+  return age >= 18 && age <= 120
+}, 'You must be at least 18 years old')
+
+// All catalogs kept in step with the shared JSON so client validation
+// and server validation cannot drift. Uppercase sets for O(1) lookups.
+const KNOWN_CURRENCY_CODES = new Set(currencyList().map((c) => c.code))
+const KNOWN_COUNTRY_CODES = new Set(countries.map((c) => String(c.code).toUpperCase()))
+const KNOWN_COUNTRY_NAMES = new Set(countries.map((c) => String(c.name).toLowerCase()))
+const KNOWN_ACCOUNT_TYPES = new Set(accountTypes.map((a) => String(a.code)))
+
+// Countries accept either the ISO code ("US") or the full name — some
+// legacy rows carry free-form names, and admin panels might not have been
+// migrated yet.
+export const registerStep1Schema = z.object({
+  firstname: nameField,
+  lastname: nameField,
+  dob: eighteenOrOlder,
+  country: z
+    .string({ required_error: 'Select a country' })
+    .trim()
+    .min(2, 'Select a country')
+    .refine(
+      (v) => KNOWN_COUNTRY_CODES.has(v.toUpperCase()) || KNOWN_COUNTRY_NAMES.has(v.toLowerCase()),
+      { message: 'Select a supported country' },
+    ),
+})
+
+export const registerStep2Schema = z.object({
+  email,
+  phone,
+  currency: z
+    .string({ required_error: 'Select a currency' })
+    .trim()
+    .min(1, 'Select a currency')
+    .refine((code) => KNOWN_CURRENCY_CODES.has(code.toUpperCase()), {
+      message: 'Select a supported currency',
+    }),
+  acct_type: z
+    .string({ required_error: 'Select an account type' })
+    .refine((code) => KNOWN_ACCOUNT_TYPES.has(code), {
+      message: 'Select a supported account type',
+    }),
+})
+
+export const registerStep3Schema = z
+  .object({
+    password,
+    confirm_password: z.string({ required_error: 'Confirm your password' }),
+    pin,
+    terms_accepted: z.literal(true, { errorMap: () => ({ message: 'You must accept the terms' }) }),
+  })
+  .refine((d) => d.password === d.confirm_password, {
     path: ['confirm_password'],
     message: 'Passwords do not match',
   })
