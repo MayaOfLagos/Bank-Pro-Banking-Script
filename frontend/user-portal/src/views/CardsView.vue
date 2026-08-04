@@ -1,6 +1,5 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import {
   PlusIcon,
@@ -24,7 +23,6 @@ import { formatMoney, formatMoneyInline } from '../utils/format'
 
 const HIDE_KEY = 'bankpro:hide-card-balance'
 
-const router = useRouter()
 const profileStore = useProfileStore()
 const cardsBundle = useCards()
 
@@ -138,6 +136,44 @@ async function onActivate() {
     toast.error(err?.response?.data?.message || err.message || 'Unable to activate card')
   }
 }
+
+const REASON_MAX = 500
+const REASON_MIN = 5
+
+const showRequest = ref(false)
+const requestType = ref('VISA')
+const requestReason = ref('')
+
+const reasonLength = computed(() => requestReason.value.trim().length)
+const reasonValid = computed(() => reasonLength.value >= REASON_MIN && reasonLength.value <= REASON_MAX)
+
+const latestRequest = computed(() => cardsBundle.latestRequest.value)
+const pendingRequest = computed(() =>
+  cardsBundle.hasRequestInProgress.value ? latestRequest.value : null,
+)
+
+function openRequest() {
+  requestType.value = 'VISA'
+  requestReason.value = ''
+  showRequest.value = true
+}
+
+async function submitRequest() {
+  if (!reasonValid.value) {
+    toast.error(`Tell us why you need this card (at least ${REASON_MIN} characters).`)
+    return
+  }
+  try {
+    const res = await cardsBundle.requestCard({
+      card_type: requestType.value,
+      card_reason: requestReason.value.trim(),
+    })
+    showRequest.value = false
+    toast.success(res?.message || 'Card request submitted')
+  } catch (err) {
+    toast.error(err?.response?.data?.message || err.message || 'Card request failed')
+  }
+}
 </script>
 
 <template>
@@ -225,13 +261,94 @@ async function onActivate() {
         v-else-if="!cardsBundle.loading.value && !cardsBundle.error.value"
         message="No card linked to your account yet."
       >
-        <button v-if="cardsBundle.canRequest.value" type="button" class="request-btn" @click="router.push('/tickets')">
+        <div v-if="pendingRequest" class="request-pending">
+          <span class="status-badge status-badge--processing">
+            <span class="status-dot"></span>{{ pendingRequest.status }}
+          </span>
+          <p class="request-note">
+            Your {{ pendingRequest.card_type }} request is with our team. Reference
+            <span class="mono">{{ pendingRequest.reference_id }}</span>.
+          </p>
+        </div>
+
+        <button
+          v-else-if="cardsBundle.canRequest.value"
+          type="button"
+          class="request-btn"
+          @click="openRequest"
+        >
           Request a card
         </button>
+
+        <p v-else-if="cardsBundle.requestBlockedReason.value" class="request-note">
+          {{ cardsBundle.requestBlockedReason.value }}
+        </p>
       </EmptyState>
 
       <ErrorState v-if="cardsBundle.error.value" :message="cardsBundle.error.value" compact />
     </div>
+
+    <Teleport to="body">
+      <div v-if="showRequest" class="sheet-overlay" @click.self="showRequest = false">
+        <div class="sheet" role="dialog" aria-labelledby="card-request-title">
+          <span class="sheet-handle" aria-hidden="true"></span>
+          <h2 id="card-request-title" class="sheet-title">Request a card</h2>
+          <p class="sheet-sub">We'll review your request and issue the card to your account.</p>
+
+          <div class="field">
+            <span class="label">Card type</span>
+            <div class="type-choice" role="radiogroup" aria-label="Card type">
+              <button
+                v-for="option in ['VISA', 'MASTERCARD']"
+                :key="option"
+                type="button"
+                role="radio"
+                :aria-checked="requestType === option"
+                class="type-option"
+                :class="{ 'type-option--on': requestType === option }"
+                :disabled="cardsBundle.requesting.value"
+                @click="requestType = option"
+              >
+                {{ option }}
+              </button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="label" for="card-reason">Why do you need this card?</label>
+            <textarea
+              id="card-reason"
+              v-model="requestReason"
+              rows="4"
+              :maxlength="REASON_MAX"
+              placeholder="Tell us how you plan to use it…"
+              class="input input--textarea"
+              :disabled="cardsBundle.requesting.value"
+            ></textarea>
+            <span class="counter">{{ reasonLength }} / {{ REASON_MAX }}</span>
+          </div>
+
+          <div class="sheet-actions">
+            <button
+              type="button"
+              class="btn btn--outlined"
+              :disabled="cardsBundle.requesting.value"
+              @click="showRequest = false"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="btn btn--filled"
+              :disabled="cardsBundle.requesting.value || !reasonValid"
+              @click="submitRequest"
+            >
+              {{ cardsBundle.requesting.value ? 'Submitting…' : 'Submit request' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -393,4 +510,94 @@ async function onActivate() {
   border-radius: inherit;
   transition: width 0.3s ease;
 }
+.request-pending {
+  margin-top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+.request-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-align: center;
+  max-width: 22rem;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-primary);
+}
+
+.sheet-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: color-mix(in srgb, #000 55%, transparent);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.sheet {
+  position: relative;
+  width: 100%; max-width: 30rem;
+  background: var(--surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: var(--space-4) var(--space-5) var(--space-6);
+  box-shadow: 0 -20px 60px -20px color-mix(in srgb, #000 40%, transparent);
+  display: flex; flex-direction: column; gap: var(--space-3);
+}
+.sheet-handle {
+  width: 2.5rem; height: 0.3rem;
+  background: var(--divider);
+  border-radius: var(--radius-pill);
+  margin: 0 auto var(--space-3);
+  display: block;
+}
+.sheet-title { font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0; letter-spacing: -0.01em; }
+.sheet-sub { font-size: 0.85rem; color: var(--text-secondary); margin: -0.2rem 0 var(--space-3); }
+
+.field { display: flex; flex-direction: column; gap: 0.4rem; }
+.label { font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+.counter { align-self: flex-end; font-size: 0.7rem; color: var(--text-muted); }
+
+.type-choice { display: flex; gap: var(--space-3); }
+.type-option {
+  flex: 1 1 0; height: 3rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-family: inherit; font-weight: 700; font-size: 0.85rem;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.type-option--on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.type-option:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.input { width: 100%; padding: 0.85rem 1rem; border-radius: var(--radius-md); border: 1px solid transparent; background: var(--surface-muted); color: var(--text-primary); font-size: 0.95rem; font-family: inherit; outline: none; transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease; }
+.input:focus { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 15%, transparent); }
+.input:disabled { opacity: 0.6; cursor: not-allowed; }
+.input--textarea { resize: none; padding-top: 0.85rem; min-height: 6rem; }
+
+.sheet-actions { display: flex; gap: var(--space-3); margin-top: var(--space-3); }
+.btn {
+  flex: 1 1 0; height: 3rem;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  font-weight: 600; font-size: 0.9rem; font-family: inherit;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: transform 0.08s ease, background-color 0.15s ease, opacity 0.15s ease;
+}
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn--filled { background: var(--btn-primary-bg); color: var(--btn-primary-fg); }
+.btn--filled:hover:not(:disabled) { opacity: 0.92; }
+.btn--outlined { background: var(--btn-outline-bg); color: var(--btn-outline-fg); border-color: var(--btn-outline-border); }
+.btn--outlined:hover:not(:disabled) { background: color-mix(in srgb, var(--text-primary) 5%, transparent); }
 </style>

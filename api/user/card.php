@@ -50,7 +50,20 @@ $safeCard = $cards[0] ?? null;
 
 $hasRequestInProgress = count(array_filter($requests, static fn(array $request): bool => in_array((int)$request['card_request_status'], [0, 2], true))) > 0;
 $accountStatus = strtolower((string)($user['acct_status'] ?? ''));
-$canRequest = !$hasRequestInProgress && !in_array($accountStatus, ['hold', 'blocked', 'suspended'], true);
+
+// These four checks mirror card-request.php's guards in the same order it
+// applies them. They must stay in sync or the UI offers a button that 403s.
+$blockedReason = '';
+if (in_array($accountStatus, ['hold', 'blocked', 'suspended'], true)) {
+  $blockedReason = 'Card requests are unavailable while your account is on hold.';
+} elseif ((string)($user['can_request_card'] ?? '1') !== '1') {
+  $blockedReason = 'Card requests are disabled for this account.';
+} elseif (count($cards) > 0) {
+  $blockedReason = 'A card is already linked to this account.';
+} elseif ($hasRequestInProgress) {
+  $blockedReason = 'Your card request is already being processed.';
+}
+$canRequest = $blockedReason === '';
 
 api_json(200, [
   'ok' => true,
@@ -63,5 +76,6 @@ api_json(200, [
     'requests' => $requests,
     'has_request_in_progress' => $hasRequestInProgress,
     'can_request' => $canRequest,
+    'request_blocked_reason' => $blockedReason,
   ]
 ]);
