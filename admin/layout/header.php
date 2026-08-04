@@ -11,6 +11,7 @@ if (!$_SESSION['admin']) {
 }
 
 require_once __DIR__ . '/../../include/branding.php';
+require_once __DIR__ . '/../../include/audit.php';
 
 $sql = "SELECT * FROM settings WHERE id ='1'";
 $stmt = $conn->prepare($sql);
