@@ -168,7 +168,7 @@
 
         <label class="reg-terms">
           <input v-bind="termsAttrs" v-model="termsAccepted" type="checkbox" class="reg-terms-check" />
-          <span>I agree to the <a href="#" class="auth-link">Terms of Service</a> and <a href="#" class="auth-link">Privacy Policy</a>.</span>
+          <span>I agree to the <RouterLink to="/terms" class="auth-link" target="_blank" rel="noopener">Terms of Service</RouterLink> and <RouterLink to="/privacy" class="auth-link" target="_blank" rel="noopener">Privacy Policy</RouterLink>.</span>
         </label>
         <p v-if="s3Errors.terms_accepted" class="reg-terms-error">{{ s3Errors.terms_accepted }}</p>
       </template>

@@ -28,7 +28,7 @@ if (!in_array(strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET'), ['GET', 'HEAD'], 
 }
 
 $conn = dbConnect();
-$stmt = $conn->prepare("SELECT image, favicon, about_us, url_name, url_tel, url_email, registration_enabled FROM settings WHERE id='1' LIMIT 1");
+$stmt = $conn->prepare("SELECT image, favicon, about_us, url_name, url_tel, url_email, registration_enabled, terms_of_service_html, privacy_policy_html FROM settings WHERE id='1' LIMIT 1");
 $stmt->execute();
 $settings = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
 
@@ -67,6 +67,13 @@ echo json_encode([
         // UX hint for the register wizard's country dropdown. Empty when
         // we can't resolve it — client will fall back to browser Intl.
         'detected_country_code' => $detectedCountry,
+        // Admin-editable legal copy. Rendered via v-html on /terms and
+        // /privacy — the admin save handler already whitelists tags on
+        // write, so trust here is bounded by that filter. Empty string
+        // default keeps the SPA's markup contract stable when the
+        // migration hasn't been applied yet or the admin left them blank.
+        'terms_of_service_html' => (string)($settings['terms_of_service_html'] ?? ''),
+        'privacy_policy_html'   => (string)($settings['privacy_policy_html']   ?? ''),
         // Seed a CSRF token so the very first non-GET request from an
         // unauthenticated visitor (e.g. login POST) has one to send. The
         // server will regenerate it after successful auth.

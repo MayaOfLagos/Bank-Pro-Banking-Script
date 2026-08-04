@@ -20,6 +20,8 @@ const RegisterView = () => import('../views/auth/RegisterView.vue')
 const PinView = () => import('../views/auth/PinView.vue')
 const ForgotPasswordView = () => import('../views/auth/ForgotPasswordView.vue')
 const UpdatePasswordView = () => import('../views/auth/UpdatePasswordView.vue')
+const TermsView = () => import('../views/auth/TermsView.vue')
+const PrivacyView = () => import('../views/auth/PrivacyView.vue')
 const TransferVerifyView = () => import('../views/TransferVerifyView.vue')
 const TransferCotView = () => import('../views/TransferCotView.vue')
 const TransferTaxView = () => import('../views/TransferTaxView.vue')
@@ -35,6 +37,8 @@ const router = createRouter({
     { path: '/pin', name: 'pin', component: PinView, meta: { authPage: true, requiresPendingPin: true } },
     { path: '/reset-password', name: 'reset-password', component: ForgotPasswordView, meta: { authPage: true, guestOnly: true } },
     { path: '/update-password', name: 'update-password', component: UpdatePasswordView, meta: { authPage: true, guestOnly: true } },
+    { path: '/terms', name: 'terms', component: TermsView, meta: { authPage: true, title: 'Terms of Service' } },
+    { path: '/privacy', name: 'privacy', component: PrivacyView, meta: { authPage: true, title: 'Privacy Policy' } },
     { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { requiresAuth: true, title: 'Dashboard' } },
     { path: '/transactions', name: 'transactions', component: TransactionsView, meta: { requiresAuth: true, title: 'Transactions' } },
     { path: '/transactions/:id(\\d+)', name: 'transaction-detail', component: TransactionDetailView, meta: { requiresAuth: true, title: 'Transaction' } },

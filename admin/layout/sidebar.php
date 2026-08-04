@@ -10,7 +10,7 @@ $usersPages    = ['users.php', 'reguser.php', 'funduser.php', 'transfer.php', 'v
 $txPages       = ['credit_debit_trans.php', 'withdraw-trans.php', 'wire-trans.php', 'crypto-transaction.php', 'domestic-trans.php', 'loan-trans.php', 'view-trans.php', 'view-domtrans.php', 'viewwire-trans.php', 'viewcrypto-trans.php', 'viewloan-trans.php', 'viewwithdraw.php', 'edit-trans.php'];
 $cardPages     = ['cards.php', 'viewcard.php'];
 $settingsPages = ['profile.php', 'crypto-currrency.php', 'deposits.php', 'settings.php', 'auth_policy.php'];
-$systemPages   = ['audit-log.php', 'system-health.php'];
+$systemPages   = ['audit-log.php', 'system-health.php', 'db-backup.php'];
 ?>
 <!-- Main Sidebar Container -->
 <aside class="main-sidebar sidebar-dark-primary elevation-4">
@@ -106,6 +106,7 @@ $systemPages   = ['audit-log.php', 'system-health.php'];
                     <ul class="nav nav-treeview">
                         <li class="nav-item"><a href="./audit-log.php" class="nav-link <?= $active('audit-log.php') ?>"><i class="far fa-circle nav-icon"></i><p>Audit Log</p></a></li>
                         <li class="nav-item"><a href="./system-health.php" class="nav-link <?= $active('system-health.php') ?>"><i class="far fa-circle nav-icon"></i><p>System Health</p></a></li>
+                        <li class="nav-item"><a href="./db-backup.php" class="nav-link <?= $active('db-backup.php') ?>"><i class="far fa-circle nav-icon"></i><p>Database Backup</p></a></li>
                     </ul>
                 </li>
 

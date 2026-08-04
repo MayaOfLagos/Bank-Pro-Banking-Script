@@ -62,6 +62,27 @@ if (isset($_POST['test_email'])) {
     }
 }
 
+if (isset($_POST['save_terms'])) {
+    // Whitelist a small block-level HTML vocabulary so admins can format
+    // the copy without opening an XSS hole on the public /terms and
+    // /privacy pages. strip_tags's second argument is inclusive — any
+    // tag not on this list is stripped, attribute-scrubbing on kept
+    // tags is handled implicitly (strip_tags rejects on* handlers).
+    $allowedTags = '<p><br><strong><em><ul><ol><li><a><h2><h3>';
+    $terms   = trim(strip_tags((string)($_POST['terms_of_service_html'] ?? ''), $allowedTags));
+    $privacy = trim(strip_tags((string)($_POST['privacy_policy_html']   ?? ''), $allowedTags));
+
+    $stmt = $conn->prepare("UPDATE settings SET terms_of_service_html=:terms, privacy_policy_html=:privacy WHERE id=1");
+    $stmt->execute([
+        'terms'   => $terms,
+        'privacy' => $privacy,
+    ]);
+    toast_alert('success', 'Legal documents updated successfully', 'Saved');
+
+    $reload = $conn->query("SELECT * FROM settings WHERE id=1");
+    $page   = $reload->fetch(PDO::FETCH_ASSOC);
+}
+
 if (isset($_POST['save_settings'])) {
     // Whitelist signup_default_status so the value written to the DB is
     // always something the register endpoint will accept.
@@ -367,6 +388,38 @@ if (isset($_POST['save_settings'])) {
                             </div>
                         </div>
                         <div class="card-footer"><button class="btn btn-primary" name="save_settings"><i class="fas fa-save"></i> Save Settings</button></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card card-secondary card-outline">
+                    <div class="card-header"><h3 class="card-title">Legal documents</h3></div>
+                    <form method="post">
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">
+                                These blocks power the customer <code>/terms</code> and <code>/privacy</code> pages.
+                                Basic HTML is allowed:
+                                <code>&lt;p&gt;</code>, <code>&lt;strong&gt;</code>, <code>&lt;em&gt;</code>,
+                                <code>&lt;ul&gt;</code>, <code>&lt;ol&gt;</code>, <code>&lt;li&gt;</code>,
+                                <code>&lt;a href&gt;</code>, <code>&lt;br&gt;</code>,
+                                <code>&lt;h2&gt;</code>, <code>&lt;h3&gt;</code>.
+                                Anything else is stripped on save.
+                            </p>
+                            <div class="form-group">
+                                <label for="terms_of_service_html">Terms of Service</label>
+                                <textarea id="terms_of_service_html" name="terms_of_service_html" class="form-control" rows="20" placeholder="<h2>Terms of Service</h2><p>...</p>"><?= htmlspecialchars((string)($page['terms_of_service_html'] ?? '')) ?></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="privacy_policy_html">Privacy Policy</label>
+                                <textarea id="privacy_policy_html" name="privacy_policy_html" class="form-control" rows="20" placeholder="<h2>Privacy Policy</h2><p>...</p>"><?= htmlspecialchars((string)($page['privacy_policy_html'] ?? '')) ?></textarea>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <button class="btn btn-secondary" name="save_terms"><i class="fas fa-save"></i> Save Legal Documents</button>
+                        </div>
                     </form>
                 </div>
             </div>
