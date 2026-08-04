@@ -16,10 +16,31 @@ header('X-XSS-Protection: 1; mode=block');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self';");
 
-if (isset($_SESSION['LAST_ACTIVITY']) && (time() - $_SESSION['LAST_ACTIVITY'] > 1100)) {
-    session_unset();
-    session_destroy();
+// Idle-timeout enforcement is now settings-driven (settings.session_idle_minutes),
+// shared with the customer portal via include/auth_flow.php. Falls back
+// to a hard-coded 1100s ceiling if the DB is unreachable so a transient
+// outage doesn't lock every admin out.
+require_once __DIR__ . '/../../include/auth_flow.php';
+
+$sessionAdminTimedOut = false;
+try {
+    if (isset($conn) && $conn instanceof PDO) {
+        $sessionAdminTimedOut = auth_flow_apply_idle_timeout($conn);
+    } else {
+        $sessionAdminConn = dbConnect();
+        $sessionAdminTimedOut = auth_flow_apply_idle_timeout($sessionAdminConn);
+    }
+} catch (Throwable $e) {
+    if (isset($_SESSION['last_activity']) && (time() - (int)$_SESSION['last_activity'] > 1100)) {
+        session_unset();
+        session_destroy();
+        session_start();
+        $sessionAdminTimedOut = true;
+    }
+    $_SESSION['last_activity'] = time();
+}
+
+if ($sessionAdminTimedOut) {
     header('Location:./login.php');
     exit;
 }
-$_SESSION['LAST_ACTIVITY'] = time();

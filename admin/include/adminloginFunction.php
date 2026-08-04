@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once("../include/config.php");
+require_once __DIR__ . "/../../include/auth_flow.php";
 require_once "adminFunction.php";
 require_once __DIR__ . "/adminClass.php";
 
@@ -8,6 +9,16 @@ $conn = dbConnect();
 
 
 if(isset($_POST['admin_login'])){
+    // IP allow/block-list is enforced BEFORE credentials are checked.
+    // Same policy as the customer login endpoint — a banned IP shouldn't
+    // even find out whether an admin account matches the address it
+    // supplied.
+    $adminIpCheck = auth_flow_ip_allowed($conn, auth_flow_client_ip());
+    if (!$adminIpCheck['allowed']) {
+        toast_alert('error', auth_flow_ip_denied_message());
+        return;
+    }
+
     $admin_email = inputValidation($_POST['admin_email']);
     $admin_password = inputValidation($_POST['admin_password']);
 

@@ -54,6 +54,10 @@ security_reset_verify_attempts($conn, (int)$user['id']);
 session_regenerate_id(true);
 $_SESSION['acct_no'] = (string)$user['acct_no'];
 $_SESSION['pw_snapshot'] = $_SESSION['pw_snapshot'] ?? time();
+// Refresh session_started_at at the moment the session becomes fully
+// authenticated (post-PIN). api/user/_bootstrap.php's forced-logout
+// check compares users.sessions_invalidated_at against this value.
+$_SESSION['session_started_at'] = time();
 unset($_SESSION['login']);
 
 auth_json(200, [
