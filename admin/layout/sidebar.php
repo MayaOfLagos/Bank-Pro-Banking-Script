@@ -10,6 +10,7 @@ $usersPages    = ['users.php', 'reguser.php', 'funduser.php', 'transfer.php', 'v
 $txPages       = ['credit_debit_trans.php', 'withdraw-trans.php', 'wire-trans.php', 'crypto-transaction.php', 'domestic-trans.php', 'loan-trans.php', 'view-trans.php', 'view-domtrans.php', 'viewwire-trans.php', 'viewcrypto-trans.php', 'viewloan-trans.php', 'viewwithdraw.php', 'edit-trans.php'];
 $cardPages     = ['cards.php', 'viewcard.php'];
 $settingsPages = ['profile.php', 'crypto-currrency.php', 'deposits.php', 'settings.php'];
+$systemPages   = ['db-backup.php'];
 ?>
 <!-- Main Sidebar Container -->
 <aside class="main-sidebar sidebar-dark-primary elevation-4">
@@ -93,6 +94,16 @@ $settingsPages = ['profile.php', 'crypto-currrency.php', 'deposits.php', 'settin
                         <li class="nav-item"><a href="./crypto-currrency.php" class="nav-link <?= $active('crypto-currrency.php') ?>"><i class="far fa-circle nav-icon"></i><p>Deposit Method</p></a></li>
                         <li class="nav-item"><a href="./deposits.php" class="nav-link <?= $active('deposits.php') ?>"><i class="far fa-circle nav-icon"></i><p>Virtual Deposit</p></a></li>
                         <li class="nav-item"><a href="./settings.php" class="nav-link <?= $active('settings.php') ?>"><i class="far fa-circle nav-icon"></i><p>Site Settings</p></a></li>
+                    </ul>
+                </li>
+
+                <li class="nav-item <?= $open($systemPages) ?>">
+                    <a href="#" class="nav-link <?= $active($systemPages) ?>">
+                        <i class="nav-icon fas fa-server"></i>
+                        <p>System<i class="right fas fa-angle-left"></i></p>
+                    </a>
+                    <ul class="nav nav-treeview">
+                        <li class="nav-item"><a href="./db-backup.php" class="nav-link <?= $active('db-backup.php') ?>"><i class="far fa-circle nav-icon"></i><p>Database Backup</p></a></li>
                     </ul>
                 </li>
 

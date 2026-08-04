@@ -27,6 +27,8 @@ assets/idcard/*
 !assets/idcard/.gitkeep
 assets/profile/*
 !assets/profile/.gitkeep
+assets/backups/
+
 
 # Legacy data exports and backup archives
 SQL File/database.sql
