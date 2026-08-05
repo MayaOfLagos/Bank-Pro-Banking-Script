@@ -24,6 +24,10 @@ export const useSiteStore = defineStore('site', () => {
   const loaded = ref(false)
   const loading = ref(false)
   const error = ref('')
+  // `loaded` only flips on success, so views that hold a placeholder until
+  // branding arrives would hold it forever when the API fails. `settled`
+  // means "we tried" — success or not, stop waiting and use the defaults.
+  const settled = ref(false)
 
   // Shared promise for the current in-flight fetch. Lets concurrent
   // callers wait for the same request instead of firing duplicates, AND
@@ -68,6 +72,7 @@ export const useSiteStore = defineStore('site', () => {
         throw err
       } finally {
         loading.value = false
+        settled.value = true
       }
     })()
 
@@ -117,6 +122,7 @@ export const useSiteStore = defineStore('site', () => {
     privacyPolicyHtml,
     loaded,
     loading,
+    settled,
     error,
     load,
   }

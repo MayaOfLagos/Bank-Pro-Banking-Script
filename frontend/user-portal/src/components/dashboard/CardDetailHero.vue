@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { SparklesIcon, WifiIcon } from '@heroicons/vue/24/outline'
+import CardNetworkMark from './CardNetworkMark.vue'
 import { formatCardNumber, maskCardNumber } from '../../utils/format'
 
 const props = defineProps({
@@ -22,9 +23,7 @@ const expiry = computed(() => props.card?.card_expiration || props.card?.expiry 
       <SparklesIcon class="sparkle" aria-hidden="true" />
       <div class="badges">
         <WifiIcon class="wifi" aria-hidden="true" />
-        <span class="network-dots" aria-hidden="true">
-          <span></span><span></span>
-        </span>
+        <CardNetworkMark class="brand" :network="card?.network" />
       </div>
     </div>
 
@@ -84,21 +83,9 @@ const expiry = computed(() => props.card?.card_expiration || props.card?.expiry 
   transform: rotate(90deg);
   opacity: 0.9;
 }
-.network-dots {
-  display: inline-flex;
-  gap: -0.25rem;
-}
-.network-dots span {
-  width: 1.35rem;
-  height: 1.35rem;
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.85);
-  display: inline-block;
-}
-.network-dots span + span {
-  margin-left: -0.55rem;
-  background: rgba(255, 200, 0, 0.85);
-  mix-blend-mode: screen;
+.brand {
+  font-size: 1.6rem;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
 }
 .number {
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;

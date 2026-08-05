@@ -1,0 +1,14 @@
+{
+    "name": "bankpro/backend-deps",
+    "description": "PHP dependencies for the BankPro backend (PHPMailer only).",
+    "type": "project",
+    "require": {
+        "php": ">=7.4",
+        "phpmailer/phpmailer": "^6"
+    },
+    "config": {
+        "vendor-dir": "vendor",
+        "optimize-autoloader": true,
+        "sort-packages": true
+    }
+}

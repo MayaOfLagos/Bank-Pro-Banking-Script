@@ -52,7 +52,7 @@ try {
   $conn->commit();
 
   $email_message = new message();
-  $sendMail = new emailMessage();
+  $sendMail = new emailMessage($settings);
   if (!empty($user['acct_email'])) {
     $msg = $sendMail->WithdrawMsg(user_currency_symbol($user), trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')), $amount, $withdrawMethod, $walletAddress, WEB_TITLE);
     $email_message->send_to_both($user['acct_email'], $msg, 'Withdrawal Notification - ' . WEB_TITLE);

@@ -54,7 +54,7 @@ try {
   $conn->commit();
 
   $email_message = new message();
-  $sendMail = new emailMessage();
+  $sendMail = new emailMessage($settings);
   if (!empty($user['acct_email'])) {
     $message = $sendMail->pinRequest(user_currency_symbol($user), $amount, trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')), $otp, $settings['url_name'] ?? WEB_TITLE);
     $email_message->send_mail($user['acct_email'], $message, '[OTP CODE] - ' . ($settings['url_name'] ?? WEB_TITLE));

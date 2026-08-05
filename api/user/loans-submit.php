@@ -28,7 +28,7 @@ $stmt->execute([
 ]);
 
 $email_message = new message();
-$sendMail = new emailMessage();
+$sendMail = new emailMessage($settings);
 if (!empty($user['acct_email'])) {
   $fullName = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
   $message = $sendMail->LoanMsg(user_currency_symbol($user), $amount, $remarks, $fullName, $settings['url_name'] ?? WEB_TITLE, WEB_URL);

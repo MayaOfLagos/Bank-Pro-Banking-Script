@@ -7,7 +7,7 @@ import {
   ArrowRightOnRectangleIcon, PencilSquareIcon, ShieldCheckIcon,
   UserGroupIcon, WalletIcon, LifebuoyIcon,
 } from '@heroicons/vue/24/solid'
-import client from '../api/client'
+import client, { UPLOAD_TIMEOUT } from '../api/client'
 import { authApi } from '../api/auth'
 import { merchantInitials } from '../utils/format'
 import { currencySymbol } from '../utils/currency'
@@ -113,6 +113,7 @@ async function uploadAvatar() {
     form.append('image', avatarFile.value)
     const { data } = await client.post('/api/user/profile-image.php', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: UPLOAD_TIMEOUT,
     })
     if (!data?.ok) throw new Error(data?.message || 'Upload failed')
     toast.success('Profile photo updated.')

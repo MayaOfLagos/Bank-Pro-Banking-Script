@@ -43,7 +43,7 @@ $stmt->execute(['pin' => $newPin, 'id' => $user['id']]);
 try {
   if (!empty($user['acct_email'])) {
     $mailer = new message();
-    $sender = new emailMessage();
+    $sender = new emailMessage($settings);
     $fullName = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
     if (method_exists($sender, 'PinChange')) {
       $body = $sender->PinChange($fullName, WEB_EMAIL, WEB_TITLE);

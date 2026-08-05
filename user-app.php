@@ -151,10 +151,79 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-sr
   <meta name="application-name" content="<?= htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') ?>" />
   <title><?= htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') ?> - <?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?></title>
   <link rel="icon" type="<?= htmlspecialchars($faviconType, ENT_QUOTES, 'UTF-8') ?>" href="<?= htmlspecialchars($faviconHref, ENT_QUOTES, 'UTF-8') ?>" />
+  <!-- Boot placeholder. The bundle has to parse and the auth check has to
+       answer before Vue mounts; without this the document is empty and the
+       customer stares at a bare background. Script-free by necessity — the
+       CSP above allows inline styles but not inline scripts. Kept in sync
+       with frontend/user-portal/index.html. -->
+  <style>
+    html, body { margin: 0; min-height: 100%; }
+    /* Scoped to :not([data-theme]) so these rules cover exactly the window
+       before the bundle runs, then stop matching the moment it stamps the
+       resolved theme on <html> — the built stylesheet owns the look from
+       there. Needed because that stylesheet keys its dark palette off
+       [data-theme] alone, so a dark-mode customer would otherwise get a
+       light page until JS lands. */
+    :root:not([data-theme]), :root:not([data-theme]) body { background: #eef1fb; }
+    #app-boot {
+      --boot-track: rgba(15, 15, 20, 0.14);
+      --boot-head: rgba(15, 15, 20, 0.45);
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #app-boot::after {
+      content: '';
+      width: 2.25rem;
+      height: 2.25rem;
+      border-radius: 50%;
+      border: 2px solid var(--boot-track);
+      border-top-color: var(--boot-head);
+      /* Delayed fade so a fast boot shows nothing at all rather than a
+         spinner that blinks in and straight back out. */
+      animation: app-boot-spin 0.7s linear infinite, app-boot-in 0.3s ease 0.25s both;
+    }
+    @keyframes app-boot-spin { to { transform: rotate(360deg); } }
+    @keyframes app-boot-in { from { opacity: 0; } to { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) {
+      #app-boot::after { animation: app-boot-in 0.3s ease 0.25s both; }
+    }
+    /* Light needs no more than the base above — the built stylesheet is
+       light by default, so it paints its own gradient here. Dark does: that
+       palette is keyed off [data-theme] alone, and #app carries the
+       gradient, so without overriding #app too a dark-mode customer gets a
+       full light-purple page until JS lands. */
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme]),
+      :root:not([data-theme]) body,
+      :root:not([data-theme]) #app { background: #0f0f14; }
+      #app-boot { --boot-track: rgba(255, 255, 255, 0.16); --boot-head: rgba(255, 255, 255, 0.55); }
+    }
+    :root[data-theme='light'] #app-boot { --boot-track: rgba(15, 15, 20, 0.14); --boot-head: rgba(15, 15, 20, 0.45); }
+    :root[data-theme='dark'] #app-boot { --boot-track: rgba(255, 255, 255, 0.16); --boot-head: rgba(255, 255, 255, 0.55); }
+    #app-noscript {
+      margin: 20vh auto 0;
+      max-width: 22rem;
+      padding: 0 1.5rem;
+      text-align: center;
+      font: 600 0.95rem/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: #6b6f83;
+    }
+  </style>
+  <noscript>
+    <!-- Otherwise the placeholder spins forever with no explanation, and
+         #app's min-height pushes the message below the fold. -->
+    <style>#app { display: none; }</style>
+  </noscript>
   <link rel="stylesheet" href="/assets/user-app/<?= htmlspecialchars($stylesheetFile, ENT_QUOTES, 'UTF-8') ?>" />
 </head>
 <body>
-  <div id="app"></div>
+  <div id="app"><div id="app-boot" role="status" aria-label="Loading"></div></div>
+  <noscript>
+    <p id="app-noscript">This portal needs JavaScript. Please enable it in your browser settings and reload the page.</p>
+  </noscript>
   <script type="module" src="/assets/user-app/<?= htmlspecialchars($javascriptFile, ENT_QUOTES, 'UTF-8') ?>"></script>
 </body>
 </html>
