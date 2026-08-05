@@ -44,3 +44,10 @@ frontend/user-portal/server.log*
 # Never committed — every file inside is considered dead ballast unless
 # consciously ported into the active tree.
 /.legacy-reference/
+
+# Retired pre-Vue customer pages. Kept on disk as the porting reference for
+# the remaining Vue work, but untracked so they stop shipping to the server:
+# .cpanel.yml rsyncs with --delete, so anything untracked is removed on deploy.
+# Every /user/* URL already 301s to a Vue route via .htaccess, so nothing
+# reachable depends on these files.
+/user/
