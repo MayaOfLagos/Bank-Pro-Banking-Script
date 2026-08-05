@@ -93,8 +93,6 @@ $audit->execute([
     'datenow' => $nowDate,
 ]);
 
-auth_send_login_email($user, $device, $ipAddress, $nowDate, $appName, $appUrl, $bankPhone, $mailer);
-
 session_regenerate_id(true);
 $_SESSION['login'] = (string)$user['acct_no'];
 $_SESSION['pw_snapshot'] = time();

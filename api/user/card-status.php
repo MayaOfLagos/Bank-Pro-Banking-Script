@@ -34,7 +34,7 @@ $stmt = $conn->prepare('UPDATE card SET card_status=:card_status WHERE user_id=:
 $stmt->execute(['card_status' => $status, 'user_id' => $user['id'], 'current_status' => $currentStatus]);
 
 $email_message = new message();
-$sendMail = new emailMessage();
+$sendMail = new emailMessage($settings);
 if (!empty($user['acct_email'])) {
   $fullName = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
   $msg = $sendMail->CardMsg($fullName, $card['card_number'] ?? '', WEB_TITLE);

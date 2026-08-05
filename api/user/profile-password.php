@@ -28,7 +28,7 @@ $stmt = $conn->prepare('UPDATE users SET acct_password=:acct_password WHERE id=:
 $stmt->execute(['acct_password' => $hash, 'id' => $user['id']]);
 
 $email_message = new message();
-$sendMail = new emailMessage();
+$sendMail = new emailMessage($settings);
 if (!empty($user['acct_email'])) {
   $fullName = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
   $msg = $sendMail->PassChange($fullName, WEB_EMAIL, WEB_TITLE);

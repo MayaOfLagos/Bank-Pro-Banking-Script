@@ -30,7 +30,7 @@ $stmt->execute([
 ]);
 
 $email_message = new message();
-$sendMail = new emailMessage();
+$sendMail = new emailMessage($settings);
 if (!empty($user['acct_email'])) {
   $fullName = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
   $msg = $sendMail->CardGenMsg($fullName, $cardName, $cardNumber, $cardExpiration, $security, WEB_TITLE);

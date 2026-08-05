@@ -59,7 +59,7 @@ $stmt->execute([
 ]);
 
 $email_message = new message();
-$sendMail = new emailMessage();
+$sendMail = new emailMessage($settings);
 if (!empty($user['acct_email'])) {
   $txStmt = $conn->prepare('SELECT d.refrence_id, c.crypto_name FROM deposit d INNER JOIN crypto_currency c ON d.crypto_id=c.id WHERE d.user_id=:acct_id ORDER BY d.d_id DESC LIMIT 1');
   $txStmt->execute(['acct_id' => $user['id']]);

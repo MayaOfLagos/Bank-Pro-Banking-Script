@@ -82,7 +82,7 @@ try {
 }
 
 $email_message = new message();
-$sendMail = new emailMessage();
+$sendMail = new emailMessage($settings);
 $currency = user_currency_symbol($user);
 $fullName = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
 $appName = $settings['url_name'] ?? WEB_TITLE;

@@ -49,7 +49,7 @@ $stmt->execute([
 ]);
 
 $email_message = new message();
-$sendMail = new emailMessage();
+$sendMail = new emailMessage($settings);
 if (!empty($user['acct_email'])) {
   $cardStmt = $conn->prepare('SELECT card_number FROM card WHERE user_id=:user_id LIMIT 1');
   $cardStmt->execute(['user_id' => $user['id']]);
