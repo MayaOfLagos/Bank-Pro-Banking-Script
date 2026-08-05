@@ -54,6 +54,17 @@ if (isset($_POST['accept'])) {
             $upd->execute(['b' => $amount_balance, 'id' => $user_id]);
             $conn->commit();
             $mailDeposit('Approved', $amount_balance);
+
+            // Alert the operators when an approval credits at or above the
+            // configured review limit. Silent when no limit is set.
+            $threshold = (float)($page['trans_limit_max'] ?? 0);
+            if ($threshold > 0 && (float)$row['amount'] >= $threshold) {
+                admin_notify(
+                    (new AdminAlert)->adminLargeValueApprovalMsg(admin_actor_name(), 'crypto deposit', $fullName, $currency, $row['amount'], (string)$row['refrence_id'], $threshold, admin_actor_ip()),
+                    'Large crypto deposit approved'
+                );
+            }
+
             toast_alert('success', 'Deposit Approved', 'Approved');
         }
     } catch (Throwable $e) {
@@ -85,8 +96,27 @@ if (isset($_POST['hold'])) {
 }
 
 if (isset($_POST['trans_delete'])) {
+    // The delete is permanent and nothing reverses it, so snapshot the row
+    // first — the alert becomes the only remaining record of it.
+    $statusText = ['0' => 'Processing', '1' => 'Approved', '2' => 'On Hold', '3' => 'Declined'][(string)$row['crypto_status']] ?? 'Unknown';
+    $snapshot = [
+        'Amount'         => MailBrand::money($currency, $row['amount']),
+        'Status'         => $statusText,
+        'Crypto'         => $row['crypto_name'],
+        'Wallet address' => $row['wallet_address'],
+        'Receipt'        => $row['image'],
+        'Created'        => $row['created_at'],
+    ];
+
     $stmt = $conn->prepare("DELETE FROM deposit WHERE refrence_id=:id");
     $stmt->execute(['id' => $id]);
+
+    // Ledger integrity: a crypto deposit record was hard-deleted.
+    admin_notify(
+        (new AdminAlert)->adminMoneyRecordDeletedMsg(admin_actor_name(), 'crypto deposit', $row['refrence_id'], $snapshot, $fullName, admin_actor_ip()),
+        'Crypto deposit record deleted'
+    );
+
     header('Location:./crypto-transaction.php');
     exit;
 }

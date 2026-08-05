@@ -191,6 +191,47 @@ try {
 } catch (\Throwable $e) {
     // leave null
 }
+
+// =========================================================================
+// OPERATOR ALERT — the probes above only run when an admin opens this page,
+// so this is the moment a red probe becomes knowable. Mail one alert for the
+// current set of failures, keyed on a hash of that set in the session: a
+// refresh re-sends nothing, but a newly-failing probe changes the hash and
+// does get through.
+// =========================================================================
+$healthProblems = [];
+if (!$dbOk) {
+    $healthProblems['Database'] = 'Connection failed' . ($dbError !== null ? ': ' . $dbError : '');
+}
+if (!$smtpConfigured) {
+    $healthProblems['SMTP'] = 'Not configured — outbound mail, including these alerts, is being dropped';
+}
+if ($diskPct !== null && $diskPct >= 90) {
+    $healthProblems['Disk'] = number_format($diskPct, 1) . '% used, only ' . $fmtBytes($diskFree) . ' free';
+}
+
+if (!empty($healthProblems)) {
+    // Key on WHICH probes are failing, not on their formatted text. The Disk
+    // entry embeds a one-decimal percentage and a byte count, both of which
+    // move between requests on a live server — hashing the rendered array meant
+    // the key never matched, so every refresh of this dashboard mailed the
+    // operators again, from every logged-in admin. Disk is additionally banded
+    // in 5% steps so a genuine escalation (91% → 97%) still re-alerts while
+    // ordinary drift does not.
+    $healthKeyParts = array_keys($healthProblems);
+    if (isset($healthProblems['Disk']) && $diskPct !== null) {
+        $healthKeyParts[] = 'disk-band-' . (int)($diskPct / 5);
+    }
+    $healthKey = md5(implode('|', $healthKeyParts));
+
+    if (($_SESSION['health_alert_sent'] ?? null) !== $healthKey) {
+        $_SESSION['health_alert_sent'] = $healthKey;
+        admin_notify(
+            (new AdminAlert)->adminSystemHealthAlertMsg($healthProblems),
+            'System health check failed'
+        );
+    }
+}
 ?>
 
 <section class="content-header">

@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../../include/countries.php';
+require_once __DIR__ . '/../../include/smtp.php';
+require_once __DIR__ . '/../../include/admin_alerts.php';
 
 $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
@@ -111,6 +113,17 @@ if ($method === 'POST') {
     $columnByKey['acct_address'] = $address !== '' ? $address : null;
   }
 
+  // Snapshot the old->new diff before the write — $user still holds the row
+  // as it was loaded, and the reflection loop below overwrites it.
+  $identityChanges = [];
+  foreach ($columnByKey as $column => $value) {
+    $before = (string)($user[$column] ?? '');
+    $after = (string)($value ?? '');
+    if ($before !== $after) {
+      $identityChanges[$column] = ['from' => $before, 'to' => $after];
+    }
+  }
+
   $assignments = [];
   $bindings = ['id' => $user['id']];
   foreach ($columnByKey as $column => $value) {
@@ -125,6 +138,19 @@ if ($method === 'POST') {
   // the value we just persisted rather than the pre-update snapshot.
   foreach ($columnByKey as $column => $value) {
     $user[$column] = $value;
+  }
+
+  // Alert the operators only when something really changed: these are the
+  // fields a KYC file is built on and nothing else records a customer edit.
+  if ($identityChanges !== []) {
+    admin_notify(
+      (new AdminAlert)->adminCustomerProfileChangedMsg(
+        trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')),
+        $identityChanges,
+        (string)($_SERVER['REMOTE_ADDR'] ?? '')
+      ),
+      'Customer identity details changed'
+    );
   }
 } elseif ($method !== 'GET') {
   api_json(405, ['ok' => false, 'message' => 'Method not allowed']);

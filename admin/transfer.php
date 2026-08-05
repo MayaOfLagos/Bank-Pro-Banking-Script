@@ -55,6 +55,19 @@ if (isset($_POST['transfer'])) {
         $message = $sendMail->adwireTransfer($currency, $amount, $available_balance, $fullName, $APP_NAME, $tran_status, $bank_name, $acct_name, $acct_number, $acct_country, $created_at, $reference_id, $transfer_type);
         $email_message->send_to_both($email, $message, "[WIRE TRANSACTION] - $APP_NAME");
 
+        // Alert the operators: money left a customer account on an operator's
+        // say-so, and a status of Complete skips the approve/hold/decline review.
+        $beneficiary = [
+            'Bank name'      => $bank_name,
+            'Account name'   => $acct_name,
+            'Account number' => $acct_number,
+            'Country'        => $acct_country
+        ];
+        admin_notify(
+            (new AdminAlert)->adminOriginatedWireMsg(admin_actor_name(), $fullName, $currency, $amount, $beneficiary, $tran_status, $reference_id, admin_actor_ip()),
+            'Wire transfer originated by an operator'
+        );
+
         toast_alert('success', 'Transfer Successful', 'Approved');
     }
 }

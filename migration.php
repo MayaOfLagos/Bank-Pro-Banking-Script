@@ -24,6 +24,12 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/include/config.php';
 require_once __DIR__ . '/include/audit.php';
+// smtp.php declares `class message`, which admin_notify() checks for before it
+// will attempt delivery. This page has no other include that reaches it — unlike
+// the admin pages, which pick it up via adminClass.php — so without this the
+// migration alert below would silently log "mailer unavailable" and never send.
+require_once __DIR__ . '/include/smtp.php';
+require_once __DIR__ . '/include/admin_alerts.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.cookie_httponly', '1');
@@ -398,6 +404,23 @@ if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'POST') {
                 'succeeded' => $okCount,
                 'failed' => count($failed),
             ]);
+
+            // The audit row only helps someone who thinks to look. Schema DDL
+            // applied to production out of band is a compromise signal, so it
+            // is pushed to the operators as well.
+            //
+            // $okCount, not count($statements): a run that dies on statement 1
+            // of 12 would otherwise mail "Statements: 12" and read as a clean
+            // schema change, contradicting the audit row written directly
+            // above. A partial run is still worth alerting on — arguably more
+            // so — hence no success-only guard, but the subject says which it
+            // was.
+            admin_notify(
+                (new AdminAlert)->adminMigrationRunMsg(admin_actor_name(), (string)$_POST['file'], $okCount, admin_actor_ip()),
+                $failed
+                    ? 'Database migration FAILED part-way (' . $okCount . ' of ' . count($statements) . ' applied)'
+                    : 'Database migration executed'
+            );
         }
     }
 }

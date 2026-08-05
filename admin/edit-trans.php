@@ -13,6 +13,16 @@ if (!$row) {
 }
 
 if (isset($_POST['update_trans'])) {
+    // Keep the pre-update values of the fields this form rewrites, so the alert
+    // below can show an old -> new diff ($row is the row as it stands now).
+    $before = [
+        'amount'       => $row['amount'],
+        'sender_name'  => $row['sender_name'],
+        'description'  => $row['description'],
+        'created_at'   => $row['created_at'],
+        'time_created' => $row['time_created'],
+    ];
+
     $stmt = $conn->prepare("UPDATE transactions SET amount=:amount, sender_name=:sender_name, description=:description, created_at=:created_at, time_created=:time_created WHERE trans_id=:id");
     $stmt->execute([
         'amount'       => $_POST['amount'],
@@ -22,14 +32,72 @@ if (isset($_POST['update_trans'])) {
         'time_created' => $_POST['time_created'],
         'id'           => $id,
     ]);
+
+    // Ledger integrity: a posted transaction was rewritten after the fact, so
+    // the operators are told which fields moved, by whom and from where.
+    // Compare on a normalised form, not the raw values. MySQL returns a TIME
+    // column as "14:30:00" while <input type="time"> submits "14:30", and a
+    // DECIMAL as "500.00" against a posted "500" — so a straight string compare
+    // reported those two fields as changed on every save. That would fire an
+    // error-severity "a settled transaction was rewritten" alert on edits that
+    // touched neither, which is exactly how operators learn to ignore an alert.
+    $normalise = static function (string $field, $value): string {
+        $value = (string)$value;
+        if ($field === 'time_created') {
+            return substr($value, 0, 5);
+        }
+        if ($field === 'amount' && is_numeric($value)) {
+            return (string)(float)$value;
+        }
+        return trim($value);
+    };
+
+    $changes = [];
+    foreach ($before as $field => $old) {
+        $new = $_POST[$field] ?? '';
+        if ($normalise($field, $old) !== $normalise($field, $new)) {
+            $changes[$field] = ['from' => $old, 'to' => $new];
+        }
+    }
+    $reference = !empty($row['refrence_id']) ? (string)$row['refrence_id'] : (string)$row['trans_id'];
+    $customer  = trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? ''));
+    admin_notify(
+        (new AdminAlert)->adminTransactionEditedMsg(admin_actor_name(), $reference, $changes, $customer, admin_actor_ip()),
+        'Posted transaction edited'
+    );
+
     toast_alert('success', 'Transaction updated successfully', 'Approved');
     header('Location:' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
     exit;
 }
 
 if (isset($_POST['trans_delete'])) {
+    // The delete is permanent and un-reversed, so snapshot the row first — the
+    // alert becomes the only remaining record of what was destroyed.
+    $snapshot = [
+        'Amount'      => (string)$row['amount'],
+        // (string) cast is load-bearing: trans_type is an INT column and
+        // include/config.php sets PDO::ATTR_EMULATE_PREPARES => false, so PDO
+        // hands back a real int and `=== '1'` never matches. Without the cast
+        // every deleted credit would be recorded as "Debit" in the one message
+        // that is the only surviving record of the destroyed row.
+        'Type'        => ((string)$row['trans_type'] === '1') ? 'Credit' : 'Debit',
+        'Sender'      => (string)$row['sender_name'],
+        'Description' => (string)$row['description'],
+        'Date'        => trim($row['created_at'] . ' ' . $row['time_created']),
+    ];
+    $reference = !empty($row['refrence_id']) ? (string)$row['refrence_id'] : (string)$row['trans_id'];
+    $customer  = trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? ''));
+
     $stmt = $conn->prepare("DELETE FROM transactions WHERE trans_id=:id");
     $stmt->execute(['id' => $id]);
+
+    // Ledger integrity: a transaction row was hard-deleted from the ledger.
+    admin_notify(
+        (new AdminAlert)->adminTransactionDeletedMsg(admin_actor_name(), $reference, $snapshot, $customer, admin_actor_ip()),
+        'Transaction deleted'
+    );
+
     header('Location:./credit_debit_trans.php');
     exit;
 }

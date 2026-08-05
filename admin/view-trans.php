@@ -62,8 +62,26 @@ if (isset($_POST['hold'])) {
 }
 
 if (isset($_POST['trans_delete'])) {
+    // The delete is permanent and un-reversed, so snapshot the row first — the
+    // alert becomes the only remaining record of what was destroyed.
+    $snapshot = [
+        'Amount'      => (string)$row['amount'],
+        'Type'        => $transfer_type_text,
+        'Sender'      => (string)$row['sender_name'],
+        'Description' => (string)$row['description'],
+        'Date'        => trim($row['created_at'] . ' ' . $row['time_created']),
+    ];
+    $reference = !empty($row['refrence_id']) ? (string)$row['refrence_id'] : (string)$row['trans_id'];
+
     $stmt = $conn->prepare("DELETE FROM transactions WHERE trans_id=:id");
     $stmt->execute(['id' => $id]);
+
+    // Ledger integrity: a transaction row was hard-deleted from the ledger.
+    admin_notify(
+        (new AdminAlert)->adminTransactionDeletedMsg(admin_actor_name(), $reference, $snapshot, $fullName, admin_actor_ip()),
+        'Transaction deleted'
+    );
+
     header('Location:./credit_debit_trans.php');
     exit;
 }

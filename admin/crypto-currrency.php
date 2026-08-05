@@ -2,8 +2,27 @@
 include_once("./layout/header.php");
 
 if (isset($_POST['delete_crypto_currency'])) {
+    // Read the row first: after the DELETE there is no record of which coin
+    // and address were removed, and the alert has to name them.
+    $prevStmt = $conn->prepare("SELECT crypto_name, wallet_address FROM crypto_currency WHERE id =:id");
+    $prevStmt->execute(['id' => $_POST['crypto_id']]);
+    $prev = $prevStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
     $stmt = $conn->prepare("DELETE FROM crypto_currency WHERE id =:id");
     $stmt->execute(['id' => $_POST['crypto_id']]);
+    // Removing a wallet withdraws a deposit route customers may already be
+    // using, so operators need to know it happened and who did it.
+    admin_notify(
+        (new AdminAlert)->adminDepositWalletChangedMsg(
+            admin_actor_name(),
+            'deleted',
+            (string)($prev['crypto_name'] ?? ''),
+            (string)($prev['wallet_address'] ?? ''),
+            '',
+            admin_actor_ip()
+        ),
+        'Deposit wallet deleted'
+    );
     header("location:./crypto-currrency.php");
     exit;
 }
@@ -14,16 +33,48 @@ if (isset($_POST['crypto_save'])) {
         'crypto_name'    => $_POST['crypto_name'],
         'wallet_address' => $_POST['wallet_address'],
     ]);
+    // A new deposit address goes live for customers immediately, so it is
+    // worth confirming against your own records before the first deposit.
+    admin_notify(
+        (new AdminAlert)->adminDepositWalletChangedMsg(
+            admin_actor_name(),
+            'added',
+            (string)$_POST['crypto_name'],
+            '',
+            (string)$_POST['wallet_address'],
+            admin_actor_ip()
+        ),
+        'Deposit wallet added'
+    );
     toast_alert('success', 'Wallet Added Successfully', 'Saved');
 }
 
 if (isset($_POST['crypto_edit'])) {
+    // Capture the current address before overwriting it so the alert can show
+    // the old → new pair; that diff is the whole point of this notification.
+    $prevStmt = $conn->prepare("SELECT wallet_address FROM crypto_currency WHERE id=:id");
+    $prevStmt->execute(['id' => $_POST['crypto_id']]);
+    $prev = $prevStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
     $stmt = $conn->prepare("UPDATE crypto_currency SET crypto_name=:crypto_name, wallet_address=:wallet_address WHERE id=:id");
     $stmt->execute([
         'crypto_name'    => $_POST['crypto_name'],
         'wallet_address' => $_POST['wallet_address'],
         'id'             => $_POST['crypto_id'],
     ]);
+    // Editing the address reroutes every future customer deposit for this
+    // coin, with no other visible symptom — the highest-risk change here.
+    admin_notify(
+        (new AdminAlert)->adminDepositWalletChangedMsg(
+            admin_actor_name(),
+            'updated',
+            (string)$_POST['crypto_name'],
+            (string)($prev['wallet_address'] ?? ''),
+            (string)$_POST['wallet_address'],
+            admin_actor_ip()
+        ),
+        'Deposit wallet updated'
+    );
     toast_alert('success', 'Wallet Saved Successfully', 'Saved');
 }
 ?>

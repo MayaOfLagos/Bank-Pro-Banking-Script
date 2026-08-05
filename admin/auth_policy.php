@@ -34,6 +34,14 @@ $errors = [];
 
 if (isset($_POST['save_session_policy'])) {
     $minutes = auth_flow_normalise_idle_minutes($_POST['session_idle_minutes'] ?? '');
+
+    // Read the stored value before the write so the operator alert below can
+    // show old -> new. Normalised on both sides to match what the form shows.
+    $priorStmt = $conn->prepare("SELECT session_idle_minutes FROM settings WHERE id = '1' LIMIT 1");
+    $priorStmt->execute();
+    $priorRow = $priorStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    $priorIdle = auth_flow_normalise_idle_minutes($priorRow['session_idle_minutes'] ?? AUTH_FLOW_SESSION_IDLE_DEFAULT);
+
     $stmt = $conn->prepare("UPDATE settings SET session_idle_minutes = :m WHERE id = '1'");
     $stmt->execute(['m' => $minutes]);
     toast_alert(
@@ -41,6 +49,19 @@ if (isset($_POST['save_session_policy'])) {
         'Sessions will now sign out after ' . $minutes . ' minute(s) of inactivity.',
         'Session policy saved'
     );
+
+    // Idle sign-out governs how long a stolen session stays usable, so a
+    // change here is worth telling every operator about.
+    $changes = [];
+    if ((string)$priorIdle !== (string)$minutes) {
+        $changes['session_idle_minutes'] = ['from' => (string)$priorIdle, 'to' => (string)$minutes];
+    }
+    if (!empty($changes)) {
+        admin_notify(
+            (new AdminAlert)->adminAuthPolicyChangedMsg(admin_actor_name(), $changes, admin_actor_ip()),
+            'Sign-in policy changed'
+        );
+    }
 }
 
 if (isset($_POST['save_ip_lists'])) {
@@ -63,6 +84,14 @@ if (isset($_POST['save_ip_lists'])) {
         $errors[] = 'Blocklist: dropped ' . ($blockInputCount - $blockValidCount) . ' invalid IP entrie(s).';
     }
 
+    // Snapshot the stored lists before the write so the operator alert can
+    // show old -> new (and so a lockout can be reversed from the email).
+    $priorStmt = $conn->prepare("SELECT login_ip_allowlist, login_ip_blocklist FROM settings WHERE id = '1' LIMIT 1");
+    $priorStmt->execute();
+    $priorRow = $priorStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    $priorAllow = (string)($priorRow['login_ip_allowlist'] ?? '');
+    $priorBlock = (string)($priorRow['login_ip_blocklist'] ?? '');
+
     $stmt = $conn->prepare("UPDATE settings SET login_ip_allowlist = :a, login_ip_blocklist = :b WHERE id = '1'");
     $stmt->execute([
         'a' => $cleanAllow === '' ? null : $cleanAllow,
@@ -73,6 +102,29 @@ if (isset($_POST['save_ip_lists'])) {
         'Sign-in IP policy saved. Allowlist has ' . $allowValidCount . ' entrie(s); blocklist has ' . $blockValidCount . '.',
         'IP policy saved'
     );
+
+    // A non-empty allowlist denies every other IP — admins and customers
+    // alike — before any password is checked, so this alert is the only
+    // warning an operator who has just locked themselves out will get.
+    $changes = [];
+    if ($priorAllow !== $cleanAllow) {
+        $changes['login_ip_allowlist'] = [
+            'from' => str_replace("\n", ', ', $priorAllow),
+            'to'   => str_replace("\n", ', ', $cleanAllow),
+        ];
+    }
+    if ($priorBlock !== $cleanBlock) {
+        $changes['login_ip_blocklist'] = [
+            'from' => str_replace("\n", ', ', $priorBlock),
+            'to'   => str_replace("\n", ', ', $cleanBlock),
+        ];
+    }
+    if (!empty($changes)) {
+        admin_notify(
+            (new AdminAlert)->adminAuthPolicyChangedMsg(admin_actor_name(), $changes, admin_actor_ip()),
+            'Sign-in policy changed'
+        );
+    }
 }
 
 $settingsStmt = $conn->prepare("SELECT session_idle_minutes, login_ip_allowlist, login_ip_blocklist FROM settings WHERE id = '1' LIMIT 1");

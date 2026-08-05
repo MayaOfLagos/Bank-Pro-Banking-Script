@@ -725,6 +725,72 @@ class AdminAlert
 
 }
 
+if (!function_exists('admin_actor_name')) {
+    /**
+     * Display name of the operator performing the current request.
+     *
+     * Every trigger site needs this, so it is resolved in one place rather
+     * than 24 slightly different ways. Resolution order:
+     *
+     *   1. $_SESSION['admin_welcome_name'] — set at login, but
+     *      admin/layout/footer.php unsets it after rendering the welcome
+     *      toast, so it is only present on the first page after sign-in.
+     *   2. A lookup of $_SESSION['admin'] (the email) against the admin row,
+     *      cached per request.
+     *   3. The session email itself.
+     *
+     * Returns '' when there is no admin session at all — callers pass that
+     * straight through and the alert reads "Unknown operator", which is the
+     * honest answer.
+     */
+    function admin_actor_name(): string
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        if (session_status() !== PHP_SESSION_ACTIVE || empty($_SESSION['admin'])) {
+            return $cached = '';
+        }
+
+        $email = (string)$_SESSION['admin'];
+
+        if (!empty($_SESSION['admin_welcome_name'])) {
+            return $cached = (string)$_SESSION['admin_welcome_name'];
+        }
+
+        try {
+            if (function_exists('dbConnect')) {
+                $stmt = dbConnect()->prepare('SELECT firstname, lastname FROM admin WHERE admin_email = :e LIMIT 1');
+                $stmt->execute(['e' => $email]);
+                if ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                    $name = trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? ''));
+                    if ($name !== '') {
+                        return $cached = $name;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[admin_actor_name] lookup failed: ' . $e->getMessage());
+        }
+
+        return $cached = $email;
+    }
+}
+
+if (!function_exists('admin_actor_ip')) {
+    /** Client IP for the current request, via auth_flow when it is loaded. */
+    function admin_actor_ip(): string
+    {
+        if (function_exists('auth_flow_client_ip')) {
+            return auth_flow_client_ip();
+        }
+
+        return (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    }
+}
+
 if (!function_exists('admin_notify')) {
     /**
      * Deliver an operator alert.

@@ -54,6 +54,18 @@ if (isset($_POST['loan_submit'])) {
                 $statusLabel = ['1' => 'Approved', '2' => 'Hold', '3' => 'Declined'][$loan_status] ?? 'Updated';
                 $message = $sendMail->loanMsg($currency, $row['amount'], $row['acct_balance'], $available_loan, $APP_NAME, $statusLabel, $loan_message);
                 $email_message->send_to_both($email, $message, "[LOAN " . strtoupper($statusLabel) . "] - $APP_NAME");
+
+                // Alert operators when an approval credits loan_balance at or above the
+                // configured review ceiling. A missing/zero trans_limit_max means no
+                // threshold is configured, so stay silent rather than mailing every approval.
+                $largeThreshold = (float)($page['trans_limit_max'] ?? 0);
+                if ($loan_status === 1 && $largeThreshold > 0 && (float)$row['amount'] >= $largeThreshold) {
+                    admin_notify(
+                        (new AdminAlert)->adminLargeValueApprovalMsg(admin_actor_name(), 'loan', $fullName, $currency, $row['amount'], (string)$row['loan_reference_id'], $largeThreshold, admin_actor_ip()),
+                        'Large loan approved'
+                    );
+                }
+
                 toast_alert('success', "Loan $statusLabel Successfully", $statusLabel);
             } else {
                 $conn->rollBack();

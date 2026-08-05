@@ -17,11 +17,28 @@ if (isset($_POST['upload_picture']) && isset($_FILES['image']) && $_FILES['image
 }
 
 if (isset($_POST['profile'])) {
+    // Read the sign-in address before the write so the alert can name the
+    // address it was changed from.
+    $before   = $conn->prepare("SELECT admin_email FROM admin WHERE id=1");
+    $before->execute();
+    $oldEmail = (string)$before->fetchColumn();
+
     $stmt = $conn->prepare("UPDATE admin SET admin_email=:admin_email, firstname=:firstname WHERE id=1");
     $stmt->execute([
         'admin_email' => $_POST['email'],
         'firstname'   => $_POST['firstname'],
     ]);
+
+    // Changing this address moves administrator sign-in and every admin alert
+    // to a different mailbox, so alert whenever it actually changed.
+    $newEmail = (string)$_POST['email'];
+    if ($newEmail !== $oldEmail) {
+        admin_notify(
+            (new AdminAlert)->adminAccountEmailChangedMsg(admin_actor_name(), $oldEmail, $newEmail, admin_actor_ip()),
+            'Admin sign-in address changed'
+        );
+    }
+
     toast_alert('success', 'Profile updated successfully', 'Approved');
 }
 
@@ -38,6 +55,14 @@ if (isset($_POST['change_password'])) {
     } else {
         $stmt = $conn->prepare("UPDATE admin SET admin_password=:p WHERE id=1");
         $stmt->execute(['p' => password_hash((string)$new_password, PASSWORD_BCRYPT)]);
+
+        // The admin password is the key to every customer account, so a change
+        // here is reported even when it was expected.
+        admin_notify(
+            (new AdminAlert)->adminPasswordChangedMsg(admin_actor_name(), admin_actor_ip()),
+            'Admin password changed'
+        );
+
         toast_alert('success', 'Password Changed Successfully', 'Approved');
     }
 }

@@ -15,6 +15,24 @@ if (isset($_POST['save_deposit'])) {
     ]);
     toast_alert('success', 'Virtual deposit updated successfully', 'Approved');
 
+    // These are the bank details customers are told to deposit into, so a
+    // silent edit reroutes real money. Compare against the row fetched above
+    // (still the pre-update values) and alert operators on any change.
+    $changes = [];
+    foreach (['bank_name', 'routine_no', 'acct_no', 'swift_code'] as $field) {
+        $oldValue = (string)($deposit[$field] ?? '');
+        $newValue = (string)($_POST[$field] ?? '');
+        if ($oldValue !== $newValue) {
+            $changes[$field] = ['from' => $oldValue, 'to' => $newValue];
+        }
+    }
+    if (!empty($changes)) {
+        admin_notify(
+            (new AdminAlert)->adminBankDepositDetailsChangedMsg(admin_actor_name(), $changes, admin_actor_ip()),
+            'Bank deposit details changed'
+        );
+    }
+
     $stmt = $conn->prepare("SELECT * FROM v_bank WHERE id='48'");
     $stmt->execute();
     $deposit = $stmt->fetch(PDO::FETCH_ASSOC);

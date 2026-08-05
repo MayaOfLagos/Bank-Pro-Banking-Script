@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
+require_once __DIR__ . '/../../include/admin_alerts.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     auth_json(405, ['ok' => false, 'message' => 'Method not allowed']);
@@ -50,5 +51,16 @@ $update->execute([
 ]);
 
 auth_send_reset_email($user, $token, $appName, $appUrl, $mailer);
+
+// Alert the operators, but only on this branch — a token was really issued for
+// a real account. A burst of these across accounts is a takeover probe.
+admin_notify(
+    (new AdminAlert)->adminPasswordResetRequestedMsg(
+        trim((string)($user['firstname'] ?? '') . ' ' . (string)($user['lastname'] ?? '')),
+        $email,
+        (string)($_SERVER['REMOTE_ADDR'] ?? '')
+    ),
+    'Customer password reset requested'
+);
 
 auth_json(200, $genericResponse);

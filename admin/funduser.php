@@ -43,6 +43,13 @@ if (isset($_POST['credit'])) {
     $message = $sendMail->FundUsers($fullName, $currency, $sender_name, $amount, $available_balance, $description, $created_at, $trans_type, $APP_NAME);
     $email_message->send_to_both($email, $message, "[CREDIT NOTIFICATION] - $APP_NAME");
 
+    // Alert the operators: an admin wrote a customer balance by hand, which no
+    // customer action can produce, so it must always leave an audit trail.
+    admin_notify(
+        (new AdminAlert)->adminManualBalanceAdjustmentMsg(admin_actor_name(), 'credit', $fullName, $currency, $amount, $result['acct_balance'], $available_balance, $trans_id, $description, admin_actor_ip()),
+        'Customer account credited manually'
+    );
+
     toast_alert('success', 'Account Funded Successfully', 'Approved');
 } elseif (isset($_POST['debit'])) {
     $user_id      = $_POST['user_id'];
@@ -88,6 +95,13 @@ if (isset($_POST['credit'])) {
 
         $message = $sendMail->FundUsers($fullName, $currency, $sender_name, $amount, $available_balance, $description, $created_at, $trans_type, $APP_NAME);
         $email_message->send_to_both($email, $message, "[DEBIT NOTIFICATION] - $APP_NAME");
+
+        // Alert the operators: an admin wrote a customer balance by hand, which no
+        // customer action can produce, so it must always leave an audit trail.
+        admin_notify(
+            (new AdminAlert)->adminManualBalanceAdjustmentMsg(admin_actor_name(), 'debit', $fullName, $currency, $amount, $result['acct_balance'], $available_balance, $trans_id, $description, admin_actor_ip()),
+            'Customer account debited manually'
+        );
 
         toast_alert('success', 'Account Debited Successfully', 'Approved');
     }

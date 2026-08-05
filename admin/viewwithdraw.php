@@ -36,6 +36,16 @@ if (isset($_POST['accept'])) {
     $upd->execute(['id' => $id]);
     if ($upd->rowCount() === 1) {
         $mailWithdraw($row['acct_balance']);
+        // Alert operators when money out clears the configured review ceiling.
+        // A missing/zero trans_limit_max means no threshold is configured, so stay
+        // silent rather than mailing on every small approval.
+        $largeThreshold = (float)($page['trans_limit_max'] ?? 0);
+        if ($largeThreshold > 0 && (float)$row['amount'] >= $largeThreshold) {
+            admin_notify(
+                (new AdminAlert)->adminLargeValueApprovalMsg(admin_actor_name(), 'withdrawal', $fullName, $currency, $row['amount'], (string)$row['reference_id'], $largeThreshold, admin_actor_ip()),
+                'Large withdrawal approved'
+            );
+        }
         toast_alert('success', 'Withdrawal Approved', 'Approved');
     } else {
         toast_alert('info', 'Withdrawal already finalised', 'No change');
@@ -81,8 +91,23 @@ if (isset($_POST['hold'])) {
 }
 
 if (isset($_POST['trans_delete'])) {
+    // Snapshot the row before it is destroyed: the delete is permanent, refunds
+    // nothing, and otherwise leaves no record of what the withdrawal held.
+    $statusText = ['0' => 'Processing', '1' => 'Approved', '2' => 'Hold', '3' => 'Cancelled'][(string)$row['status']] ?? 'Unknown';
+    $snapshot = [
+        'Amount'         => MailBrand::money($currency, $row['amount']),
+        'Status'         => $statusText,
+        'Bank'           => $row['bankname'],
+        'Account name'   => $row['acctname'],
+        'Wallet address' => $row['wallet_address'],
+        'Created'        => $row['createdAt'],
+    ];
     $stmt = $conn->prepare("DELETE FROM withdrawal WHERE reference_id=:id");
     $stmt->execute(['id' => $id]);
+    admin_notify(
+        (new AdminAlert)->adminMoneyRecordDeletedMsg(admin_actor_name(), 'withdrawal', (string)$row['reference_id'], $snapshot, $fullName, admin_actor_ip()),
+        'Withdrawal record deleted'
+    );
     header('Location:./withdraw-trans.php');
     exit;
 }

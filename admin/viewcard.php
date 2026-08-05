@@ -22,6 +22,12 @@ if (isset($_POST['hold_card'])) {
             'new_status'  => 3,
         ]);
     }
+    // Freezing a payment instrument is a customer-visible service change, so operators
+    // hear about it. Only the last 4 digits go in the mail, never the full PAN.
+    admin_notify(
+        (new AdminAlert)->adminCardStatusChangedMsg(admin_actor_name(), (string)($cardCheck['card_name'] ?? ''), '**** ' . substr(preg_replace('/\D+/', '', (string)($cardCheck['card_number'] ?? '')), -4), 'paused', admin_actor_ip()),
+        'Customer card paused'
+    );
     toast_alert('success', 'Card placed on hold', 'Done');
     header('Location:' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
     exit;
@@ -37,6 +43,12 @@ if (isset($_POST['active_card'])) {
             'new_status'  => 1,
         ]);
     }
+    // An activated card is a live spending instrument, so operators hear about it.
+    // Only the last 4 digits go in the mail, never the full PAN.
+    admin_notify(
+        (new AdminAlert)->adminCardStatusChangedMsg(admin_actor_name(), (string)($cardCheck['card_name'] ?? ''), '**** ' . substr(preg_replace('/\D+/', '', (string)($cardCheck['card_number'] ?? '')), -4), 'activated', admin_actor_ip()),
+        'Customer card activated'
+    );
     toast_alert('success', 'Card activated', 'Done');
     header('Location:' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
     exit;

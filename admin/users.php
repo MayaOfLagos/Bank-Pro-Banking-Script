@@ -54,6 +54,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['bulk_action'])) {
             $update = $conn->prepare("UPDATE users SET acct_status = ? WHERE id IN ($updatePlaceholders) AND acct_status = 'hold'");
             $update->execute(array_merge([$targetStatus], $eligibleIds));
 
+            // Alert the operators: one submit rewrote the status of every
+            // eligible account at once, the widest-reaching action in the panel.
+            $bulkVerb = $targetStatus === 'active' ? 'approved' : 'suspended';
+            admin_notify(
+                (new AdminAlert)->adminBulkAccountActionMsg(admin_actor_name(), $bulkVerb, count($eligibleIds), admin_actor_ip()),
+                'Bulk account action'
+            );
+
             // Best-effort welcome mail for newly-approved users. Never fail
             // the whole bulk action because of an SMTP hiccup, and skip
             // rows without an email address.

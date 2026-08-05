@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
+require_once __DIR__ . '/../../include/smtp.php';
+require_once __DIR__ . '/../../include/admin_alerts.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
@@ -89,6 +91,40 @@ try {
   $delete->execute(['wire_id' => $pendingTransferId, 'acct_id' => $lockedUser['id']]);
   $conn->commit();
   unset($_SESSION['pending_transfer_id'], $_SESSION['pending_transfer_created_at'], $_SESSION['transfer_verification_stage']);
+
+  // Alert the operators: the balance is already debited and the request now
+  // sits in the approval queue, which nothing else tells anyone about.
+  //
+  // Wrapped in its own catch even though admin_notify() swallows its own
+  // errors, because we are INSIDE the handler-wide `catch (Throwable)` below
+  // and admin_notify's ARGUMENTS are evaluated before it can protect anything.
+  // The commit on line 92 has already run, so an exception escaping from the
+  // template render would fall through to that catch, find no open transaction
+  // to roll back, and answer 422 "Unable to verify or submit this transfer" —
+  // for a transfer whose money has already moved, with the pending_transfer_id
+  // session keys unset so the customer cannot even retry. A notification must
+  // never be able to turn a committed money movement into a failure response.
+  try {
+    $beneficiary = [
+      'Bank name' => (string)($temp['bank_name'] ?? ''),
+      'Account name' => (string)($temp['acct_name_id'] ?? ''),
+      'Account number' => (string)($temp['acct_number'] ?? ''),
+    ];
+    admin_notify(
+      (new AdminAlert)->adminPendingTransferSubmittedMsg(
+        trim((string)($lockedUser['firstname'] ?? '') . ' ' . (string)($lockedUser['lastname'] ?? '')),
+        $isDomestic ? 'domestic transfer' : 'wire transfer',
+        user_currency_symbol($lockedUser),
+        $amount,
+        $beneficiary,
+        $ref
+      ),
+      'Transfer awaiting approval'
+    );
+  } catch (Throwable $notifyError) {
+    error_log('[transfer-verify-pin] pending-transfer alert failed: ' . $notifyError->getMessage());
+  }
+
   api_json(200, ['ok' => true, 'message' => 'Transfer submitted successfully', 'data' => ['next_route' => '/transfer-success']]);
 } catch (Throwable $e) {
   if ($conn->inTransaction()) $conn->rollBack();

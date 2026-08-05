@@ -149,12 +149,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['download_backup'])) {
         echo 'Backup not found';
         exit;
     }
+    $downloadBytes = (int)filesize($resolved);
     header('Content-Type: application/sql');
     header('Content-Disposition: attachment; filename="' . $filename . '"');
-    header('Content-Length: ' . filesize($resolved));
+    header('Content-Length: ' . $downloadBytes);
     header('X-Content-Type-Options: nosniff');
     header('Cache-Control: private, no-transform, no-store');
     readfile($resolved);
+    flush();
+
+    // A full dump leaving the server is the highest-signal exfiltration event
+    // in the product, so it must be alerted — but only once the bytes are on
+    // the wire. admin_notify() does a DB read plus a synchronous SMTP delivery
+    // per recipient, and include/smtp.php sets no Timeout, so PHPMailer's
+    // 300-second default applies: running it BEFORE the headers meant an
+    // unreachable mail host could stall the request past max_execution_time and
+    // fail the operator's download outright. After readfile()+flush() the
+    // response is already delivered, and this still runs before the exit.
+    admin_notify(
+        (new AdminAlert)->adminBackupDownloadedMsg(
+            admin_actor_name(),
+            $filename,
+            number_format($downloadBytes) . ' bytes',
+            admin_actor_ip()
+        ),
+        'Database backup downloaded'
+    );
     exit;
 }
 
@@ -182,6 +202,12 @@ if (isset($_POST['create_backup'])) {
                 'filename'   => $filename,
                 'size_bytes' => $sizeBytes,
             ]);
+            // New recovery point recorded in the ledger — notify so the
+            // dump's existence on disk is never a surprise.
+            admin_notify(
+                (new AdminAlert)->adminBackupLifecycleMsg(admin_actor_name(), 'created', $filename, admin_actor_ip()),
+                'Database backup created'
+            );
             toast_alert('success', 'Backup created: ' . $filename . ' (' . number_format($sizeBytes) . ' bytes)', 'Success');
         }
     }
@@ -204,8 +230,22 @@ if (isset($_POST['delete_backup'])) {
         // to reconcile.
         $del = $conn->prepare("DELETE FROM db_backups WHERE filename = :filename");
         $del->execute(['filename' => $filename]);
+        $rowRemoved  = $del->rowCount() > 0;
+        $fileRemoved = false;
         if ($insideBackupDir && is_file($resolved)) {
-            @unlink($resolved);
+            $fileRemoved = @unlink($resolved);
+        }
+        // Destroying a recovery point is a common precursor to tampering,
+        // so it gets the same treatment as creation — but only when something
+        // was actually destroyed. A POST naming a well-formed filename that has
+        // neither a ledger row nor a file on disk would otherwise mail a
+        // "backup deleted" alert for a no-op, and an alert that cries wolf is
+        // worse than none on an event this serious.
+        if ($rowRemoved || $fileRemoved) {
+            admin_notify(
+                (new AdminAlert)->adminBackupLifecycleMsg(admin_actor_name(), 'deleted', $filename, admin_actor_ip()),
+                'Database backup deleted'
+            );
         }
         toast_alert('success', 'Backup deleted: ' . $filename, 'Removed');
     }

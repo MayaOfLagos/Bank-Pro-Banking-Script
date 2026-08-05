@@ -32,6 +32,16 @@ if (isset($_POST['accept'])) {
     if ($upd->rowCount() === 1) {
         $message = $sendMail->wireMsg($currency, $row['amount'], $row['acct_balance'], 'Wire Transfer', $fullName, $APP_NAME, 'Approved', $row['refrence_id']);
         $email_message->send_to_both($email, $message, "[WIRE TRANSFER APPROVED] - $APP_NAME");
+        // Alert operators when money out clears the configured review ceiling.
+        // A missing/zero trans_limit_max means no threshold is configured, so stay
+        // silent rather than mailing on every small approval.
+        $largeThreshold = (float)($page['trans_limit_max'] ?? 0);
+        if ($largeThreshold > 0 && (float)$row['amount'] >= $largeThreshold) {
+            admin_notify(
+                (new AdminAlert)->adminLargeValueApprovalMsg(admin_actor_name(), 'wire transfer', $fullName, $currency, $row['amount'], (string)$row['refrence_id'], $largeThreshold, admin_actor_ip()),
+                'Large wire transfer approved'
+            );
+        }
         toast_alert('success', 'Wire Transfer Approved', 'Approved');
     } else {
         toast_alert('info', 'Wire transfer already finalised', 'No change');
@@ -80,8 +90,23 @@ if (isset($_POST['hold'])) {
 }
 
 if (isset($_POST['trans_delete'])) {
+    // Snapshot the row before it is destroyed: the delete is permanent, refunds
+    // nothing, and otherwise leaves no record of what the transfer held.
+    $statusText = ['0' => 'Processing', '1' => 'Approved', '2' => 'Hold', '3' => 'Cancelled'][(string)$row['wire_status']] ?? 'Unknown';
+    $snapshot = [
+        'Amount'           => MailBrand::money($currency, $row['amount']),
+        'Status'           => $statusText,
+        'Beneficiary'      => $row['acct_name'],
+        'Beneficiary bank' => $row['bank_name'],
+        'Account number'   => $row['acct_number'],
+        'Created'          => $row['created_at'],
+    ];
     $stmt = $conn->prepare("DELETE FROM wire_transfer WHERE refrence_id=:id");
     $stmt->execute(['id' => $id]);
+    admin_notify(
+        (new AdminAlert)->adminMoneyRecordDeletedMsg(admin_actor_name(), 'wire transfer', (string)$row['refrence_id'], $snapshot, $fullName, admin_actor_ip()),
+        'Wire transfer record deleted'
+    );
     header('Location:./wire-trans.php');
     exit;
 }

@@ -14,6 +14,9 @@ if (!$row) {
 
 $billing  = $row['billing_code'] == '1' ? 'ACTIVE' : 'DEACTIVATE';
 $transfer = $row['transfer'] == '1' ? 'ACTIVE' : 'DEACTIVATE';
+// Pre-write snapshot of the customer's name, used to identify the account in
+// the operator alerts below (the delete handler wipes the row it comes from).
+$customerName = trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? ''));
 
 if (isset($_POST['upload_picture']) && isset($_FILES['image']) && $_FILES['image']['name']) {
     $file = $_FILES['image'];
@@ -50,22 +53,35 @@ if (isset($_POST['profile_save'])) {
         'limit_remain'    => $limiBalance,
         'id'              => $id
     ]);
-    if (function_exists('audit_log')) {
-        // Diff the tracked fields — most user-profile edits only touch a
-        // subset, no point spamming the log with unchanged rows.
-        $tracked = ['acct_no','acct_type','acct_email','acct_dob','acct_occupation','acct_phone','acct_gender','acct_tax','acct_cot','acct_imf','marital_status','acct_balance'];
-        $changed = [];
-        foreach ($tracked as $f) {
-            $old = isset($row[$f]) ? (string)$row[$f] : '';
-            $new = isset($_POST[$f]) ? (string)$_POST[$f] : '';
-            if ($old !== $new) {
-                $changed[$f] = ['old' => $old, 'new' => $new];
-            }
+    // Diff the tracked fields — most user-profile edits only touch a
+    // subset, no point spamming the log with unchanged rows.
+    //
+    // Computed outside the audit_log branch because the operator alert below
+    // consumes the same diff. Left inside, $changed only existed when
+    // audit_log() happened to be defined, so removing or reordering the audit
+    // block would silently disable the alert with no other symptom.
+    $tracked = ['acct_no','acct_type','acct_email','acct_dob','acct_occupation','acct_phone','acct_gender','acct_tax','acct_cot','acct_imf','marital_status','acct_balance'];
+    $changed = [];
+    foreach ($tracked as $f) {
+        $old = isset($row[$f]) ? (string)$row[$f] : '';
+        $new = isset($_POST[$f]) ? (string)$_POST[$f] : '';
+        if ($old !== $new) {
+            $changed[$f] = ['old' => $old, 'new' => $new];
         }
+    }
+    if (function_exists('audit_log')) {
         audit_log('user.profile_updated', 'user', (string)$id, [
             'user_email' => $row['acct_email'] ?? null,
             'changed'    => $changed,
         ]);
+    }
+    // A balance or email edited here writes no ledger row and skips the
+    // customer-side email verification, so mail the same diff to the operators.
+    if (!empty($changed)) {
+        admin_notify(
+            (new AdminAlert)->adminCustomerBalanceOrEmailEditedMsg(admin_actor_name(), $customerName, $changed, admin_actor_ip()),
+            'Customer profile edited by an operator'
+        );
     }
     header("Location:./users.php"); die;
 }
@@ -80,6 +96,12 @@ if (isset($_POST['status_delete'])) {
             'name'       => trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? '')),
         ]);
     }
+    // Hard DELETE with no soft-delete flag and no undo — the operators need to
+    // hear about a customer of record disappearing.
+    admin_notify(
+        (new AdminAlert)->adminCustomerAccountLifecycleMsg(admin_actor_name(), $customerName, 'deleted', '', admin_actor_ip()),
+        'Customer account deleted'
+    );
     header("Location:./users.php"); die;
 }
 
@@ -102,6 +124,12 @@ if (isset($_POST['change_pin'])) {
                 'user_email' => $row['acct_email'] ?? null,
             ]);
         }
+        // The operator now knows a live transaction PIN for an account they do
+        // not own — anything done with it looks like ordinary customer activity.
+        admin_notify(
+            (new AdminAlert)->adminCustomerCredentialsResetMsg(admin_actor_name(), $customerName, 'transaction PIN', admin_actor_ip()),
+            'Customer credentials reset by an operator'
+        );
         toast_alert('success', 'PIN Changed Successfully', 'Approved');
     }
 }
@@ -125,6 +153,12 @@ if (isset($_POST['change_password'])) {
                 'user_email' => $row['acct_email'] ?? null,
             ]);
         }
+        // Same account-takeover risk as the PIN reset: an operator holds a
+        // working customer credential from here on.
+        admin_notify(
+            (new AdminAlert)->adminCustomerCredentialsResetMsg(admin_actor_name(), $customerName, 'password', admin_actor_ip()),
+            'Customer credentials reset by an operator'
+        );
         toast_alert('success', 'Password Changed Successfully', 'Approved');
     }
 }
@@ -158,6 +192,12 @@ if (isset($_POST['status_submit'])) {
                 'reason'     => $reason !== '' ? $reason : null,
             ]);
         }
+        // Anything other than "active" cuts the customer off from their money,
+        // so carry the new status and the operator's reason to the inbox.
+        admin_notify(
+            (new AdminAlert)->adminCustomerAccountLifecycleMsg(admin_actor_name(), $customerName, $newStatus, $reason, admin_actor_ip()),
+            'Customer account ' . $newStatus
+        );
         header("Location:./users.php"); die;
     }
 }
@@ -204,6 +244,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['feature_access_save']
         "can_withdraw=:can_withdraw, can_request_card=:can_request_card WHERE id=:acct_id"
     );
     $stmt->execute($flags + ['acct_id' => $id]);
+    // A cleared flag silently strands the customer's funds with no customer-side
+    // notice, so mail the exact flag set that was written.
+    admin_notify(
+        (new AdminAlert)->adminCustomerAccessRevokedMsg(admin_actor_name(), $customerName, $flags, admin_actor_ip()),
+        'Customer access changed'
+    );
     header("Location:./view_users.php?id=" . $id . "&feature_saved=1");
     die;
 }
@@ -224,6 +270,12 @@ $featureFlags = [
 if (isset($_POST['force_logout_user'])) {
     $stmt = $conn->prepare("UPDATE users SET sessions_invalidated_at = NOW() WHERE id = :id");
     $stmt->execute(['id' => $id]);
+    // Every live session for this customer dies at once — worth an operator
+    // record in case it was not the account owner asking for it.
+    admin_notify(
+        (new AdminAlert)->adminCustomerAccessRevokedMsg(admin_actor_name(), $customerName, ['all sessions' => 'terminated'], admin_actor_ip()),
+        'Customer access changed'
+    );
     toast_alert('success', 'User signed out of all active sessions. Their next request will require re-authentication.', 'Sessions revoked');
     // Re-read so the on-page timestamp reflects the new value below.
     $refresh = $conn->prepare("SELECT sessions_invalidated_at FROM users WHERE id = :id LIMIT 1");

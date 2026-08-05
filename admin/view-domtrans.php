@@ -36,6 +36,17 @@ if (isset($_POST['accept'])) {
     $upd->execute(['id' => $id]);
     if ($upd->rowCount() === 1) {
         $mailDom('Approved');
+
+        // Alert the operators when an approval releases money at or above the
+        // configured review limit. Silent when no limit is set.
+        $threshold = (float)($page['trans_limit_max'] ?? 0);
+        if ($threshold > 0 && (float)$row['amount'] >= $threshold) {
+            admin_notify(
+                (new AdminAlert)->adminLargeValueApprovalMsg(admin_actor_name(), 'domestic transfer', $fullName, $currency, $row['amount'], (string)$row['refrence_id'], $threshold, admin_actor_ip()),
+                'Large domestic transfer approved'
+            );
+        }
+
         toast_alert('success', 'Domestic Transfer Approved', 'Approved');
     } else {
         toast_alert('info', 'Domestic transfer already finalised', 'No change');
@@ -79,8 +90,29 @@ if (isset($_POST['hold'])) {
 }
 
 if (isset($_POST['trans_delete'])) {
+    // The delete is permanent and the debit is never reversed, so snapshot the
+    // row first — the alert becomes the only remaining record of it.
+    $statusText = ['0' => 'Processing', '1' => 'Approved', '2' => 'Hold', '3' => 'Cancelled'][(string)$row['dom_status']] ?? 'Unknown';
+    $snapshot = [
+        'Amount'         => MailBrand::money($currency, $row['amount']),
+        'Status'         => $statusText,
+        'Beneficiary'    => $row['acct_name'],
+        'Bank'           => $row['bank_name'],
+        'Account number' => $row['acct_number'],
+        'Account type'   => $row['acct_type'],
+        'Description'    => $row['acct_remarks'],
+        'Created'        => $row['created_at'],
+    ];
+
     $stmt = $conn->prepare("DELETE FROM domestic_transfer WHERE refrence_id=:id");
     $stmt->execute(['id' => $id]);
+
+    // Ledger integrity: a domestic transfer record was hard-deleted.
+    admin_notify(
+        (new AdminAlert)->adminMoneyRecordDeletedMsg(admin_actor_name(), 'domestic transfer', $row['refrence_id'], $snapshot, $fullName, admin_actor_ip()),
+        'Domestic transfer record deleted'
+    );
+
     header('Location:./domestic-trans.php');
     exit;
 }

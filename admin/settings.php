@@ -186,6 +186,15 @@ if (isset($_POST['save_settings'])) {
         audit_log('settings.updated', 'settings', '1', ['changed' => $changed]);
     }
 
+    // Same diff, mailed out: transfer limits, the global transfer switch and
+    // the signup defaults all move customer money, so a silent edit is not ok.
+    if ($changed !== []) {
+        admin_notify(
+            (new AdminAlert)->adminSettingsChangedMsg(admin_actor_name(), $changed, admin_actor_ip()),
+            'Platform settings changed'
+        );
+    }
+
     $reload = $conn->query("SELECT * FROM settings WHERE id=1");
     $page   = $reload->fetch(PDO::FETCH_ASSOC);
 }

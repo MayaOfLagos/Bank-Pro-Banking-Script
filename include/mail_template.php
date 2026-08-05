@@ -749,22 +749,47 @@ final class MailBrand
     /**
      * Render an old→new diff as table rows.
      *
-     * admin/settings.php and admin/view_users.php already build this shape for
-     * audit_log(), so a caller can pass the array it already has. Accepts
-     * ['field' => ['from' => x, 'to' => y]] or a flat ['field' => 'value'].
+     * Accepts three shapes so a caller can pass the array it already has:
+     *
+     *   ['field' => ['from' => x, 'to' => y]]   explicit
+     *   ['field' => ['old' => x, 'new' => y]]   the audit_log() convention
+     *   ['field' => 'value']                    flat
+     *
+     * Both key pairs are supported deliberately. admin/settings.php and
+     * admin/view_users.php build their diffs as old/new for audit_log(), and
+     * reusing that array for the alert is the obvious thing to do at the call
+     * site — but with only from/to recognised those entries fell through to the
+     * scalar branch and rendered as raw `{"old":"1000","new":"50000"}` JSON,
+     * destroying the one detail the alert exists to convey. Accepting both here
+     * is one fix instead of a remap at every call site, and it stops the next
+     * person hitting the same trap.
+     *
+     * Null is rendered as an empty cell rather than the literal "null" that
+     * json_encode would produce — snapshot rows routinely carry NULL columns
+     * (a withdrawal's wallet_address, a transfer's memo).
      */
     public static function changeRows(array $changes): array
     {
         $rows = [];
         foreach ($changes as $field => $change) {
             $label = ucfirst(str_replace('_', ' ', (string)$field));
-            if (is_array($change) && (array_key_exists('from', $change) || array_key_exists('to', $change))) {
-                $from = (string)($change['from'] ?? '');
-                $to   = (string)($change['to'] ?? '');
-                $rows[$label] = ($from === '' ? '(empty)' : $from) . '  →  ' . ($to === '' ? '(empty)' : $to);
-            } else {
-                $rows[$label] = is_scalar($change) ? (string)$change : json_encode($change);
+
+            if (is_array($change)) {
+                $hasFromTo = array_key_exists('from', $change) || array_key_exists('to', $change);
+                $hasOldNew = array_key_exists('old', $change) || array_key_exists('new', $change);
+
+                if ($hasFromTo || $hasOldNew) {
+                    $from = (string)($hasFromTo ? ($change['from'] ?? '') : ($change['old'] ?? ''));
+                    $to   = (string)($hasFromTo ? ($change['to'] ?? '') : ($change['new'] ?? ''));
+                    $rows[$label] = ($from === '' ? '(empty)' : $from) . '  →  ' . ($to === '' ? '(empty)' : $to);
+                    continue;
+                }
+
+                $rows[$label] = json_encode($change);
+                continue;
             }
+
+            $rows[$label] = $change === null ? '' : (string)$change;
         }
 
         return $rows;
