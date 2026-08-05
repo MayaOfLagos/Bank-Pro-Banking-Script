@@ -287,6 +287,35 @@ $insert->execute([
     'limit_remain'  => $defaultLimitRemain,
 ]);
 
+$newUserId = (int)$conn->lastInsertId();
+
+// ─── In-app notifications ─────────────────────────────────────────────
+// This endpoint is unauthenticated, so it is the one place worth arguing
+// about. It is safe to emit here because a row can only be written AFTER a
+// users row was successfully created: the volume is bounded 1:1 by real
+// account creation, which is itself capped at 5 attempts per IP per hour by
+// the rate limiter above and gated by the registration_enabled kill switch.
+// Contrast forgot-password.php, which deliberately emits nothing — it fires
+// on a bare email address with no row created, so it would let anyone flood
+// a victim's drawer. The rule: emit only where a durable business row was
+// just written.
+require_once __DIR__ . '/../../include/notifications.php';
+// Everything the applicant typed is stripped of markdown before it is
+// composed into a body the admin inbox renders. $acctNo is generated.
+$signupName = notify_plain(trim($firstname . ' ' . $lastname), 80);
+$signupAcctType = notify_plain($acctType, 40);
+$signupCurrency = notify_plain($currency, 10);
+if ($newUserId > 0) {
+    notify_user($conn, $newUserId, 'account.registered', 'Welcome to ' . $appName,
+        'Your account **' . $acctNo . '** has been created' .
+        ($defaultStatus === 'active' ? '. You can sign in now.' : ' and is pending review. We will email you once it is approved.'),
+        ['severity' => 'success', 'link' => '/dashboard', 'meta' => ['acct_no' => $acctNo, 'acct_status' => $defaultStatus]]);
+}
+notify_admin($conn, 'account.registered', 'New account registration',
+    $signupName . ' registered account **' . $acctNo . '** (' . $signupAcctType . ', ' . $signupCurrency . ') with status `' . $defaultStatus . '`.',
+    ['severity' => ($defaultStatus === 'active' ? 'info' : 'warning'),
+     'meta' => ['user_id' => $newUserId, 'acct_no' => $acctNo, 'acct_status' => $defaultStatus, 'country' => $country]]);
+
 // ─── Notify (best-effort — never fail signup because of mail issues) ───
 try {
     $fullName = trim($firstname . ' ' . $lastname);

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../../include/userClass.php';
+require_once __DIR__ . '/../../include/notifications.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
@@ -26,6 +27,15 @@ $stmt->execute([
   'amount' => $amount,
   'loan_remarks' => $remarks
 ]);
+
+$loanName = notify_plain(trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')), 80);
+$loanMoney = user_currency_symbol($user) . number_format($amount, 2);
+notify_user($conn, (int)$user['id'], 'loan.requested', 'Loan application received',
+  'Your loan application for **' . $loanMoney . '** is under review. Reference `' . $reference . '`.',
+  ['severity' => 'info', 'link' => '/loans/' . $reference, 'meta' => ['reference' => $reference, 'amount' => $amount]]);
+notify_admin($conn, 'loan.requested', 'Loan application awaiting decision',
+  $loanName . ' applied for a loan of **' . $loanMoney . '**. Reference `' . $reference . '`.',
+  ['severity' => 'warning', 'link' => '/loans/' . $reference, 'meta' => ['reference' => $reference, 'user_id' => (int)$user['id'], 'amount' => $amount]]);
 
 $email_message = new message();
 $sendMail = new emailMessage($settings);

@@ -60,6 +60,58 @@ $_SESSION['pw_snapshot'] = $_SESSION['pw_snapshot'] ?? time();
 $_SESSION['session_started_at'] = time();
 unset($_SESSION['login']);
 
+// New authenticated session. Emitted HERE and not in login.php: this is the
+// first point at which the caller has proved BOTH password and PIN, so an
+// unauthenticated or half-authenticated caller can never push rows into the
+// table. One PIN verify == one new session, so this is naturally once-per-
+// session; the 10-minute dedupe below only exists to stop a customer who is
+// bouncing between tabs/devices from filling their own drawer.
+//
+// The dedupe reads the notifications table rather than adding a users column,
+// so this ships with the notifications migration alone — no second schema
+// change to sequence, and no fighting the last_login_email_at window that the
+// email alert below owns.
+require_once __DIR__ . '/../../include/notifications.php';
+$shouldNotifyLogin = true;
+try {
+    $recentLoginStmt = $conn->prepare(
+        'SELECT 1 FROM notifications
+          WHERE audience = :audience AND user_id = :uid AND event = :event
+            AND created_at > DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+          LIMIT 1'
+    );
+    $recentLoginStmt->execute([
+        'audience' => 'user',
+        'uid' => (int)$user['id'],
+        'event' => 'auth.login',
+    ]);
+    $shouldNotifyLogin = !$recentLoginStmt->fetchColumn();
+} catch (Throwable $loginNoticeError) {
+    // Table not migrated yet. Fall through and let notify_user() do its own
+    // logging + no-op rather than silently disabling the feature.
+    error_log('[pin-verify] login notice dedupe unavailable: ' . $loginNoticeError->getMessage());
+}
+if ($shouldNotifyLogin) {
+    // The User-Agent is wholly attacker-supplied and the name is self-chosen;
+    // both land in a markdown body that the portal renders. notify_plain()
+    // strips the syntax so neither can inject a link or an image.
+    $loginDevice = notify_plain($_SERVER['HTTP_USER_AGENT'] ?? '', 120);
+    if ($loginDevice === '') {
+        $loginDevice = 'Unknown device';
+    }
+    $loginIp = notify_plain($_SERVER['REMOTE_ADDR'] ?? '', 45);
+    if ($loginIp === '') {
+        $loginIp = '0.0.0.0';
+    }
+    $loginName = notify_plain(trim((string)($user['firstname'] ?? '') . ' ' . (string)($user['lastname'] ?? '')), 80);
+    notify_user($conn, (int)$user['id'], 'auth.login', 'New sign-in to your account',
+        'A new sign-in was completed from `' . $loginIp . '` (' . $loginDevice . '). If this was not you, change your password immediately.',
+        ['severity' => 'info', 'link' => '/profile/security', 'meta' => ['ip' => $loginIp, 'device' => $loginDevice]]);
+    notify_admin($conn, 'auth.login', 'Customer signed in',
+        ($loginName !== '' ? $loginName : 'Account ' . (string)$user['acct_no']) . ' signed in from `' . $loginIp . '`.',
+        ['severity' => 'info', 'meta' => ['user_id' => (int)$user['id'], 'ip' => $loginIp, 'device' => $loginDevice]]);
+}
+
 // Rate-limited login alert: fire at most once per 10-minute window per
 // user. The UPDATE is atomic — only one concurrent PIN verify wins the
 // write, so even rapid parallel logins produce exactly one email.

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../../include/userClass.php';
+require_once __DIR__ . '/../../include/notifications.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
@@ -70,6 +71,18 @@ $promote = $conn->prepare(
    WHERE id = :id'
 );
 $promote->execute(['new_email' => $newEmail, 'id' => $user['id']]);
+
+// Fires only after the OTP has been verified and the address promoted, so a
+// half-finished change never produces a notification.
+$emailChangeName = notify_plain(trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')), 80);
+$newEmailLabel = notify_plain($newEmail, 120);
+$oldEmailLabel = notify_plain($oldEmail, 120);
+notify_user($conn, (int)$user['id'], 'profile.email_changed', 'Your email address was changed',
+  'Your account email is now **' . $newEmailLabel . '**. If this was not you, contact support immediately.',
+  ['severity' => 'warning', 'link' => '/profile/security', 'meta' => ['new_email' => $newEmail]]);
+notify_admin($conn, 'profile.email_changed', 'Customer changed their email address',
+  $emailChangeName . ' changed their account email from ' . ($oldEmailLabel !== '' ? $oldEmailLabel : 'an unset address') . ' to **' . $newEmailLabel . '**.',
+  ['severity' => 'warning', 'meta' => ['user_id' => (int)$user['id'], 'old_email' => $oldEmail, 'new_email' => $newEmail]]);
 
 $appName = (string)($settings['url_name'] ?? WEB_TITLE);
 $appEmail = defined('WEB_EMAIL') ? WEB_EMAIL : '';

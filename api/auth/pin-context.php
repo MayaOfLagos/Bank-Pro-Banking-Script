@@ -32,7 +32,12 @@ auth_json(200, [
     'message' => 'PIN context loaded',
     'data' => [
         'fullname' => trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')),
-        'image' => '/assets/profile/' . ($user['image'] ?? ''),
+        // Empty rather than a bare directory URL when nothing was uploaded, so
+        // the PIN screen can tell "no picture" from "picture" and fall back to
+        // initials instead of rendering a broken image.
+        'image' => trim((string)($user['image'] ?? '')) !== ''
+            ? '/assets/profile/' . trim((string)$user['image'])
+            : '',
         'acct_no' => (string)($user['acct_no'] ?? ''),
     ],
 ]);

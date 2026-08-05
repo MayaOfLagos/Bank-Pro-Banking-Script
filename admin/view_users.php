@@ -17,6 +17,12 @@ $transfer = $row['transfer'] == '1' ? 'ACTIVE' : 'DEACTIVATE';
 // Pre-write snapshot of the customer's name, used to identify the account in
 // the operator alerts below (the delete handler wipes the row it comes from).
 $customerName = trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? ''));
+// Attribution for the operator feed. Every notify_admin() below is admin
+// activity only — nothing on this page emits notify_user(), because none of
+// these handlers changes a customer-visible outcome (see the notifications
+// report): they change back-office state, credentials the customer is told
+// about by email, or access flags whose effect the customer meets in the app.
+$actorAdminId = isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null;
 
 if (isset($_POST['upload_picture'])) {
     // Was: destination built from the raw client filename ($acct_no . $name),
@@ -99,6 +105,23 @@ if (isset($_POST['profile_save'])) {
             (new AdminAlert)->adminCustomerBalanceOrEmailEditedMsg(admin_actor_name(), $customerName, $changed, admin_actor_ip()),
             'Customer profile edited by an operator'
         );
+
+        notify_admin(
+            $conn,
+            'admin.user_profile_edited',
+            'Customer profile edited',
+            admin_actor_name() . ' edited ' . ($customerName !== '' ? $customerName : 'a customer')
+                . ' — changed: ' . implode(', ', array_keys($changed)) . '.',
+            array(
+                // A hand-edited balance writes no ledger row, so flag it louder
+                // than a phone-number correction.
+                'severity'            => isset($changed['acct_balance']) || isset($changed['acct_email']) ? 'danger' : 'warning',
+                'link'                => '/admin/view_users.php?id=' . $id,
+                'source'              => 'admin',
+                'created_by_admin_id' => $actorAdminId,
+                'meta'                => array('user_id' => $id, 'changed' => array_keys($changed)),
+            )
+        );
     }
     header("Location:./users.php"); die;
 }
@@ -118,6 +141,21 @@ if (isset($_POST['status_delete'])) {
     admin_notify(
         (new AdminAlert)->adminCustomerAccountLifecycleMsg(admin_actor_name(), $customerName, 'deleted', '', admin_actor_ip()),
         'Customer account deleted'
+    );
+
+    notify_admin(
+        $conn,
+        'admin.user_deleted',
+        'Customer account deleted',
+        admin_actor_name() . ' permanently deleted ' . ($customerName !== '' ? $customerName : 'a customer')
+            . ' (' . (string)($row['acct_no'] ?? 'unknown account') . '). This is not reversible.',
+        array(
+            'severity'            => 'danger',
+            'link'                => '/admin/users.php',
+            'source'              => 'admin',
+            'created_by_admin_id' => $actorAdminId,
+            'meta'                => array('user_id' => $id, 'acct_no' => (string)($row['acct_no'] ?? '')),
+        )
     );
     header("Location:./users.php"); die;
 }
@@ -147,6 +185,23 @@ if (isset($_POST['change_pin'])) {
             (new AdminAlert)->adminCustomerCredentialsResetMsg(admin_actor_name(), $customerName, 'transaction PIN', admin_actor_ip()),
             'Customer credentials reset by an operator'
         );
+
+        // The value itself is never carried into the notification body — the
+        // bell renders on every admin page.
+        notify_admin(
+            $conn,
+            'admin.user_credentials_reset',
+            'Customer transaction PIN reset',
+            admin_actor_name() . ' set a new transaction PIN on '
+                . ($customerName !== '' ? $customerName : 'a customer') . "'s account.",
+            array(
+                'severity'            => 'danger',
+                'link'                => '/admin/view_users.php?id=' . $id,
+                'source'              => 'admin',
+                'created_by_admin_id' => $actorAdminId,
+                'meta'                => array('user_id' => $id, 'credential' => 'transaction_pin'),
+            )
+        );
         toast_alert('success', 'PIN Changed Successfully', 'Approved');
     }
 }
@@ -175,6 +230,21 @@ if (isset($_POST['change_password'])) {
         admin_notify(
             (new AdminAlert)->adminCustomerCredentialsResetMsg(admin_actor_name(), $customerName, 'password', admin_actor_ip()),
             'Customer credentials reset by an operator'
+        );
+
+        notify_admin(
+            $conn,
+            'admin.user_credentials_reset',
+            'Customer password reset',
+            admin_actor_name() . ' set a new sign-in password on '
+                . ($customerName !== '' ? $customerName : 'a customer') . "'s account.",
+            array(
+                'severity'            => 'danger',
+                'link'                => '/admin/view_users.php?id=' . $id,
+                'source'              => 'admin',
+                'created_by_admin_id' => $actorAdminId,
+                'meta'                => array('user_id' => $id, 'credential' => 'password'),
+            )
         );
         toast_alert('success', 'Password Changed Successfully', 'Approved');
     }
@@ -215,6 +285,22 @@ if (isset($_POST['status_submit'])) {
             (new AdminAlert)->adminCustomerAccountLifecycleMsg(admin_actor_name(), $customerName, $newStatus, $reason, admin_actor_ip()),
             'Customer account ' . $newStatus
         );
+
+        notify_admin(
+            $conn,
+            'admin.user_status_changed',
+            'Customer account status changed',
+            admin_actor_name() . ' moved ' . ($customerName !== '' ? $customerName : 'a customer')
+                . ' from ' . (string)$oldStatus . ' to ' . $newStatus
+                . ($reason !== '' ? '. Reason: ' . $reason : '.'),
+            array(
+                'severity'            => $newStatus === 'active' ? 'info' : 'danger',
+                'link'                => '/admin/view_users.php?id=' . $id,
+                'source'              => 'admin',
+                'created_by_admin_id' => $actorAdminId,
+                'meta'                => array('user_id' => $id, 'old' => (string)$oldStatus, 'new' => $newStatus),
+            )
+        );
         header("Location:./users.php"); die;
     }
 }
@@ -229,6 +315,21 @@ if (isset($_POST['billing_code'])) {
             'new'        => $_POST['billing_type'] ?? null,
         ]);
     }
+    notify_admin(
+        $conn,
+        'admin.user_access_changed',
+        'Customer billing code toggled',
+        admin_actor_name() . ' set the billing code on '
+            . ($customerName !== '' ? $customerName : 'a customer') . "'s account to "
+            . (((string)($_POST['billing_type'] ?? '')) === '1' ? 'ACTIVE' : 'DEACTIVATE') . '.',
+        array(
+            'severity'            => 'warning',
+            'link'                => '/admin/view_users.php?id=' . $id,
+            'source'              => 'admin',
+            'created_by_admin_id' => $actorAdminId,
+            'meta'                => array('user_id' => $id, 'billing_code' => (string)($_POST['billing_type'] ?? '')),
+        )
+    );
     header("Location:./users.php"); die;
 }
 
@@ -242,6 +343,21 @@ if (isset($_POST['transfer'])) {
             'new'        => $_POST['transfer_type'] ?? null,
         ]);
     }
+    notify_admin(
+        $conn,
+        'admin.user_access_changed',
+        'Customer transfer access toggled',
+        admin_actor_name() . ' set transfer access on '
+            . ($customerName !== '' ? $customerName : 'a customer') . "'s account to "
+            . (((string)($_POST['transfer_type'] ?? '')) === '1' ? 'ACTIVE' : 'DEACTIVATE') . '.',
+        array(
+            'severity'            => 'warning',
+            'link'                => '/admin/view_users.php?id=' . $id,
+            'source'              => 'admin',
+            'created_by_admin_id' => $actorAdminId,
+            'meta'                => array('user_id' => $id, 'transfer' => (string)($_POST['transfer_type'] ?? '')),
+        )
+    );
     header("Location:./users.php"); die;
 }
 
@@ -266,6 +382,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['feature_access_save']
     admin_notify(
         (new AdminAlert)->adminCustomerAccessRevokedMsg(admin_actor_name(), $customerName, $flags, admin_actor_ip()),
         'Customer access changed'
+    );
+
+    $offFlags = array_keys(array_filter($flags, static function ($v) { return $v === 0; }));
+    notify_admin(
+        $conn,
+        'admin.user_access_changed',
+        'Customer feature access changed',
+        admin_actor_name() . ' saved feature access for '
+            . ($customerName !== '' ? $customerName : 'a customer') . '. '
+            . ($offFlags ? 'Disabled: ' . implode(', ', $offFlags) . '.' : 'All features enabled.'),
+        array(
+            'severity'            => $offFlags ? 'warning' : 'info',
+            'link'                => '/admin/view_users.php?id=' . $id,
+            'source'              => 'admin',
+            'created_by_admin_id' => $actorAdminId,
+            'meta'                => array('user_id' => $id, 'flags' => $flags),
+        )
     );
     header("Location:./view_users.php?id=" . $id . "&feature_saved=1");
     die;
@@ -293,6 +426,22 @@ if (isset($_POST['force_logout_user'])) {
         (new AdminAlert)->adminCustomerAccessRevokedMsg(admin_actor_name(), $customerName, ['all sessions' => 'terminated'], admin_actor_ip()),
         'Customer access changed'
     );
+
+    notify_admin(
+        $conn,
+        'admin.user_sessions_revoked',
+        'Customer sessions force-revoked',
+        admin_actor_name() . ' signed ' . ($customerName !== '' ? $customerName : 'a customer')
+            . ' out of every active session.',
+        array(
+            'severity'            => 'warning',
+            'link'                => '/admin/view_users.php?id=' . $id,
+            'source'              => 'admin',
+            'created_by_admin_id' => $actorAdminId,
+            'meta'                => array('user_id' => $id),
+        )
+    );
+
     toast_alert('success', 'User signed out of all active sessions. Their next request will require re-authentication.', 'Sessions revoked');
     // Re-read so the on-page timestamp reflects the new value below.
     $refresh = $conn->prepare("SELECT sessions_invalidated_at FROM users WHERE id = :id LIMIT 1");

@@ -128,6 +128,23 @@ if (isset($_POST['register'])) {
                 ]);
             }
 
+            // Operator feed only. The customer already gets the welcome email
+            // with their credentials; a bell notification on an account they
+            // have not signed into yet has nowhere to be read.
+            notify_admin(
+                $conn,
+                'admin.user_created',
+                'New customer account created',
+                admin_actor_name() . ' registered ' . $fullName . ' (' . $acct_no . ', ' . $acct_type . ').',
+                array(
+                    'severity'            => 'info',
+                    'link'                => '/admin/view_users.php',
+                    'source'              => 'admin',
+                    'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+                    'meta'                => array('acct_no' => (string)$acct_no, 'acct_type' => $acct_type),
+                )
+            );
+
             toast_alert('success', 'Account Created Successfully', 'Approved');
         }
     }

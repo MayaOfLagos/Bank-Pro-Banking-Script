@@ -61,6 +61,21 @@ if (isset($_POST['save_session_policy'])) {
             (new AdminAlert)->adminAuthPolicyChangedMsg(admin_actor_name(), $changes, admin_actor_ip()),
             'Sign-in policy changed'
         );
+
+        notify_admin(
+            $conn,
+            'admin.auth_policy_changed',
+            'Session idle policy changed',
+            admin_actor_name() . ' changed the idle sign-out window from '
+                . $priorIdle . ' to ' . $minutes . ' minute(s).',
+            array(
+                'severity'            => 'warning',
+                'link'                => '/admin/auth_policy.php',
+                'source'              => 'admin',
+                'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+                'meta'                => array('changes' => $changes),
+            )
+        );
     }
 }
 
@@ -123,6 +138,24 @@ if (isset($_POST['save_ip_lists'])) {
         admin_notify(
             (new AdminAlert)->adminAuthPolicyChangedMsg(admin_actor_name(), $changes, admin_actor_ip()),
             'Sign-in policy changed'
+        );
+
+        // Highest severity in the vocabulary: a non-empty allowlist denies
+        // every other IP before a password is checked, so this is the entry an
+        // operator who just locked the panel out will be looking for.
+        notify_admin(
+            $conn,
+            'admin.auth_policy_changed',
+            'Sign-in IP policy changed',
+            admin_actor_name() . ' updated ' . implode(' and ', array_keys($changes))
+                . '. Allowlist now has ' . $allowValidCount . ' entrie(s), blocklist ' . $blockValidCount . '.',
+            array(
+                'severity'            => 'danger',
+                'link'                => '/admin/auth_policy.php',
+                'source'              => 'admin',
+                'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+                'meta'                => array('changes' => $changes),
+            )
         );
     }
 }

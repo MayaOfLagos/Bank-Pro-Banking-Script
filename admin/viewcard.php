@@ -28,6 +28,43 @@ if (isset($_POST['hold_card'])) {
         (new AdminAlert)->adminCardStatusChangedMsg(admin_actor_name(), (string)($cardCheck['card_name'] ?? ''), '**** ' . substr(preg_replace('/\D+/', '', (string)($cardCheck['card_number'] ?? '')), -4), 'paused', admin_actor_ip()),
         'Customer card paused'
     );
+
+    // Never the full PAN in a notification body — the bell renders on every
+    // admin page and the customer row is readable from the inbox list.
+    $cardMask = '**** ' . substr(preg_replace('/\D+/', '', (string)($cardCheck['card_number'] ?? '')), -4);
+    notify_admin(
+        $conn,
+        'admin.card_paused',
+        'Customer card paused',
+        admin_actor_name() . ' paused ' . (string)($cardCheck['card_name'] ?? 'a card') . ' ' . $cardMask . '.',
+        array(
+            'severity'            => 'warning',
+            'link'                => '/admin/viewcard.php?id=' . rawurlencode((string)$id),
+            'source'              => 'admin',
+            'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+            'meta'                => array('card_mask' => $cardMask, 'user_id' => (int)($cardCheck['user_id'] ?? 0)),
+        )
+    );
+
+    // Customer-visible outcome: their card will now decline at the till.
+    if (!empty($cardCheck['user_id'])) {
+        notify_user(
+            $conn,
+            (int)$cardCheck['user_id'],
+            'card.paused',
+            'Your card has been paused',
+            'Card ' . $cardMask . ' is temporarily on hold and will decline new transactions. '
+                . 'Contact support if you did not request this.',
+            array(
+                'severity'            => 'warning',
+                'link'                => '/cards',
+                'source'              => 'admin',
+                'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+                'meta'                => array('card_mask' => $cardMask),
+            )
+        );
+    }
+
     toast_flash('success', 'Card placed on hold', 'Done');
     header('Location: ./viewcard.php?id=' . rawurlencode((string)$id));
     exit;
@@ -49,6 +86,40 @@ if (isset($_POST['active_card'])) {
         (new AdminAlert)->adminCardStatusChangedMsg(admin_actor_name(), (string)($cardCheck['card_name'] ?? ''), '**** ' . substr(preg_replace('/\D+/', '', (string)($cardCheck['card_number'] ?? '')), -4), 'activated', admin_actor_ip()),
         'Customer card activated'
     );
+
+    $cardMask = '**** ' . substr(preg_replace('/\D+/', '', (string)($cardCheck['card_number'] ?? '')), -4);
+    notify_admin(
+        $conn,
+        'admin.card_activated',
+        'Customer card activated',
+        admin_actor_name() . ' activated ' . (string)($cardCheck['card_name'] ?? 'a card') . ' ' . $cardMask . '.',
+        array(
+            'severity'            => 'info',
+            'link'                => '/admin/viewcard.php?id=' . rawurlencode((string)$id),
+            'source'              => 'admin',
+            'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+            'meta'                => array('card_mask' => $cardMask, 'user_id' => (int)($cardCheck['user_id'] ?? 0)),
+        )
+    );
+
+    // Customer-visible outcome: the instrument is now spendable.
+    if (!empty($cardCheck['user_id'])) {
+        notify_user(
+            $conn,
+            (int)$cardCheck['user_id'],
+            'card.activated',
+            'Your card is active',
+            'Card ' . $cardMask . ' has been activated and is ready to use.',
+            array(
+                'severity'            => 'success',
+                'link'                => '/cards',
+                'source'              => 'admin',
+                'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+                'meta'                => array('card_mask' => $cardMask),
+            )
+        );
+    }
+
     toast_flash('success', 'Card activated', 'Done');
     header('Location: ./viewcard.php?id=' . rawurlencode((string)$id));
     exit;

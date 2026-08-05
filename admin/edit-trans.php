@@ -66,6 +66,25 @@ if (isset($_POST['update_trans'])) {
         'Posted transaction edited'
     );
 
+    // Operator feed only — no notify_user(). Rewriting a settled row is a
+    // back-office ledger correction; the customer's balance is untouched by
+    // this form, so there is no customer-visible outcome to announce.
+    notify_admin(
+        $conn,
+        'admin.transaction_edited',
+        'Posted transaction edited',
+        admin_actor_name() . ' edited transaction ' . $reference
+            . ($customer !== '' ? ' on ' . $customer . "'s account" : '')
+            . '. Fields changed: ' . ($changes ? implode(', ', array_keys($changes)) : 'none') . '.',
+        array(
+            'severity'            => $changes ? 'warning' : 'info',
+            'link'                => '/admin/edit-trans.php?id=' . $id,
+            'source'              => 'admin',
+            'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+            'meta'                => array('reference' => $reference, 'changes' => $changes),
+        )
+    );
+
     toast_alert('success', 'Transaction updated successfully', 'Approved');
     header('Location:' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
     exit;
@@ -96,6 +115,25 @@ if (isset($_POST['trans_delete'])) {
     admin_notify(
         (new AdminAlert)->adminTransactionDeletedMsg(admin_actor_name(), $reference, $snapshot, $customer, admin_actor_ip()),
         'Transaction deleted'
+    );
+
+    // Operator feed only. Same reasoning as the edit branch: this is ledger
+    // maintenance, and telling a customer "a transaction disappeared" without
+    // a balance change behind it would generate support calls, not clarity.
+    notify_admin(
+        $conn,
+        'admin.transaction_deleted',
+        'Transaction deleted from the ledger',
+        admin_actor_name() . ' permanently deleted transaction ' . $reference
+            . ($customer !== '' ? ' on ' . $customer . "'s account" : '')
+            . ' (' . $snapshot['Type'] . ' ' . $snapshot['Amount'] . ').',
+        array(
+            'severity'            => 'danger',
+            'link'                => '/admin/credit_debit_trans.php',
+            'source'              => 'admin',
+            'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+            'meta'                => array('reference' => $reference, 'snapshot' => $snapshot),
+        )
     );
 
     header('Location:./credit_debit_trans.php');

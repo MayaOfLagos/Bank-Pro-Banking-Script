@@ -27,6 +27,7 @@ $routeTitles = [
     '/cards' => 'Cards',
     '/loans' => 'Loans',
     '/tickets' => 'Support',
+    '/notifications' => 'Notifications',
     '/profile' => 'Profile',
     '/profile/edit' => 'Edit Personal Details',
     '/profile/security' => 'Security',
@@ -146,7 +147,11 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-sr
 <html lang="en" data-app-name="<?= htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') ?>">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- maximum-scale=1 suppresses double-tap zoom; viewport-fit=cover lets the
+       shell paint under the notch. Neither stops iOS' focus-zoom on small form
+       controls — the 16px rule in style.css does. Keep in sync with
+       frontend/user-portal/index.html. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex,nofollow" />
   <meta name="application-name" content="<?= htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') ?>" />
   <title><?= htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') ?> - <?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?></title>

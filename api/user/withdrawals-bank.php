@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../../include/userClass.php';
+require_once __DIR__ . '/../../include/notifications.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
@@ -51,7 +52,24 @@ try {
     'reference_id' => $ref,
     'trans_type' => 2
   ]);
+  $withdrawalRowId = (int)$conn->lastInsertId();
   $conn->commit();
+
+  // After the commit — the balance has already moved, so a notification
+  // failure here must not (and cannot) undo it.
+  $wMoney = user_currency_symbol($user) . number_format($amount, 2);
+  $wLink = '/transactions/withdrawal/' . $withdrawalRowId;
+  // The bank name is free text the customer typed; the display name is
+  // self-chosen. Both are stripped of markdown before composition — the admin
+  // body in particular is rendered, so this is the untrusted-to-staff path.
+  $wBankLabel = notify_plain($bankname, 80);
+  $wAcctName = notify_plain($acctname, 80);
+  notify_user($conn, (int)$user['id'], 'withdrawal.requested', 'Withdrawal requested',
+    'Your bank withdrawal of **' . $wMoney . '** to ' . $wBankLabel . ' is pending review. Reference `' . $ref . '`.',
+    ['severity' => 'info', 'link' => $wLink, 'meta' => ['reference' => $ref, 'amount' => $amount, 'method' => 'bank']]);
+  notify_admin($conn, 'withdrawal.requested', 'Bank withdrawal awaiting approval',
+    $wAcctName . ' requested a bank withdrawal of **' . $wMoney . '** to ' . $wBankLabel . '. Reference `' . $ref . '`.',
+    ['severity' => 'warning', 'link' => $wLink, 'meta' => ['reference' => $ref, 'user_id' => (int)$user['id'], 'amount' => $amount, 'method' => 'bank']]);
 
   $email_message = new message();
   $sendMail = new emailMessage($settings);

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../../include/userClass.php';
+require_once __DIR__ . '/../../include/notifications.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
@@ -38,6 +39,14 @@ if (in_array($newPin, ['1234', '4321', '0000', '1111', '2222', '3333', '4444', '
 
 $stmt = $conn->prepare('UPDATE users SET acct_pin=:pin WHERE id=:id');
 $stmt->execute(['pin' => $newPin, 'id' => $user['id']]);
+
+$pinName = notify_plain(trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')), 80);
+notify_user($conn, (int)$user['id'], 'profile.pin_changed', 'Your transaction PIN was changed',
+  'Your 4-digit transaction PIN was updated just now. If this was not you, contact support immediately.',
+  ['severity' => 'warning', 'link' => '/profile/security']);
+notify_admin($conn, 'profile.pin_changed', 'Customer changed their transaction PIN',
+  $pinName . ' updated their transaction PIN from the customer portal.',
+  ['severity' => 'info', 'meta' => ['user_id' => (int)$user['id']]]);
 
 // Best-effort notification — never blocks the response.
 try {

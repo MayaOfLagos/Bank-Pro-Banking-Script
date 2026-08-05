@@ -43,50 +43,115 @@ if (isset($_POST['transfer'])) {
         $fullName = $result['firstname'] . " " . $result['lastname'];
         $available_balance = (float)$result['acct_balance'] - $amount;
 
-        $addUp = $conn->prepare("UPDATE users SET acct_balance=:available_balance WHERE id=:user_id");
-        $addUp->execute(['available_balance' => $available_balance, 'user_id' => $user_id]);
-
         $reference_id = uniqid();
-        $stmt = $conn->prepare("INSERT INTO wire_transfer (amount,acct_id,bank_name,acct_name,acct_number,acct_type,acct_country,acct_swift,acct_routing,acct_remarks,created_at,wire_status,refrence_id) VALUES(:amount,:acct_id,:bank_name,:acct_name,:acct_number,:acct_type,:acct_country,:acct_swift,:acct_routing,:acct_remarks,:created_at,:status,:refrence_id)");
-        $stmt->execute([
-            'amount'       => $amount,
-            'acct_id'      => $user_id,
-            'bank_name'    => $bank_name,
-            'acct_name'    => $acct_name,
-            'acct_number'  => $acct_number,
-            'acct_type'    => $acct_type,
-            'acct_country' => $acct_country,
-            'acct_swift'   => $acct_swift,
-            'acct_routing' => $acct_routing,
-            'acct_remarks' => $acct_remarks,
-            'created_at'   => $created_at,
-            'status'       => $status,
-            'refrence_id'  => $reference_id
-        ]);
 
-        $tran_status = ['0' => 'Processing', '1' => 'Complete', '2' => 'On Hold', '3' => 'Cancelled'][$status] ?? 'Cancelled';
-        $APP_NAME    = $pageTitle;
-        $currency    = currency($result);
-        $email       = $result['acct_email'];
-        $transfer_type = "Wire Transfer";
+        // The debit and the wire row are one unit of work. Previously they were
+        // two bare statements and the INSERT named a `created_at` column that
+        // does not exist — the table's column is `createdAt` — so every
+        // admin-originated wire debited the customer and then fatalled, leaving
+        // money gone with no wire record and nothing to reconcile against.
+        $wireBooked = true;
+        $conn->beginTransaction();
+        try {
+            $addUp = $conn->prepare("UPDATE users SET acct_balance=:available_balance WHERE id=:user_id");
+            $addUp->execute(['available_balance' => $available_balance, 'user_id' => $user_id]);
 
-        $message = $sendMail->adwireTransfer($currency, $amount, $available_balance, $fullName, $APP_NAME, $tran_status, $bank_name, $acct_name, $acct_number, $acct_country, $created_at, $reference_id, $transfer_type);
-        $email_message->send_to_both($email, $message, "[WIRE TRANSACTION] - $APP_NAME");
+            $stmt = $conn->prepare("INSERT INTO wire_transfer (amount,acct_id,bank_name,acct_name,acct_number,acct_type,acct_country,acct_swift,acct_routing,acct_remarks,createdAt,wire_status,refrence_id) VALUES(:amount,:acct_id,:bank_name,:acct_name,:acct_number,:acct_type,:acct_country,:acct_swift,:acct_routing,:acct_remarks,:created_at,:status,:refrence_id)");
+            $stmt->execute([
+                'amount'       => $amount,
+                'acct_id'      => $user_id,
+                'bank_name'    => $bank_name,
+                'acct_name'    => $acct_name,
+                'acct_number'  => $acct_number,
+                'acct_type'    => $acct_type,
+                'acct_country' => $acct_country,
+                'acct_swift'   => $acct_swift,
+                'acct_routing' => $acct_routing,
+                'acct_remarks' => $acct_remarks,
+                'created_at'   => $created_at,
+                'status'       => $status,
+                'refrence_id'  => $reference_id
+            ]);
 
-        // Alert the operators: money left a customer account on an operator's
-        // say-so, and a status of Complete skips the approve/hold/decline review.
-        $beneficiary = [
-            'Bank name'      => $bank_name,
-            'Account name'   => $acct_name,
-            'Account number' => $acct_number,
-            'Country'        => $acct_country
-        ];
-        admin_notify(
-            (new AdminAlert)->adminOriginatedWireMsg(admin_actor_name(), $fullName, $currency, $amount, $beneficiary, $tran_status, $reference_id, admin_actor_ip()),
-            'Wire transfer originated by an operator'
-        );
+            $conn->commit();
+        } catch (Throwable $wireError) {
+            $conn->rollBack();
+            $wireBooked = false;
+            error_log('[admin-transfer] wire not booked, balance restored: ' . $wireError->getMessage());
+            toast_alert('error', 'The transfer could not be booked. The balance was not changed.', 'Transfer failed');
+        }
 
-        toast_alert('success', 'Transfer Successful', 'Approved');
+        // toast_alert() only echoes — it does not stop the request — so the
+        // confirmation email, the operator alert and both notifications have to
+        // be gated explicitly. Without this a rolled-back transfer would still
+        // tell the customer their money had moved.
+        if ($wireBooked) {
+            $tran_status = ['0' => 'Processing', '1' => 'Complete', '2' => 'On Hold', '3' => 'Cancelled'][$status] ?? 'Cancelled';
+            $APP_NAME    = $pageTitle;
+            $currency    = currency($result);
+            $email       = $result['acct_email'];
+            $transfer_type = "Wire Transfer";
+
+            $message = $sendMail->adwireTransfer($currency, $amount, $available_balance, $fullName, $APP_NAME, $tran_status, $bank_name, $acct_name, $acct_number, $acct_country, $created_at, $reference_id, $transfer_type);
+            $email_message->send_to_both($email, $message, "[WIRE TRANSACTION] - $APP_NAME");
+
+            // Alert the operators: money left a customer account on an operator's
+            // say-so, and a status of Complete skips the approve/hold/decline review.
+            $beneficiary = [
+                'Bank name'      => $bank_name,
+                'Account name'   => $acct_name,
+                'Account number' => $acct_number,
+                'Country'        => $acct_country
+            ];
+            admin_notify(
+                (new AdminAlert)->adminOriginatedWireMsg(admin_actor_name(), $fullName, $currency, $amount, $beneficiary, $tran_status, $reference_id, admin_actor_ip()),
+                'Wire transfer originated by an operator'
+            );
+
+            // Beneficiary fields are free-text form input composed into markdown
+            // bodies that both inboxes render.
+            $wireBankLabel = notify_plain($bank_name, 80);
+            $wireAcctLabel = notify_plain($acct_name, 80);
+            $wireCustLabel = notify_plain($fullName, 80);
+
+            notify_admin(
+                $conn,
+                'admin.transfer_executed',
+                'Wire transfer originated by an operator',
+                admin_actor_name() . ' sent ' . $currency . number_format($amount, 2) . ' from ' . $wireCustLabel
+                    . ' to ' . $wireAcctLabel . ' at ' . $wireBankLabel . ' (' . $tran_status . '). Ref ' . $reference_id . '.',
+                array(
+                    'severity'            => $status === '1' ? 'danger' : 'warning',
+                    'link'                => '/admin/viewwire-trans.php',
+                    'source'              => 'admin',
+                    'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+                    'meta'                => array('user_id' => (int)$user_id, 'amount' => $amount, 'reference' => $reference_id, 'status' => $tran_status),
+                )
+            );
+
+            // Customer-visible outcome: their balance dropped and a wire is on its
+            // way in their name. Cancelled transfers still debited nothing they can
+            // see differently, so the same message covers all four statuses with
+            // the status spelled out.
+            notify_user(
+                $conn,
+                (int)$user_id,
+                'transfer.executed',
+                'A wire transfer was processed on your account',
+                $currency . number_format($amount, 2) . ' to ' . $wireAcctLabel . ' at ' . $wireBankLabel
+                    . ' is now ' . $tran_status . '. Reference ' . $reference_id . '. '
+                    . 'Your available balance is ' . $currency . number_format($available_balance, 2) . '.',
+                array(
+                    'severity'            => 'info',
+                    'link'                => '/transactions',
+                    'source'              => 'admin',
+                    'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+                    'meta'                => array('reference' => $reference_id, 'amount' => $amount, 'status' => $tran_status),
+                )
+            );
+
+            toast_alert('success', 'Transfer Successful', 'Approved');
+        }
     }
 }
 ?>

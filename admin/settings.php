@@ -277,6 +277,25 @@ if (isset($_POST['save_settings'])) {
             (new AdminAlert)->adminSettingsChangedMsg(admin_actor_name(), $changed, admin_actor_ip()),
             'Platform settings changed'
         );
+
+        // Operator feed only. Settings are platform configuration; a customer
+        // sees the effect (a limit, a disabled transfer button) at the moment
+        // they hit it, and does not need a bell entry about a table they
+        // cannot see.
+        notify_admin(
+            $conn,
+            'admin.settings_changed',
+            'Platform settings changed',
+            admin_actor_name() . ' changed ' . count($changed) . ' setting(s): '
+                . implode(', ', array_keys($changed)) . '.',
+            array(
+                'severity'            => 'warning',
+                'link'                => '/admin/settings.php',
+                'source'              => 'admin',
+                'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+                'meta'                => array('changed' => array_keys($changed)),
+            )
+        );
     }
 
     $reload = $conn->query("SELECT * FROM settings WHERE id=1");

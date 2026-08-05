@@ -3,6 +3,7 @@ require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../../include/smtp.php';
 require_once __DIR__ . '/../../include/transfer_otp.php';
 require_once __DIR__ . '/../../include/admin_alerts.php';
+require_once __DIR__ . '/../../include/notifications.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
@@ -95,6 +96,7 @@ try {
       'acct_name' => $temp['acct_name_id'], 'acct_number' => $temp['acct_number'], 'acct_type' => $temp['acct_type'],
       'acct_remarks' => $temp['acct_remarks'], 'refrence_id' => $ref,
     ]);
+    $transferRowId = (int)$conn->lastInsertId();
     $_SESSION['dom_transfer'] = $ref;
   } else {
     $insert = $conn->prepare('INSERT INTO wire_transfer (amount,acct_id,refrence_id,bank_name,acct_name,acct_number,acct_type,acct_country,acct_swift,acct_routing,acct_remarks) VALUES(:amount,:acct_id,:refrence_id,:bank_name,:acct_name,:acct_number,:acct_type,:acct_country,:acct_swift,:acct_routing,:acct_remarks)');
@@ -104,6 +106,7 @@ try {
       'acct_country' => $temp['acct_country'] ?? '', 'acct_swift' => $temp['acct_swift'] ?? '',
       'acct_routing' => $temp['acct_routing'] ?? '', 'acct_remarks' => $temp['acct_remarks'],
     ]);
+    $transferRowId = (int)$conn->lastInsertId();
     $_SESSION['wire_transfer'] = $ref;
   }
 
@@ -125,6 +128,39 @@ try {
   // session keys unset so the customer cannot even retry. A notification must
   // never be able to turn a committed money movement into a failure response.
   try {
+    // In-app notifications. Placed inside this same protective try for the
+    // reason spelled out above: notify_*() cannot throw, but the expressions
+    // that build its ARGUMENTS run before it can protect anything, and we are
+    // still inside the handler-wide catch.
+    $transferKind = $isDomestic ? 'Domestic transfer' : 'Wire transfer';
+    $transferLink = '/transactions/' . ($isDomestic ? 'domestic' : 'wire') . '/' . (int)$transferRowId;
+    // Beneficiary name and bank are free text the customer typed, and the
+    // display name is self-chosen. All three are stripped of markdown before
+    // composition so nothing user-supplied can inject a link or raw HTML into
+    // a body that gets rendered — the admin one most of all.
+    $customerName = notify_plain(trim((string)($lockedUser['firstname'] ?? '') . ' ' . (string)($lockedUser['lastname'] ?? '')), 80);
+    $beneficiaryName = notify_plain($temp['acct_name_id'] ?? '', 80);
+    $beneficiaryBank = notify_plain($temp['bank_name'] ?? '', 80);
+    $money = user_currency_symbol($lockedUser) . number_format($amount, 2);
+
+    notify_user(
+      $conn,
+      (int)$lockedUser['id'],
+      'transfer.submitted',
+      $transferKind . ' submitted',
+      'Your ' . strtolower($transferKind) . ' of **' . $money . '** to ' . $beneficiaryName .
+      ' is being reviewed. Reference `' . $ref . '`.',
+      array('severity' => 'info', 'link' => $transferLink, 'meta' => array('reference' => $ref, 'amount' => $amount))
+    );
+    notify_admin(
+      $conn,
+      'transfer.submitted',
+      $transferKind . ' awaiting approval',
+      $customerName . ' submitted a ' . strtolower($transferKind) . ' of **' . $money . '** to ' .
+      $beneficiaryBank . '. Reference `' . $ref . '`.',
+      array('severity' => 'warning', 'link' => $transferLink, 'meta' => array('reference' => $ref, 'user_id' => (int)$lockedUser['id'], 'amount' => $amount))
+    );
+
     $beneficiary = [
       'Bank name' => (string)($temp['bank_name'] ?? ''),
       'Account name' => (string)($temp['acct_name_id'] ?? ''),

@@ -42,6 +42,20 @@ $update->execute([
     'token' => $token,
 ]);
 
+// Unauthenticated endpoint, but not a spam vector: reaching this line
+// required a valid, unexpired, single-use reset token bound to this exact
+// email, and the token was just consumed by the UPDATE above. One row per
+// genuine reset.
+require_once __DIR__ . '/../../include/notifications.php';
+$resetName = notify_plain(trim((string)($user['firstname'] ?? '') . ' ' . (string)($user['lastname'] ?? '')), 80);
+$resetEmailLabel = notify_plain($email, 120);
+notify_user($conn, (int)$user['id'], 'profile.password_changed', 'Your password was reset',
+    'Your password was reset using the "forgot password" link. If this was not you, contact support immediately.',
+    ['severity' => 'warning', 'link' => '/profile/security', 'meta' => ['via' => 'reset_token']]);
+notify_admin($conn, 'profile.password_changed', 'Customer reset their password',
+    ($resetName !== '' ? $resetName : $resetEmailLabel) . ' completed a password reset via the emailed link.',
+    ['severity' => 'info', 'meta' => ['user_id' => (int)$user['id'], 'via' => 'reset_token']]);
+
 auth_send_password_changed_email($user, $appName, $mailer, $settings);
 
 auth_json(200, [

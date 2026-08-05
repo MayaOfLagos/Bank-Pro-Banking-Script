@@ -76,6 +76,41 @@ if ($adjustError === '' && isset($_POST['credit'])) {
         'Customer account credited manually'
     );
 
+    // Operator feed. Fires only after both the balance UPDATE and the ledger
+    // INSERT have gone through.
+    notify_admin(
+        $conn,
+        'admin.user_funded',
+        'Account credited manually',
+        admin_actor_name() . ' credited ' . $currency . number_format($amount, 2)
+            . ' to ' . $fullName . '. New balance ' . $currency . number_format($available_balance, 2) . '.',
+        array(
+            'severity'            => 'warning',
+            'link'                => '/admin/view_users.php?id=' . (int)$user_id,
+            'source'              => 'admin',
+            'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+            'meta'                => array('user_id' => (int)$user_id, 'amount' => $amount, 'reference' => $trans_id),
+        )
+    );
+
+    // Customer-visible outcome: their money changed. This is one of the very
+    // few admin actions the customer is told about (see report).
+    notify_user(
+        $conn,
+        (int)$user_id,
+        'account.credited',
+        'Your account was credited',
+        'A credit of ' . $currency . number_format($amount, 2) . ' was posted to your account. '
+            . 'Your available balance is now ' . $currency . number_format($available_balance, 2) . '.',
+        array(
+            'severity'            => 'success',
+            'link'                => '/transactions',
+            'source'              => 'admin',
+            'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+            'meta'                => array('reference' => $trans_id, 'amount' => $amount),
+        )
+    );
+
     toast_alert('success', 'Account Funded Successfully', 'Approved');
 } elseif ($adjustError === '' && isset($_POST['debit'])) {
     $user_id      = $_POST['user_id'];
@@ -125,6 +160,37 @@ if ($adjustError === '' && isset($_POST['credit'])) {
         admin_notify(
             (new AdminAlert)->adminManualBalanceAdjustmentMsg(admin_actor_name(), 'debit', $fullName, $currency, $amount, $result['acct_balance'], $available_balance, $trans_id, $description, admin_actor_ip()),
             'Customer account debited manually'
+        );
+
+        notify_admin(
+            $conn,
+            'admin.user_debited',
+            'Account debited manually',
+            admin_actor_name() . ' debited ' . $currency . number_format($amount, 2)
+                . ' from ' . $fullName . '. New balance ' . $currency . number_format($available_balance, 2) . '.',
+            array(
+                'severity'            => 'warning',
+                'link'                => '/admin/view_users.php?id=' . (int)$user_id,
+                'source'              => 'admin',
+                'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+                'meta'                => array('user_id' => (int)$user_id, 'amount' => $amount, 'reference' => $trans_id),
+            )
+        );
+
+        notify_user(
+            $conn,
+            (int)$user_id,
+            'account.debited',
+            'Your account was debited',
+            'A debit of ' . $currency . number_format($amount, 2) . ' was posted to your account. '
+                . 'Your available balance is now ' . $currency . number_format($available_balance, 2) . '.',
+            array(
+                'severity'            => 'warning',
+                'link'                => '/transactions',
+                'source'              => 'admin',
+                'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+                'meta'                => array('reference' => $trans_id, 'amount' => $amount),
+            )
         );
 
         toast_alert('success', 'Account Debited Successfully', 'Approved');

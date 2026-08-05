@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../../include/userClass.php';
+require_once __DIR__ . '/../../include/notifications.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
@@ -47,6 +48,16 @@ $stmt->execute([
   'card_type' => $cardType,
   'card_reason' => $cardReason
 ]);
+
+// notify_plain(): the name is self-chosen and the body is markdown that the
+// portal renders. $cardType is allowlisted above and the reference is hex.
+$cardName = notify_plain(trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')), 80);
+notify_user($conn, (int)$user['id'], 'card.requested', 'Card request received',
+  'Your ' . $cardType . ' card request is being reviewed. Reference `' . $referenceId . '`.',
+  ['severity' => 'info', 'link' => '/cards', 'meta' => ['reference' => $referenceId, 'card_type' => $cardType]]);
+notify_admin($conn, 'card.requested', 'Card request awaiting approval',
+  $cardName . ' requested a ' . $cardType . ' card. Reference `' . $referenceId . '`.',
+  ['severity' => 'warning', 'link' => '/cards', 'meta' => ['reference' => $referenceId, 'user_id' => (int)$user['id'], 'card_type' => $cardType]]);
 
 $email_message = new message();
 $sendMail = new emailMessage($settings);

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../../include/userClass.php';
+require_once __DIR__ . '/../../include/notifications.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
@@ -57,6 +58,16 @@ $stmt->execute([
   'image' => $filename,
   'refrence_id' => $referenceId
 ]);
+
+$depositRowId = (int)$conn->lastInsertId();
+$depositMoney = user_currency_symbol($user) . number_format($amount, 2);
+$depositName = notify_plain(trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')), 80);
+notify_user($conn, (int)$user['id'], 'deposit.recorded', 'Deposit submitted',
+  'We received your deposit of **' . $depositMoney . '**. It will be credited once an agent confirms the payment. Reference `' . $referenceId . '`.',
+  ['severity' => 'info', 'link' => '/transactions/deposit/' . $depositRowId, 'meta' => ['reference' => $referenceId, 'amount' => $amount]]);
+notify_admin($conn, 'deposit.recorded', 'Deposit awaiting confirmation',
+  $depositName . ' submitted a deposit of **' . $depositMoney . '** with proof of payment. Reference `' . $referenceId . '`.',
+  ['severity' => 'warning', 'link' => '/transactions/deposit/' . $depositRowId, 'meta' => ['reference' => $referenceId, 'user_id' => (int)$user['id'], 'amount' => $amount]]);
 
 $email_message = new message();
 $sendMail = new emailMessage($settings);

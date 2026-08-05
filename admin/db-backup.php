@@ -22,6 +22,10 @@
 require_once __DIR__ . '/include/session.php';
 require_once __DIR__ . '/include/adminloginFunction.php';
 require_once __DIR__ . '/include/adminClass.php';
+// The download branch below returns before layout/header.php, which is where
+// every other page picks up the notification helpers — so require them here.
+// __DIR__-relative because PHP-FPM's CWD is not the script directory.
+require_once __DIR__ . '/../include/notifications.php';
 
 if (empty($_SESSION['admin'])) {
     header('Location: ./login.php');
@@ -203,6 +207,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['download_backup'])) {
         ),
         'Database backup downloaded'
     );
+
+    // $conn comes from adminloginFunction.php's dbConnect(), not from
+    // layout/header.php — this branch never reaches the header.
+    if (isset($conn) && $conn instanceof PDO) {
+        notify_admin(
+            $conn,
+            'admin.backup_downloaded',
+            'Database backup downloaded',
+            admin_actor_name() . ' downloaded ' . $filename . ' ('
+                . number_format($downloadBytes) . ' bytes) from ' . admin_actor_ip() . '.',
+            array(
+                'severity'            => 'danger',
+                'link'                => '/admin/db-backup.php',
+                'source'              => 'admin',
+                'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+                'meta'                => array('filename' => $filename, 'bytes' => $downloadBytes),
+            )
+        );
+    }
     exit;
 }
 
@@ -235,6 +258,20 @@ if (isset($_POST['create_backup'])) {
             admin_notify(
                 (new AdminAlert)->adminBackupLifecycleMsg(admin_actor_name(), 'created', $filename, admin_actor_ip()),
                 'Database backup created'
+            );
+            notify_admin(
+                $conn,
+                'admin.backup_created',
+                'Database backup created',
+                admin_actor_name() . ' created ' . $filename . ' ('
+                    . number_format($sizeBytes) . ' bytes).',
+                array(
+                    'severity'            => 'info',
+                    'link'                => '/admin/db-backup.php',
+                    'source'              => 'admin',
+                    'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+                    'meta'                => array('filename' => $filename, 'bytes' => $sizeBytes),
+                )
             );
             toast_alert('success', 'Backup created: ' . $filename . ' (' . number_format($sizeBytes) . ' bytes)', 'Success');
         }
@@ -273,6 +310,19 @@ if (isset($_POST['delete_backup'])) {
             admin_notify(
                 (new AdminAlert)->adminBackupLifecycleMsg(admin_actor_name(), 'deleted', $filename, admin_actor_ip()),
                 'Database backup deleted'
+            );
+            notify_admin(
+                $conn,
+                'admin.backup_deleted',
+                'Database backup deleted',
+                admin_actor_name() . ' deleted ' . $filename . '. A recovery point is gone.',
+                array(
+                    'severity'            => 'danger',
+                    'link'                => '/admin/db-backup.php',
+                    'source'              => 'admin',
+                    'created_by_admin_id' => isset($_SESSION['admin_id']) ? (int)$_SESSION['admin_id'] : null,
+                    'meta'                => array('filename' => $filename, 'row_removed' => $rowRemoved, 'file_removed' => $fileRemoved),
+                )
             );
         }
         // Report what actually happened. The old unconditional success toast

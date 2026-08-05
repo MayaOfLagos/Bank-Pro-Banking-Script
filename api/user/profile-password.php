@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../../include/userClass.php';
+require_once __DIR__ . '/../../include/notifications.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
@@ -26,6 +27,14 @@ if ($newPassword === $oldPassword) {
 $hash = password_hash($newPassword, PASSWORD_BCRYPT);
 $stmt = $conn->prepare('UPDATE users SET acct_password=:acct_password WHERE id=:id');
 $stmt->execute(['acct_password' => $hash, 'id' => $user['id']]);
+
+$pwName = notify_plain(trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')), 80);
+notify_user($conn, (int)$user['id'], 'profile.password_changed', 'Your password was changed',
+  'Your sign-in password was changed just now. If this was not you, contact support immediately.',
+  ['severity' => 'warning', 'link' => '/profile/security']);
+notify_admin($conn, 'profile.password_changed', 'Customer changed their password',
+  $pwName . ' changed their sign-in password from the customer portal.',
+  ['severity' => 'info', 'meta' => ['user_id' => (int)$user['id']]]);
 
 $email_message = new message();
 $sendMail = new emailMessage($settings);

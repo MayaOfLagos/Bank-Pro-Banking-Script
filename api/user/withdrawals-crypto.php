@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../../include/userClass.php';
+require_once __DIR__ . '/../../include/notifications.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
@@ -49,7 +50,24 @@ try {
     'reference_id' => $ref,
     'trans_type' => 2
   ]);
+  $withdrawalRowId = (int)$conn->lastInsertId();
   $conn->commit();
+
+  // After the commit — the balance has already moved, so a notification
+  // failure here must not (and cannot) undo it.
+  $wName = notify_plain(trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')), 80);
+  // withdraw_method is free-form payload text with no allowlist, so it is the
+  // one fragment here an attacker fully controls. Stripped before it reaches a
+  // markdown body — especially the admin one.
+  $wMethodLabel = notify_plain($withdrawMethod, 40);
+  $wMoney = user_currency_symbol($user) . number_format($amount, 2);
+  $wLink = '/transactions/withdrawal/' . $withdrawalRowId;
+  notify_user($conn, (int)$user['id'], 'withdrawal.requested', 'Withdrawal requested',
+    'Your ' . $wMethodLabel . ' withdrawal of **' . $wMoney . '** is pending review. Reference `' . $ref . '`.',
+    ['severity' => 'info', 'link' => $wLink, 'meta' => ['reference' => $ref, 'amount' => $amount, 'method' => $withdrawMethod]]);
+  notify_admin($conn, 'withdrawal.requested', 'Crypto withdrawal awaiting approval',
+    $wName . ' requested a ' . $wMethodLabel . ' withdrawal of **' . $wMoney . '**. Reference `' . $ref . '`.',
+    ['severity' => 'warning', 'link' => $wLink, 'meta' => ['reference' => $ref, 'user_id' => (int)$user['id'], 'amount' => $amount, 'method' => $withdrawMethod]]);
 
   $email_message = new message();
   $sendMail = new emailMessage($settings);
