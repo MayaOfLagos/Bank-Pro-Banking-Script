@@ -5,10 +5,19 @@ import { BackspaceIcon } from '@heroicons/vue/24/outline'
 /**
  * Shuffled PIN pad.
  *
- * The digit keys are re-ordered every time the pad mounts (and on demand via
- * `reshuffle()`), so the physical position of a digit is never stable. That
- * defeats shoulder-surfers memorising a finger pattern and positional
- * keyloggers that only capture tap coordinates.
+ * Modelled on the legacy .legacy-reference/pin.php pad, which re-ran its
+ * jQuery `.shuffle()` on every keypress. The digit keys are therefore
+ * re-ordered on mount, after each accepted digit, and whenever the value is
+ * cleared — so the physical position of a digit is never stable, defeating
+ * shoulder-surfers memorising a finger pattern and positional keyloggers that
+ * only capture tap coordinates.
+ *
+ * Two deliberate departures from the legacy pad:
+ *  - it replaced the DOM nodes, so the keys visibly jumped; here the 3x4 grid
+ *    is fixed and only the labels swap, which is the same security property
+ *    without the layout thrash;
+ *  - it blocked the keyboard outright (`keypress` -> preventDefault), locking
+ *    out keyboard-only users. Physical digit keys work here instead.
  *
  * The shuffle is a presentation-layer concern only: the value emitted through
  * `v-model` is the plain PIN string, so callers keep whatever request contract
@@ -83,6 +92,10 @@ function append(digit) {
   if (props.disabled || isFull.value) return
   const next = `${value.value}${digit}`
   emit('update:modelValue', next)
+  // Re-shuffle after every accepted digit, matching the legacy pad. This is the
+  // property that makes the pad worth having: an observer who watches the whole
+  // entry sees four taps whose positions imply nothing about the digits.
+  reshuffle()
   if (next.length >= props.length) emit('complete', next)
 }
 
