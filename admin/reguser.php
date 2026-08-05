@@ -86,9 +86,17 @@ if (isset($_POST['register'])) {
             $APP_NAME = $pageTitle;
             $APP_URL  = WEB_URL;
 
+            // Two bodies, not one. The customer's copy carries the temporary
+            // password and PIN because they need them to sign in; the admin
+            // copy passes $forAdmin = true, which swaps that block for a
+            // notice. Sending the single shared body to WEB_EMAIL — as this
+            // did — left every customer's plaintext password and transaction
+            // PIN sitting in the shared operations mailbox in perpetuity,
+            // even though admin/reguser.php only ever stores the bcrypt hash.
             $message = $sendMail->regMsg($currency, $acct_balance, $fullName, $acct_type, $acct_password, $APP_NAME, $APP_URL, $BANK_PHONE, $acct_no, $acct_pin);
+            $adminCopy = $sendMail->regMsg($currency, $acct_balance, $fullName, $acct_type, $acct_password, $APP_NAME, $APP_URL, $BANK_PHONE, $acct_no, $acct_pin, true);
             $email_message->send_mail($email, $message, "Welcome $fullName - $APP_NAME");
-            $email_message->send_mail(WEB_EMAIL, $message, "[New Account Registered] $fullName - $APP_NAME");
+            $email_message->send_mail(WEB_EMAIL, $adminCopy, "[New Account Registered] $fullName - $APP_NAME");
 
             if (function_exists('audit_log')) {
                 // target_id is the newly-issued account number since we
