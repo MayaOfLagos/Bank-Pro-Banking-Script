@@ -632,6 +632,147 @@ HTML;
 
 }
 
+if (!class_exists('MailBrand')) {
+
+/**
+ * Brand resolution and the small formatting helpers every template needs.
+ *
+ * Lives here rather than on a template class because there are two of those —
+ * `emailMessage` in admin/include/adminClass.php for customer receipts, and
+ * `AdminAlert` in include/admin_alerts.php for operator alerts — and both need
+ * the same brand lookup, money format and status vocabulary. Putting it in the
+ * shared mail file is what stops that plumbing being copy-pasted twice.
+ */
+final class MailBrand
+{
+    /** @var array|null Resolved once per request. */
+    private static ?array $cache = null;
+
+    /**
+     * Brand details from the `settings` row, cached for the request.
+     *
+     * Resolved lazily so merely loading a template file never touches the
+     * database, and every failure path falls back to the WEB_* constants — a
+     * missing settings table degrades to a plain but correct email, never a
+     * fatal.
+     */
+    public static function resolve(): array
+    {
+        if (self::$cache !== null) {
+            return self::$cache;
+        }
+
+        $settings = [];
+        try {
+            if (function_exists('dbConnect')) {
+                $stmt = dbConnect()->query("SELECT * FROM settings WHERE id = '1' LIMIT 1");
+                $settings = $stmt ? ($stmt->fetch(PDO::FETCH_ASSOC) ?: []) : [];
+            }
+        } catch (\Throwable $e) {
+            error_log('[MailBrand] settings lookup failed, using constants: ' . $e->getMessage());
+        }
+
+        return self::$cache = mail_brand_from_settings($settings);
+    }
+
+    /** Operator-configured platform name, for subject lines and sign-offs. */
+    public static function name(): string
+    {
+        return (string)(self::resolve()['appName'] ?? 'BankPro');
+    }
+
+    /**
+     * A MailTemplate pre-loaded with the brand.
+     *
+     * $appName overrides the name for one message. The legacy customer methods
+     * all take an $APP_NAME argument (usually $pageTitle from the admin
+     * layout); honouring it keeps their output identical in intent.
+     */
+    public static function template(string $appName = ''): MailTemplate
+    {
+        $brand = self::resolve();
+        if ($appName !== '') {
+            $brand['appName'] = $appName;
+        }
+
+        return MailTemplate::make($brand);
+    }
+
+    /** Absolute URL into the admin panel, or '' when WEB_URL is unset. */
+    public static function adminUrl(string $path): string
+    {
+        $base = (string)(self::resolve()['appUrl'] ?? '');
+
+        return $base === '' ? '' : rtrim($base, '/') . '/admin/' . ltrim($path, '/');
+    }
+
+    /** `$1,234.56` — one money format across every template. */
+    public static function money(string $currency, $amount): string
+    {
+        return $currency . number_format((float)$amount, 2, '.', ',');
+    }
+
+    /** "Wed, 05 Aug 2026 14:03:11 UTC" */
+    public static function now(): string
+    {
+        return date('D, d M Y H:i:s T');
+    }
+
+    /**
+     * Map a human status word onto a MailTemplate accent.
+     *
+     * Call sites use four vocabularies for the same three outcomes —
+     * "Successful"/"Approved"/"Complete", "Declined"/"Cancelled", "ON HOLD"/
+     * "On Hold"/"Processing" — so match loosely on lowercased text rather than
+     * an exact set.
+     */
+    public static function statusTone(string $status): string
+    {
+        $s = strtolower(trim($status));
+        if ($s === '') {
+            return 'info';
+        }
+        foreach (['success', 'complete', 'approve', 'credit', 'active'] as $needle) {
+            if (str_contains($s, $needle)) {
+                return 'success';
+            }
+        }
+        foreach (['declin', 'cancel', 'reject', 'fail', 'delet', 'block'] as $needle) {
+            if (str_contains($s, $needle)) {
+                return 'error';
+            }
+        }
+
+        return 'warning';
+    }
+
+    /**
+     * Render an old→new diff as table rows.
+     *
+     * admin/settings.php and admin/view_users.php already build this shape for
+     * audit_log(), so a caller can pass the array it already has. Accepts
+     * ['field' => ['from' => x, 'to' => y]] or a flat ['field' => 'value'].
+     */
+    public static function changeRows(array $changes): array
+    {
+        $rows = [];
+        foreach ($changes as $field => $change) {
+            $label = ucfirst(str_replace('_', ' ', (string)$field));
+            if (is_array($change) && (array_key_exists('from', $change) || array_key_exists('to', $change))) {
+                $from = (string)($change['from'] ?? '');
+                $to   = (string)($change['to'] ?? '');
+                $rows[$label] = ($from === '' ? '(empty)' : $from) . '  →  ' . ($to === '' ? '(empty)' : $to);
+            } else {
+                $rows[$label] = is_scalar($change) ? (string)$change : json_encode($change);
+            }
+        }
+
+        return $rows;
+    }
+}
+
+}
+
 if (!function_exists('mail_brand_from_settings')) {
     /**
      * Build the MailTemplate brand array from a `settings` row.

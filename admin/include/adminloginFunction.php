@@ -349,7 +349,7 @@ if (!function_exists('admin_handle_login')) {
             if ($state['locked_until'] !== null && $state['attempts'] >= ADMIN_LOGIN_MAX_ATTEMPTS) {
                 try {
                     admin_notify(
-                        (new emailMessage())->adminFailedLoginAlertMsg(
+                        (new AdminAlert())->adminFailedLoginAlertMsg(
                             $admin_email,
                             auth_flow_client_ip(),
                             substr((string)($_SERVER['HTTP_USER_AGENT'] ?? 'Unknown'), 0, 300),
@@ -419,12 +419,12 @@ if (!function_exists('admin_handle_login')) {
         try {
             $location = admin_login_geo_lookup($ip);
 
-            $emailTpl = new emailMessage();
+            $emailTpl = new AdminAlert();
             $mailer   = new message();
             $mailer->send_mail(
                 (string)$row['admin_email'],
                 $emailTpl->adminLoginAlertMsg($adminName, $ip, $location, $userAgent, $loginTime),
-                'Admin login alert - ' . emailMessage::brandName()
+                'Admin login alert - ' . MailBrand::name()
             );
         } catch (\Throwable $e) {
             error_log('[admin_login] alert email failed: ' . $e->getMessage());
