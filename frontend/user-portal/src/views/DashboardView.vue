@@ -1,28 +1,30 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { GlobeAltIcon, HomeIcon } from '@heroicons/vue/24/solid'
+import { ArrowsRightLeftIcon, PlusIcon } from '@heroicons/vue/24/solid'
 import BalanceHeader from '../components/dashboard/BalanceHeader.vue'
 import ActionButtons from '../components/dashboard/ActionButtons.vue'
 import CardCarousel from '../components/dashboard/CardCarousel.vue'
-import BudgetWidget from '../components/dashboard/BudgetWidget.vue'
+import LoanBalanceWidget from '../components/dashboard/LoanBalanceWidget.vue'
 import TransactionList from '../components/dashboard/TransactionList.vue'
+import TransferDrawer from '../components/layout/TransferDrawer.vue'
+import DepositDrawer from '../components/layout/DepositDrawer.vue'
 import ErrorState from '../components/ui/ErrorState.vue'
 import { useProfileStore } from '../stores/profile'
 import { useCards } from '../composables/useCards'
-import { useBudget } from '../composables/useBudget'
 import { formatMoney } from '../utils/format'
 
 const router = useRouter()
 
 const profileStore = useProfileStore()
 const cardsBundle = useCards()
-const budget = useBudget()
+
+// 'transfer' | 'deposit' | null — one slot so the two sheets can never stack.
+const openSheet = ref(null)
 
 onMounted(() => {
   profileStore.loadDashboard().catch(() => {})
   cardsBundle.load()
-  budget.load()
 })
 
 const balances = computed(() => profileStore.balances ?? {})
@@ -38,10 +40,42 @@ const firstName = computed(() => {
 
 const avatar = computed(() => profile.value.image || '')
 
-const dashboardActions = [
-  { label: 'Wire', icon: GlobeAltIcon, variant: 'filled', to: '/wire-transfer', ariaLabel: 'Send a wire transfer' },
-  { label: 'Domestic', icon: HomeIcon, variant: 'outlined', to: '/domestic-transfer', ariaLabel: 'Send a domestic transfer' },
-]
+const quickActions = computed(() => balances.value.quick_actions ?? {})
+
+const loanBalance = computed(() => balances.value.loan_balance ?? 0)
+const activeLoanCount = computed(() => Number(balances.value.counters?.loans_active) || 0)
+
+/**
+ * Both buttons open a drawer rather than navigating, because each one fans
+ * out to several flows. A flag the backend reports as false drops its button
+ * entirely — the endpoints behind it would just 403.
+ */
+const dashboardActions = computed(() => {
+  const actions = []
+  if (quickActions.value.can_transfer !== false) {
+    actions.push({
+      label: 'Transfer',
+      icon: ArrowsRightLeftIcon,
+      variant: 'filled',
+      ariaLabel: 'Choose a transfer type',
+      opensDialog: true,
+      expanded: openSheet.value === 'transfer',
+      onClick: () => { openSheet.value = 'transfer' },
+    })
+  }
+  if (quickActions.value.can_deposit !== false) {
+    actions.push({
+      label: 'Deposit',
+      icon: PlusIcon,
+      variant: 'outlined',
+      ariaLabel: 'Choose a deposit method',
+      opensDialog: true,
+      expanded: openSheet.value === 'deposit',
+      onClick: () => { openSheet.value = 'deposit' },
+    })
+  }
+  return actions
+})
 
 const recentTransactions = computed(() => {
   const rows = balances.value.recent_transactions
@@ -68,7 +102,7 @@ function onAddCard() {
           <span class="int">{{ currency }}{{ balanceParts.integer }}</span>
           <span v-if="balanceParts.fraction" class="frac">.{{ balanceParts.fraction }}</span>
         </p>
-        <ActionButtons :actions="dashboardActions" />
+        <ActionButtons v-if="dashboardActions.length" :actions="dashboardActions" />
       </section>
 
       <CardCarousel
@@ -78,13 +112,11 @@ function onAddCard() {
         @select-card="router.push('/cards')"
       />
 
-      <BudgetWidget
-        v-if="budget.limit.value !== null"
-        :spent="budget.spent.value"
-        :limit="budget.limit.value"
-        :currency="budget.currency.value"
-        :week-start="budget.weekStart.value"
-        :week-end="budget.weekEnd.value"
+      <LoanBalanceWidget
+        :balance="loanBalance"
+        :active-count="activeLoanCount"
+        :currency="currency"
+        @open="router.push('/loans')"
       />
 
       <TransactionList
@@ -95,6 +127,9 @@ function onAddCard() {
 
       <ErrorState v-if="cardsBundle.error.value" :message="cardsBundle.error.value" compact />
     </div>
+
+    <TransferDrawer :open="openSheet === 'transfer'" side="top" @close="openSheet = null" />
+    <DepositDrawer :open="openSheet === 'deposit'" side="top" @close="openSheet = null" />
   </div>
 </template>
 

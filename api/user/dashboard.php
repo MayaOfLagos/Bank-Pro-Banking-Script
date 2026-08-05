@@ -119,6 +119,12 @@ $loanCountStmt = $conn->prepare('SELECT COUNT(*) FROM loan WHERE acct_id=:acct_i
 $loanCountStmt->execute(['acct_id' => $userId]);
 $loanCount = (int)$loanCountStmt->fetchColumn();
 
+// loan_status 1 is Approved (see admin/viewloan-trans.php); 0, 2 and 3 are
+// pending, on hold and declined, none of which the customer owes on yet.
+$loanActiveStmt = $conn->prepare('SELECT COUNT(*) FROM loan WHERE acct_id=:acct_id AND loan_status=1');
+$loanActiveStmt->execute(['acct_id' => $userId]);
+$loanActiveCount = (int)$loanActiveStmt->fetchColumn();
+
 $cardStmt = $conn->prepare('SELECT card_name, card_status FROM card WHERE user_id=:user_id LIMIT 1');
 $cardStmt->execute(['user_id' => $userId]);
 $card = $cardStmt->fetch(PDO::FETCH_ASSOC) ?: null;
@@ -163,6 +169,7 @@ api_json(200, [
             'domestic_transfers' => $domesticCount,
             'withdrawals' => $withdrawalCount,
             'loans' => $loanCount,
+            'loans_active' => $loanActiveCount,
         ],
         'last_login' => $lastLogin,
         'card' => $card ? [

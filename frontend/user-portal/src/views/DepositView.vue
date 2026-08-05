@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
 import {
   ChevronLeftIcon,
@@ -14,6 +14,7 @@ import { useDeposit } from '../composables/useDeposit'
 import { formatMoneyInline } from '../utils/format'
 import ErrorState from '../components/ui/ErrorState.vue'
 
+const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const dep = useDeposit()
@@ -40,7 +41,12 @@ const canPickBankTab = computed(() => dep.bankDepositEnabled.value)
 const tabList = computed(() => (canPickBankTab.value ? TABS : ['Crypto']))
 
 onMounted(async () => {
+  // ?method=bank comes from the dashboard deposit drawer. Applied after meta
+  // resolves so a stale or hand-typed link cannot select a tab the admin has
+  // switched off.
+  const requested = String(route.query.method || '').toLowerCase()
   await dep.loadMeta()
+  if (requested === 'bank' && canPickBankTab.value) activeTab.value = 'Bank'
   if (!canPickBankTab.value) activeTab.value = 'Crypto'
 })
 

@@ -71,15 +71,20 @@
     </form>
 
     <template #footer>
-      <p v-if="site.registrationEnabled" class="auth-footer-note">
-        New to {{ site.brandName }}?
-        <RouterLink to="/register">Create an account</RouterLink>
-      </p>
-      <p class="auth-footer-note auth-footer-note--muted">
-        Need help signing in?
-        <a v-if="site.supportEmail" :href="`mailto:${site.supportEmail}`">Contact support</a>
-        <RouterLink v-else to="/reset-password">Contact support</RouterLink>
-      </p>
+      <!-- Held until site config settles: `registrationEnabled` defaults to
+           true, so rendering early would flash a "Create an account" link at
+           customers of a bank that has registration switched off. -->
+      <template v-if="site.settled">
+        <p v-if="site.registrationEnabled" class="auth-footer-note">
+          New to {{ site.brandName }}?
+          <RouterLink to="/register">Create an account</RouterLink>
+        </p>
+        <p class="auth-footer-note auth-footer-note--muted">
+          Need help signing in?
+          <a v-if="site.supportEmail" :href="`mailto:${site.supportEmail}`">Contact support</a>
+          <RouterLink v-else to="/reset-password">Contact support</RouterLink>
+        </p>
+      </template>
     </template>
   </AuthShell>
 </template>

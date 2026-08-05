@@ -12,6 +12,11 @@ const site = useSiteStore()
 
 const brandName = computed(() => site.brandName || 'Bank Pro')
 const logoUrl = computed(() => site.logoUrl)
+// Site config no longer blocks the mount, so the logo can arrive a beat
+// after this renders. Hold the slot (its height is reserved in CSS) rather
+// than show the fallback tile and swap it out. `settled`, not `loaded`, so
+// a failed config request still falls through to the fallback.
+const brandReady = computed(() => site.settled)
 </script>
 
 <template>
@@ -24,15 +29,17 @@ const logoUrl = computed(() => site.logoUrl)
              border, no background. Icon fallback keeps the tile only so
              something identifiable still shows for accounts without a
              logo uploaded yet. -->
-        <img
-          v-if="logoUrl"
-          :src="logoUrl"
-          :alt="`${brandName} logo`"
-          class="auth-shell__logo-free"
-        />
-        <div v-else class="auth-shell__logo">
-          <BuildingLibraryIcon class="auth-shell__logo-icon" aria-hidden="true" />
-        </div>
+        <template v-if="brandReady">
+          <img
+            v-if="logoUrl"
+            :src="logoUrl"
+            :alt="`${brandName} logo`"
+            class="auth-shell__logo-free"
+          />
+          <div v-else class="auth-shell__logo">
+            <BuildingLibraryIcon class="auth-shell__logo-icon" aria-hidden="true" />
+          </div>
+        </template>
       </div>
 
       <div class="auth-shell__card">

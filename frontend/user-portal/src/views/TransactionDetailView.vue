@@ -1,10 +1,11 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronLeftIcon, ArrowDownIcon, PrinterIcon } from '@heroicons/vue/24/solid'
+import { ChevronLeftIcon, PrinterIcon } from '@heroicons/vue/24/solid'
 import client from '../api/client'
 import ErrorState from '../components/ui/ErrorState.vue'
-import { formatMoney, coerceNumber, merchantInitials } from '../utils/format'
+import TransactionAvatar from '../components/ui/TransactionAvatar.vue'
+import { formatMoney, coerceNumber } from '../utils/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -45,18 +46,6 @@ const amountValue = computed(() => coerceNumber(tx.value.amount))
 const amountParts = computed(() => formatMoney(amountValue.value))
 const merchant = computed(() => tx.value.description || tx.value.sender_name || 'Account transaction')
 
-const category = computed(() => {
-  const name = String(merchant.value).toLowerCase()
-  if (name.includes('uber')) return 'uber'
-  if (name.includes('amazon')) return 'amazon'
-  if (name.includes('cashback') || name.includes('refund') || name.includes('reward')) return 'cashback'
-  if (name.includes('flower')) return 'flower'
-  if (isCredit.value) return 'cashback'
-  return 'default'
-})
-
-const initials = computed(() => merchantInitials(merchant.value))
-
 const statusLabel = computed(() => tx.value.status_label || '')
 const statusKind = computed(() => {
   const s = statusLabel.value.toLowerCase()
@@ -89,12 +78,22 @@ function printReceipt() {
   window.print()
 }
 
+// Only `transactions` rows name a counterparty in `sender_name`; the other
+// four sources put a title there ('Wire Transfer'), which would render as
+// "To: Wire Transfer" over the beneficiary that `extra` already carries.
+const isCounterparty = computed(() => {
+  const source = String(tx.value.source || 'transaction')
+  return source === 'transaction'
+})
+
 // `extra` carries the fields that only make sense for one source — SWIFT and
 // routing for a wire, destination wallet for a crypto withdrawal, and so on.
 const detailRows = computed(() => [
   { label: 'Type', value: tx.value.type_label || (isCredit.value ? 'Credit' : 'Debit') },
   { label: 'Reference', value: tx.value.reference_id || tx.value.refrence_id || '—', mono: true },
-  { label: isCredit.value ? 'From' : 'To', value: tx.value.sender_name || '—' },
+  ...(isCounterparty.value
+    ? [{ label: isCredit.value ? 'From' : 'To', value: tx.value.sender_name || '—' }]
+    : []),
   { label: 'Description', value: tx.value.description || '—' },
   ...(tx.value.extra || []),
   { label: 'Date', value: dateLabel.value || '—' },
@@ -124,23 +123,7 @@ const detailRows = computed(() => [
 
       <template v-else-if="transaction">
         <section class="hero">
-          <div class="avatar" :class="`avatar--${category}`" aria-hidden="true">
-            <template v-if="category === 'uber'">
-              <span class="uber-mark">Uber</span>
-            </template>
-            <template v-else-if="category === 'amazon'">
-              <span class="amazon-mark">a</span>
-            </template>
-            <template v-else-if="category === 'cashback'">
-              <ArrowDownIcon class="cashback-icon" />
-            </template>
-            <template v-else-if="category === 'flower'">
-              <span class="flower-mark">✿</span>
-            </template>
-            <template v-else>
-              {{ initials }}
-            </template>
-          </div>
+          <TransactionAvatar :transaction="tx" />
 
           <p class="amount" :class="{ 'amount--credit': isCredit }">
             <span class="amount-sign">{{ isCredit ? '+' : '-' }}</span>
@@ -235,6 +218,7 @@ const detailRows = computed(() => [
   margin: 0.15rem 0 0;
 }
 .hero {
+  --tx-avatar-size: 4rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -244,54 +228,6 @@ const detailRows = computed(() => [
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   text-align: center;
-}
-.avatar {
-  width: 4rem;
-  height: 4rem;
-  border-radius: var(--radius-pill);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.05rem;
-  font-weight: 700;
-  overflow: hidden;
-}
-.avatar--default,
-.avatar--flower {
-  background: var(--accent-tint);
-  color: var(--accent-strong);
-}
-.avatar--cashback {
-  background: var(--accent);
-  color: var(--text-on-accent);
-}
-.avatar--uber {
-  background: var(--text-primary);
-  color: var(--surface);
-}
-.avatar--amazon {
-  background: var(--text-primary);
-  color: #ff9900;
-}
-.uber-mark {
-  font-size: 1rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.amazon-mark {
-  font-family: "Comic Sans MS", "Verdana", sans-serif;
-  font-size: 1.85rem;
-  font-weight: 700;
-  line-height: 1;
-}
-.cashback-icon {
-  width: 1.6rem;
-  height: 1.6rem;
-}
-.flower-mark {
-  color: #d946ef;
-  font-size: 1.9rem;
-  line-height: 1;
 }
 .amount {
   margin: 0;

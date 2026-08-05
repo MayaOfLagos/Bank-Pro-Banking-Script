@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import client from '../api/client'
+import client, { UPLOAD_TIMEOUT } from '../api/client'
 
 /**
  * Loads /api/user/deposits-meta.php (crypto list, bank details, limits) and
@@ -52,6 +52,7 @@ export function useDeposit() {
       if (image) form.append('image', image)
       const { data } = await client.post('/api/user/deposits.php', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: UPLOAD_TIMEOUT,
       })
       if (!data?.ok) throw new Error(data?.message || 'Deposit failed')
       return data

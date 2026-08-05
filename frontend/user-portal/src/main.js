@@ -81,11 +81,17 @@ authStore.$subscribe((_, state) => {
 const siteStore = useSiteStore()
 
 const bootstrap = async () => {
-	// Fetch admin-configured branding before mount so the first paint of
-	// pre-auth screens already shows the correct logo / brand name.
-	// Failure is non-fatal — the store keeps sensible defaults.
-	await siteStore.load().catch(() => {})
-	await router.isReady()
+	// Kicked, not awaited: this used to run before the auth check in the
+	// router guard, so boot cost two serial round trips with an empty
+	// document on screen the whole time. Now the two overlap, and AuthShell
+	// holds its brand block until this settles. Failure is non-fatal — the
+	// store keeps sensible defaults.
+	siteStore.load().catch(() => {})
+	// Kept blocking: App.vue picks the shell off route.meta, so mounting
+	// before the initial navigation resolves would wrap a login page in the
+	// authenticated chrome for a frame. A guard rejection must not leave the
+	// customer on the boot placeholder forever, hence the catch.
+	await router.isReady().catch(() => {})
 	app.mount('#app')
 }
 

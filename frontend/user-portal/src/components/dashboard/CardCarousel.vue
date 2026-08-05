@@ -17,6 +17,10 @@ const activeIndex = ref(0)
 const cardList = computed(() => (Array.isArray(props.cards) ? props.cards : []))
 const hasCards = computed(() => cardList.value.length > 0)
 
+// Up to two cards sit side by side inside the box with nothing to scroll, as
+// in the reference. The third card is what turns the row into a carousel.
+const isSwipeable = computed(() => cardList.value.length > 2)
+
 let scrollListener = null
 
 function updateActiveIndex() {
@@ -26,6 +30,12 @@ function updateActiveIndex() {
   const children = Array.from(el.children)
   if (!children.length) return
   const scrollLeft = el.scrollLeft
+  // The trailing cards share the last screenful, so their snap points are
+  // never reached — at the end of the track the last card is the active one.
+  if (scrollLeft >= el.scrollWidth - el.clientWidth - 2) {
+    activeIndex.value = children.length - 1
+    return
+  }
   let closest = 0
   let closestDelta = Infinity
   children.forEach((child, i) => {
@@ -72,7 +82,13 @@ function handleSelect(card) {
 
     <div v-if="!hasCards" class="empty">No cards linked yet.</div>
 
-    <div v-else ref="scroller" class="scroller no-scrollbar" role="list">
+    <div
+      v-else
+      ref="scroller"
+      class="scroller no-scrollbar"
+      :class="{ 'scroller--swipeable': isSwipeable }"
+      role="list"
+    >
       <button
         v-for="(card, i) in cardList"
         :key="card.id ?? i"
@@ -86,7 +102,7 @@ function handleSelect(card) {
       </button>
     </div>
 
-    <div v-if="cardList.length > 1" class="dots" aria-hidden="true">
+    <div v-if="isSwipeable" class="dots" aria-hidden="true">
       <span
         v-for="(_, i) in cardList"
         :key="i"
@@ -147,23 +163,34 @@ function handleSelect(card) {
 .scroller {
   display: flex;
   gap: var(--space-3);
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  scroll-padding-inline: 0;
+  overflow: hidden;
   padding-bottom: var(--space-2);
 }
 .slot {
-  flex: 0 0 66%;
-  scroll-snap-align: start;
+  /* One or two cards share the box evenly and stay fully visible. */
+  flex: 1 1 0;
+  min-width: 0;
   background: transparent;
   border: none;
   padding: 0;
   cursor: pointer;
   text-align: left;
 }
-.slot:last-child {
-  flex-basis: 90%;
+
+/* From the third card on, the row scrolls and the next card peeks out to
+   advertise that there is more to swipe to. */
+.scroller--swipeable {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 0;
+}
+/* Just under half, so two cards stay the same size they are in the static
+   layout and the third peeks in. Every slot matches: the cards take their
+   height from their width, so an odd one out would make the row jump. */
+.scroller--swipeable .slot {
+  flex: 0 0 46%;
+  scroll-snap-align: start;
 }
 .dots {
   display: flex;

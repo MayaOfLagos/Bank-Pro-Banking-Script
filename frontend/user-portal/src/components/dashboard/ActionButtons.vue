@@ -1,8 +1,11 @@
 <script setup>
 /**
  * Pair of pill buttons. Each item in :actions can be:
- *   { label, to?, onClick?, icon?, variant: 'filled' | 'outlined', disabled? }
- * If both `to` and `onClick` are provided, click wins.
+ *   { label, to?, onClick?, icon?, variant: 'filled' | 'outlined', disabled?,
+ *     opensDialog?, expanded? }
+ * If both `to` and `onClick` are provided, click wins. Set opensDialog when
+ * the button reveals a drawer instead of navigating, so it announces itself
+ * as a disclosure rather than a link.
  */
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
@@ -44,6 +47,8 @@ function handleClick(item, event) {
         :class="[`btn--${item.variant}`, { 'btn--disabled': item.disabled }]"
         :disabled="item.disabled"
         :aria-label="item.ariaLabel || item.label"
+        :aria-haspopup="item.opensDialog ? 'dialog' : undefined"
+        :aria-expanded="item.opensDialog ? String(Boolean(item.expanded)) : undefined"
         @click="handleClick(item, $event)"
       >
         <component :is="item.icon" v-if="item.icon" class="btn-icon" aria-hidden="true" />

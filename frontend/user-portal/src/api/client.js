@@ -7,9 +7,15 @@ let onRateLimited = null
 let onServerError = null
 let onAccountHold = null
 
+// Without a timeout a stalled connection never rejects, so callers that await
+// a request before rendering (boot, route guards) wedge with no way out.
+// File uploads pass their own longer timeout.
+export const UPLOAD_TIMEOUT = 120000
+
 const client = axios.create({
   baseURL: '/',
   withCredentials: true,
+  timeout: 30000,
   headers: {
     'X-Requested-With': 'XMLHttpRequest'
   }
@@ -33,6 +39,14 @@ client.interceptors.response.use(
   (error) => {
     const status = error?.response?.status
     const message = error?.response?.data?.message || ''
+
+    if (!error?.response) {
+      // Views surface err.message directly; axios' own "timeout of 30000ms
+      // exceeded" is not something to show a customer.
+      error.message = error?.code === 'ECONNABORTED'
+        ? 'The server took too long to respond. Please try again.'
+        : 'Network error. Check your connection and try again.'
+    }
 
     if (status === 401 && typeof onUnauthorized === 'function') {
       onUnauthorized(message)

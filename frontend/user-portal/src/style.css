@@ -232,6 +232,9 @@ body {
   justify-content: center;
   align-items: center;
   margin-bottom: var(--space-2);
+  /* Tallest variant is the free logo (max-height 4.5rem). Reserved so the
+     card below doesn't jump when branding resolves after mount. */
+  min-height: 4.5rem;
 }
 /* Icon-only fallback: keep the gradient tile so accounts without a logo
    still get an identifiable brand mark. */
