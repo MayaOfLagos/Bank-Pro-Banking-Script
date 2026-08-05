@@ -144,19 +144,35 @@ if (!function_exists('admin_login_record_failure')) {
     function admin_login_record_failure(PDO $conn, int $adminId): array
     {
         try {
+            // The expiry is computed in PHP, not with MySQL's
+            // DATE_ADD(NOW(), ...), because admin_login_locked_until() reads it
+            // back with strtotime()/time(). MySQL's clock and PHP's are not
+            // necessarily the same: on this project's own dev box PHP runs UTC
+            // while MySQL runs SYSTEM (UTC+1), so a NOW()-based 15-minute lock
+            // reads back as 75 minutes — and on a host where MySQL is BEHIND
+            // PHP the lock would read as already expired, disabling the
+            // rate limiter entirely. Writing and reading with one clock removes
+            // the dependency.
+            //
+            // Assignment order also matters: MySQL evaluates SET clauses
+            // left-to-right and later clauses see already-updated values, so
+            // verify_locked_until is assigned FIRST, while verify_attempts
+            // still holds the pre-increment count. Incrementing first made
+            // `verify_attempts + 1` one too high and locked the account on the
+            // 4th failure instead of the 5th.
             $stmt = $conn->prepare(
                 'UPDATE admin
-                    SET verify_attempts = verify_attempts + 1,
-                        verify_locked_until = CASE
-                            WHEN verify_attempts + 1 >= :max THEN DATE_ADD(NOW(), INTERVAL :mins MINUTE)
+                    SET verify_locked_until = CASE
+                            WHEN verify_attempts + 1 >= :max THEN :locked_until
                             ELSE verify_locked_until
-                        END
+                        END,
+                        verify_attempts = verify_attempts + 1
                   WHERE id = :id'
             );
             $stmt->execute([
-                'id'   => $adminId,
-                'max'  => ADMIN_LOGIN_MAX_ATTEMPTS,
-                'mins' => ADMIN_LOGIN_LOCK_MINUTES,
+                'id'           => $adminId,
+                'max'          => ADMIN_LOGIN_MAX_ATTEMPTS,
+                'locked_until' => date('Y-m-d H:i:s', time() + ADMIN_LOGIN_LOCK_MINUTES * 60),
             ]);
 
             $read = $conn->prepare('SELECT verify_attempts, verify_locked_until FROM admin WHERE id = :id LIMIT 1');

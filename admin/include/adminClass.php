@@ -1120,6 +1120,51 @@ class emailMessage
         );
     }
 
+    /**
+     * A customer changed their own identity details.
+     *
+     * Distinct from adminCustomerBalanceOrEmailEditedMsg, which covers an
+     * OPERATOR editing a customer. This is the customer-initiated path
+     * (api/user/profile.php), which today writes name, date of birth, country,
+     * address and phone with no notification and no audit row — the fields a
+     * KYC file is built on can be rewritten silently.
+     */
+    public function adminCustomerProfileChangedMsg(string $customer, array $changes, string $ip = '', string $when = ''): string
+    {
+        return $this->adminNotice(
+            'Customer identity details changed',
+            'warning',
+            'KYC-relevant details were changed by the customer',
+            ['A customer updated their own identity details. These are the fields a KYC file is built on, so a change here may need re-verification.'],
+            array_merge(
+                ['Customer' => $customer],
+                self::changeRows($changes),
+                ['Source IP' => $ip, 'When' => $when !== '' ? $when : self::now()]
+            ),
+            'Review customers',
+            self::adminUrl('users.php')
+        );
+    }
+
+    /** A customer asked for a password reset link. */
+    public function adminPasswordResetRequestedMsg(string $customer, string $email, string $ip = '', string $when = ''): string
+    {
+        return $this->adminNotice(
+            'Customer password reset requested',
+            'info',
+            'A password reset link was issued',
+            ['A customer requested a password reset. A burst of these across different accounts is an account-takeover probe rather than ordinary forgetfulness.'],
+            [
+                'Customer'  => $customer,
+                'Address'   => $email,
+                'Source IP' => $ip,
+                'When'      => $when !== '' ? $when : self::now(),
+            ],
+            'Review customers',
+            self::adminUrl('users.php')
+        );
+    }
+
     /** A customer hit the failed-attempt lockout — credential-stuffing signal. */
     public function adminCustomerLockoutMsg(string $customer, int $attempts, string $lockedUntil, string $ip = '', string $when = ''): string
     {

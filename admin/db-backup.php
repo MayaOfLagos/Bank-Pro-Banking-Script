@@ -21,7 +21,6 @@
 
 require_once __DIR__ . '/include/session.php';
 require_once __DIR__ . '/include/adminloginFunction.php';
-require_once __DIR__ . '/include/adminregFunction.php';
 require_once __DIR__ . '/include/adminClass.php';
 
 if (empty($_SESSION['admin'])) {

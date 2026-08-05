@@ -1,7 +1,6 @@
 <?php
 ob_start();
 require_once("./include/adminloginFunction.php");
-require_once("./include/adminregFunction.php");
 require_once("./include/session.php");
 require_once("./include/adminClass.php");
 
