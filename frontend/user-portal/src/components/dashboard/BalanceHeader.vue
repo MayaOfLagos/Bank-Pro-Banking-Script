@@ -153,7 +153,7 @@ const { isDark, toggleTheme } = useTheme()
   width: 0.5rem;
   height: 0.5rem;
   border-radius: var(--radius-pill);
-  background: #ff4d6d;
+  background: var(--danger-fg);
   border: 2px solid transparent;
 }
 </style>

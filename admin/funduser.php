@@ -1,10 +1,38 @@
 <?php
 include_once("./layout/header.php");
 
-if (isset($_POST['credit'])) {
+// Shared gate for both manual-adjustment branches.
+//
+// Two real defects lived below: the SELECT result was used without ever being
+// checked, so a stale/removed user_id produced "Insufficient Balance" or a
+// credit against NULL rather than an error; and the amount was never validated
+// as positive. A negative amount made "credit" *reduce* the balance, and made
+// "debit" pass the `$amount > $result['acct_balance']` guard (any negative is
+// below the balance) and then compute `balance - (-100)`, i.e. a silent credit
+// booked as a debit — with a debit notification mailed to the customer.
+$adjustError  = '';
+$adjustUser   = null;
+$adjustAmount = 0.0;
+if (isset($_POST['credit']) || isset($_POST['debit'])) {
+    $checkUser = $conn->prepare("SELECT * FROM users WHERE id =:user_id");
+    $checkUser->execute(['user_id' => (int)($_POST['user_id'] ?? 0)]);
+    $adjustUser   = $checkUser->fetch(PDO::FETCH_ASSOC);
+    $rawAmount    = $_POST['amount'] ?? '';
+    $adjustAmount = (float)$rawAmount;
+    if (!$adjustUser) {
+        $adjustError = 'No such customer — pick a user from the list and try again.';
+    } elseif (!is_numeric($rawAmount) || $adjustAmount <= 0) {
+        $adjustError = 'Amount must be a positive number.';
+    }
+    if ($adjustError !== '') {
+        toast_alert('error', $adjustError, 'Rejected');
+    }
+}
+
+if ($adjustError === '' && isset($_POST['credit'])) {
     $user_id      = $_POST['user_id'];
     $sender_name  = $_POST['sender_name'];
-    $amount       = $_POST['amount'];
+    $amount       = $adjustAmount;
     $description  = $_POST['description'];
     $created_at   = $_POST['created_at'];
     $time_created = $_POST['time_created'];
@@ -12,11 +40,9 @@ if (isset($_POST['credit'])) {
     $trans_type   = 1;
     $trans_status = 1;
 
-    $checkUser = $conn->prepare("SELECT * FROM users WHERE id =:user_id");
-    $checkUser->execute(['user_id' => $user_id]);
-    $result = $checkUser->fetch(PDO::FETCH_ASSOC);
+    $result = $adjustUser;
 
-    $available_balance = $amount + $result['acct_balance'];
+    $available_balance = $amount + (float)$result['acct_balance'];
 
     $addUp = $conn->prepare("UPDATE users SET acct_balance=:available_balance WHERE id=:user_id");
     $addUp->execute(['available_balance' => $available_balance, 'user_id' => $user_id]);
@@ -51,10 +77,10 @@ if (isset($_POST['credit'])) {
     );
 
     toast_alert('success', 'Account Funded Successfully', 'Approved');
-} elseif (isset($_POST['debit'])) {
+} elseif ($adjustError === '' && isset($_POST['debit'])) {
     $user_id      = $_POST['user_id'];
     $sender_name  = $_POST['sender_name'];
-    $amount       = $_POST['amount'];
+    $amount       = $adjustAmount;
     $description  = $_POST['description'];
     $created_at   = $_POST['created_at'];
     $time_created = $_POST['time_created'];
@@ -62,14 +88,12 @@ if (isset($_POST['credit'])) {
     $trans_type   = 2;
     $trans_status = 1;
 
-    $checkUser = $conn->prepare("SELECT * FROM users WHERE id =:user_id");
-    $checkUser->execute(['user_id' => $user_id]);
-    $result = $checkUser->fetch(PDO::FETCH_ASSOC);
+    $result = $adjustUser;
 
-    if ($amount > $result['acct_balance']) {
+    if ($amount > (float)$result['acct_balance']) {
         toast_alert('error', 'Insufficient Balance');
     } else {
-        $available_balance = $result['acct_balance'] - $amount;
+        $available_balance = (float)$result['acct_balance'] - $amount;
 
         $addUp = $conn->prepare("UPDATE users SET acct_balance=:available_balance WHERE id=:user_id");
         $addUp->execute(['available_balance' => $available_balance, 'user_id' => $user_id]);

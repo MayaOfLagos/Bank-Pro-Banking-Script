@@ -51,70 +51,36 @@ $bankPhone = $settings['url_tel'] ?? '';
 
 $mailer = new message();
 
-function auth_send_login_email(array $user, string $device, string $ipAddress, string $dateTime, string $appName, string $appUrl, string $bankPhone, message $mailer): void {
-    $fullName = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
-    $to = (string)($user['acct_email'] ?? '');
-
-    if ($to === '') {
-        return;
-    }
-
-    $subject = "Login Notification - {$appName}";
-    $body = "
-        <div style=\"font-family:Arial,sans-serif;font-size:14px;color:#111\">
-            <h3 style=\"margin-bottom:10px\">Hello {$fullName},</h3>
-            <p>A login was detected on your account.</p>
-            <ul>
-                <li><strong>Date:</strong> {$dateTime}</li>
-                <li><strong>IP Address:</strong> {$ipAddress}</li>
-                <li><strong>Device:</strong> {$device}</li>
-            </ul>
-            <p>If this wasn't you, contact support immediately at {$bankPhone}.</p>
-            <p><a href=\"{$appUrl}\">{$appName}</a></p>
-        </div>
-    ";
-
-    $mailer->send_to_both($to, $body, $subject);
-}
-
-function auth_send_reset_email(array $user, string $token, string $appName, string $appUrl, message $mailer): void {
+// Both helpers render through the shared emailMessage layout so the reset and
+// password-changed mails carry the same logo, footer and escaping as every
+// other customer email. The hand-rolled bodies they replaced interpolated the
+// customer's name straight into HTML.
+function auth_send_reset_email(array $user, string $token, string $appName, string $appUrl, message $mailer, array $settings = array()): void {
     $email = (string)($user['acct_email'] ?? '');
     if ($email === '') {
         return;
     }
 
+    require_once __DIR__ . '/../../include/userClass.php';
     $fullName = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
-    $acctNo = (string)($user['acct_no'] ?? '');
-    $resetUrl = rtrim($appUrl, '/') . '/update-password?email=' . urlencode($email) . '&reset_token=' . urlencode($token);
+    $template = new emailMessage($settings);
+    $body = $template->ForgotMsg($fullName, $email, (string)($user['acct_no'] ?? ''), $token, $appName, $appUrl);
 
-    $subject = "Password Reset - {$appName}";
-    $body = "
-        <div style=\"font-family:Arial,sans-serif;font-size:14px;color:#111\">
-            <h3 style=\"margin-bottom:10px\">Hi {$fullName},</h3>
-            <p>We received a password reset request for account <strong>{$acctNo}</strong>.</p>
-            <p><a href=\"{$resetUrl}\">Click here to reset your password</a>.</p>
-            <p>If you did not request this, you can ignore this email.</p>
-        </div>
-    ";
-
-    $mailer->send_mail($email, $body, $subject);
+    if (!$mailer->send_mail($email, $body, "Password Reset - {$appName}")) {
+        error_log('[auth] password reset email failed for ' . $email . ': ' . $mailer->lastError());
+    }
 }
 
-function auth_send_password_changed_email(array $user, string $appName, message $mailer): void {
+function auth_send_password_changed_email(array $user, string $appName, message $mailer, array $settings = array()): void {
     $email = (string)($user['acct_email'] ?? '');
     if ($email === '') {
         return;
     }
 
+    require_once __DIR__ . '/../../include/userClass.php';
     $fullName = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
-    $subject = "Password Updated - {$appName}";
-    $body = "
-        <div style=\"font-family:Arial,sans-serif;font-size:14px;color:#111\">
-            <h3 style=\"margin-bottom:10px\">Hi {$fullName},</h3>
-            <p>Your account password was changed successfully.</p>
-            <p>If this wasn't you, contact support immediately.</p>
-        </div>
-    ";
+    $template = new emailMessage($settings);
+    $body = $template->PassChange($fullName, (string)($settings['url_email'] ?? ''), $appName);
 
-    $mailer->send_to_both($email, $body, $subject);
+    $mailer->send_to_both($email, $body, "Password Updated - {$appName}");
 }

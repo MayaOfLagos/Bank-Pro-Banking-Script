@@ -350,13 +350,6 @@ body {
 .auth-input::placeholder {
   color: var(--text-muted);
 }
-.auth-input--pin {
-  text-align: center;
-  font-size: 1.75rem;
-  letter-spacing: 0.5em;
-  font-weight: 700;
-  padding-inline: 1.75rem 0.75rem; /* offset the letter-spacing so text stays centred */
-}
 .auth-input-wrap {
   position: relative;
   display: flex;

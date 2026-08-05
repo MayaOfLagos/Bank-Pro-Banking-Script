@@ -17,23 +17,15 @@
       </div>
 
       <form @submit.prevent="onSubmit" class="auth-form">
-        <FormField label="PIN code" :error="errors.pin" required>
-          <template #default="{ id, describedBy }">
-            <input
-              :id="id"
-              v-bind="pinAttrs"
-              v-model="pin"
-              type="password"
-              inputmode="numeric"
-              autocomplete="off"
-              maxlength="4"
-              placeholder="••••"
-              :aria-describedby="describedBy"
-              :aria-invalid="!!errors.pin || null"
-              class="auth-input auth-input--pin"
-            />
-          </template>
-        </FormField>
+        <PinPad
+          v-model="pin"
+          :length="PIN_LENGTH"
+          :disabled="isSubmitting"
+          label="PIN entry keypad"
+          @complete="() => onSubmit()"
+        />
+
+        <p v-if="errors.pin" class="pin-error" role="alert">{{ errors.pin }}</p>
 
         <ErrorState v-if="serverError" :message="serverError" compact />
 
@@ -43,7 +35,7 @@
             : `${attemptsRemaining} attempt${attemptsRemaining === 1 ? '' : 's'} remaining before the account is locked.` }}
         </p>
 
-        <button type="submit" :disabled="isSubmitting" class="auth-submit">
+        <button type="submit" :disabled="isSubmitting || !isComplete" class="auth-submit">
           {{ isSubmitting ? 'Verifying...' : 'Verify PIN' }}
         </button>
       </form>
@@ -61,7 +53,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AuthShell from '../../components/auth/AuthShell.vue'
-import FormField from '../../components/ui/FormField.vue'
+import PinPad from '../../components/ui/PinPad.vue'
 import ErrorState from '../../components/ui/ErrorState.vue'
 import { authApi } from '../../api/auth'
 import { useAuthStore } from '../../stores/auth'
@@ -89,11 +81,15 @@ const initials = computed(() =>
     .join('')
 )
 
+const PIN_LENGTH = 4
+
 const { defineField, handleSubmit, errors, isSubmitting, resetForm } = useValidatedForm(
   z.object({ pin: pinSchema }),
   { initialValues: { pin: '' } }
 )
-const [pin, pinAttrs] = defineField('pin')
+const [pin] = defineField('pin')
+
+const isComplete = computed(() => (pin.value || '').length === PIN_LENGTH)
 
 onMounted(async () => {
   try {
@@ -158,5 +154,11 @@ const logout = async () => {
 .cancel-row {
   text-align: center;
   margin-top: var(--space-4);
+}
+.pin-error {
+  margin: 0;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--danger-fg);
 }
 </style>

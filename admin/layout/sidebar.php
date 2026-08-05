@@ -29,7 +29,7 @@ $systemPages   = ['audit-log.php', 'system-health.php', 'db-backup.php'];
     <div class="sidebar">
         <div class="user-panel mt-3 pb-3 mb-3 d-flex">
             <div class="image">
-                <img src="../assets/profile/<?= htmlspecialchars($row['image']) ?>" class="img-circle elevation-2" alt="Admin">
+                <img src="<?= htmlspecialchars(admin_profile_src($row['image'])) ?>" class="img-circle elevation-2" alt="Admin">
             </div>
             <div class="info">
                 <a href="./profile.php" class="d-block"><?= htmlspecialchars($adminName) ?></a>

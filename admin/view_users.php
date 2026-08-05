@@ -18,23 +18,40 @@ $transfer = $row['transfer'] == '1' ? 'ACTIVE' : 'DEACTIVATE';
 // the operator alerts below (the delete handler wipes the row it comes from).
 $customerName = trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? ''));
 
-if (isset($_POST['upload_picture']) && isset($_FILES['image']) && $_FILES['image']['name']) {
-    $file = $_FILES['image'];
-    $name = $file['name'];
-    $folder = "../assets/profile/";
-    $n = $row['acct_no'] . $name;
-    $destination = $folder . $n;
-    if (move_uploaded_file($file['tmp_name'], $destination)) {
+if (isset($_POST['upload_picture'])) {
+    // Was: destination built from the raw client filename ($acct_no . $name),
+    // which let an operator-supplied "x.php" land executable in the web root,
+    // against a CWD-relative folder that does not resolve to the document root
+    // under PHP-FPM. A failed move fell through with no message at all.
+    $stored = admin_store_upload(
+        $_FILES['image'] ?? [],
+        dirname(__DIR__) . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'profile',
+        ['png', 'jpg', 'jpeg', 'gif', 'webp'],
+        2 * 1024 * 1024,
+        'user-' . $id
+    );
+    if (!$stored['ok']) {
+        toast_alert('error', $stored['error'], 'Not uploaded');
+    } else {
         $stmt = $conn->prepare("UPDATE users SET image=:image WHERE id =:acct_id");
-        $stmt->execute(['image' => $n, 'acct_id' => $id]);
-        toast_alert('success', 'Image Uploaded Successfully', 'Thanks!');
+        $stmt->execute(['image' => $stored['name'], 'acct_id' => $id]);
+        toast_flash('success', 'Image Uploaded Successfully', 'Thanks!');
         header("Location:./users.php"); die;
     }
 }
 
 if (isset($_POST['profile_save'])) {
-    $limiBalance = $_POST['acct_limit'] + $row['limit_remain'];
-    $limit       = $row['acct_limit'] + $_POST['acct_limit'];
+    // The Account Limit input is pre-filled with the *current* acct_limit, so
+    // adding it to the stored value doubled the limit on every save and grew
+    // limit_remain by the whole limit each time — an operator who opened the
+    // profile and clicked Save without editing anything handed the customer an
+    // ever-increasing transfer allowance. Treat the posted value as the new
+    // limit and move the remaining allowance by the delta, which preserves how
+    // much of the limit has already been consumed.
+    $newLimit    = (float)($_POST['acct_limit'] ?? $row['acct_limit']);
+    $limitDelta  = $newLimit - (float)$row['acct_limit'];
+    $limit       = max(0, $newLimit);
+    $limiBalance = max(0, (float)$row['limit_remain'] + $limitDelta);
     $stmt = $conn->prepare("UPDATE users SET acct_no=:acct_no, acct_type=:acct_type,acct_email=:acct_email,acct_dob=:acct_dob,acct_occupation=:acct_occupation,acct_phone=:acct_phone,acct_gender=:acct_gender,marital_status=:marital_status,acct_limit=:acct_limit,acct_cot=:acct_cot,acct_tax=:acct_tax,acct_imf=:acct_imf,acct_balance=:acct_balance,limit_remain=:limit_remain WHERE id=:id");
     $stmt->execute([
         'acct_no'         => $_POST['acct_no'],
@@ -309,7 +326,7 @@ if (isset($_POST['force_logout_user'])) {
                 <div class="card card-primary card-outline">
                     <div class="card-body box-profile">
                         <div class="text-center">
-                            <img class="profile-user-img img-fluid img-circle" src="../assets/profile/<?= htmlspecialchars($row['image']) ?>" alt="user">
+                            <img class="profile-user-img img-fluid img-circle" src="<?= htmlspecialchars(admin_profile_src($row['image'])) ?>" alt="user">
                         </div>
                         <h3 class="profile-username text-center"><?= htmlspecialchars($row['firstname'] . ' ' . $row['lastname']) ?></h3>
                         <p class="text-muted text-center"><?= htmlspecialchars($row['acct_type']) ?></p>

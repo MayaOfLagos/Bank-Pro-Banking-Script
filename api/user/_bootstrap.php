@@ -78,22 +78,7 @@ if ($accountBlockMessage !== null && !$isReadRequest) {
     ]);
 }
 
-/**
- * Kept for back-compat — every user API endpoint calls this to convert
- * users.acct_currency into a display symbol. Now delegates to the shared
- * currency_symbol() helper so every code in the JSON catalog resolves.
- *
- * Also fixes the CAD → "¢" bug the old switch had (CAD should be "$"),
- * and translates the two legacy free-form values ("Euro", "Yuan") to
- * canonical ISO codes before lookup.
- */
-function user_currency_symbol(array $user): string {
-    $raw = trim((string)($user['acct_currency'] ?? 'USD'));
-    if ($raw === '') return '$';
-    $alias = ['Euro' => 'EUR', 'Yuan' => 'CNY'];
-    $code = $alias[$raw] ?? $raw;
-    return currency_symbol($code, '$');
-}
+// user_currency_symbol() now lives in include/currency.php, required above.
 
 function api_payload(): array {
     $raw = file_get_contents('php://input');

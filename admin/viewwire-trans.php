@@ -139,7 +139,7 @@ $tran_status = $statusMap[(string)$row['wire_status']] ?? '<span class="badge ba
             <div class="card-body">
                 <table class="table table-bordered">
                     <tbody>
-                        <tr><th>Name</th><td><?= ucwords($fullName) ?></td></tr>
+                        <tr><th>Name</th><td><?= htmlspecialchars(ucwords($fullName)) ?></td></tr>
                         <tr><th>Reference ID</th><td><?= htmlspecialchars($row['refrence_id']) ?></td></tr>
                         <tr><th>Amount</th><td><?= $currency . htmlspecialchars($row['amount']) ?></td></tr>
                         <tr><th>Bank Name</th><td><?= htmlspecialchars($row['bank_name']) ?></td></tr>

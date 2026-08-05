@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
-require_once __DIR__ . '/../../include/smtp.php';
+require_once __DIR__ . '/../../include/userClass.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
@@ -77,15 +77,28 @@ $mailer = new message();
 // verification loop: prove the user actually controls the destination
 // inbox before we swap the login email.
 $otpSubject = "Confirm your new email address - {$appName}";
-$otpBody = "
-    <div style=\"font-family:Arial,sans-serif;font-size:14px;color:#111;line-height:1.6\">
-        <h3 style=\"margin-bottom:10px\">Hi " . htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8') . ",</h3>
-        <p>Use the code below to confirm this address as the new sign-in email for your <strong>" . htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') . "</strong> account.</p>
-        <p style=\"font-size:28px;font-weight:800;letter-spacing:6px;margin:20px 0;color:#111\">{$otp}</p>
-        <p>The code expires in 15 minutes. If you didn't request this change, ignore this email and the address on your account stays the same.</p>
-    </div>
-";
-$mailer->send_mail($newEmail, $otpBody, $otpSubject);
+$otpBody = (new emailMessage($settings))->emailChangeOtp($displayName, $otp, $appName);
+$otpDelivered = $mailer->send_mail($newEmail, $otpBody, $otpSubject);
+
+// If the code could not be delivered there is nothing for the user to type,
+// so clear the pending request rather than parking the account in a state
+// whose only exit is a 15-minute expiry. Reporting success here is what made
+// this look like "the OTP email just never arrives".
+if (!$otpDelivered) {
+  $conn->prepare(
+    'UPDATE users SET pending_email = NULL,
+                      pending_email_otp = NULL,
+                      pending_email_expires = NULL,
+                      pending_email_attempts = 0
+     WHERE id = :id'
+  )->execute(['id' => $user['id']]);
+
+  error_log('[profile-email-request] OTP delivery failed for user ' . (int)$user['id'] . ': ' . $mailer->lastError());
+  api_json(502, [
+    'ok' => false,
+    'message' => 'We could not send the verification code right now. Please try again shortly or contact support.',
+  ]);
+}
 
 // Notify the OLD address as an out-of-band security signal — if the
 // account is being taken over, the legitimate owner learns immediately

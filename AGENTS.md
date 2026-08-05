@@ -23,13 +23,15 @@ again when you finish. Merge coordinators check this before touching `main` or
 
 ## Current `main` tip
 
-`e27172d` — Rebuild admin email templates on a shared Laravel-style layout  
+`5e8c6c4` — Wire the operator notifications into their trigger points  
 Committed: 2026-08-05
 
 ### Recent commits
 
 | Commit | Description |
 |--------|-------------|
+| `5e8c6c4` | Wire the operator notifications into their trigger points |
+| `d90f5ee` | Extract the operator alerts into include/admin_alerts.php |
 | `e27172d` | Rebuild admin email templates on a shared Laravel-style layout (merge of admin agent branch) |
 | `e19dcd0` | Rebuild user email templates + rate-limited login alert |
 | `45c792f` | Rebuild admin email templates (admin agent commit — now merged) |
@@ -82,9 +84,30 @@ Committed: 2026-08-05
 
 | Branch | Owner | Status | Notes |
 |--------|-------|--------|-------|
-| `main` | — | ✅ current tip `e27172d` | Both email rewrites landed |
-| `production` | owner | ⏳ awaiting push permission | ff-only from `main` |
+| `main` | — | ✅ current tip `5e8c6c4` | In sync with `origin/main` |
+| `production` | owner | ✅ `5e8c6c4` | In sync; ff-only from `main` |
 
 **Pending owner action:** apply migrations via the web migration console —  
-`2026_08_05_01_login_email_rate_limit.sql` (users table) and  
-`2026_08_05_01_admin_login_rate_limit.sql` (admin_users table).
+`2026_08_05_01_login_email_rate_limit.sql` (users table),  
+`2026_08_05_01_admin_login_rate_limit.sql` (admin_users table) and  
+`2026_08_04_01_settings_favicon.sql` (settings.favicon column).
+
+Until the first is applied the login-alert email stays silently disabled —
+`api/auth/pin-verify.php` now catches the missing column so it can no longer
+500 the PIN step. Until the last is applied the favicon uploader reports the
+missing column by name instead of failing blank.
+
+---
+
+## Testing
+
+Suites live in `tests/` and are shell-only (the directory carries a deny-all
+`.htaccess` because the repo root is the cPanel document root):
+
+| Command | Covers |
+|---------|--------|
+| `php tests/email_templates.php` | renders all 24 customer templates, asserts chrome/footer/escaping (196 assertions) |
+| `php tests/transfer_otp.php` | transfer OTP issue/verify lifecycle against the real schema (13 assertions) |
+
+`tests/transfer_otp.php` writes to `temp_trans` and cleans up after itself —
+do not point it at production.

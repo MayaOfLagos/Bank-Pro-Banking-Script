@@ -2,7 +2,10 @@ import forms from '@tailwindcss/forms'
 import typography from '@tailwindcss/typography'
 
 export default {
-  darkMode: 'class',
+  // The theme system sets [data-theme] on <html> (see composables/useTheme.js)
+  // and never adds a `.dark` class, so plain 'class' made every `dark:` variant
+  // dead code. Point the variant at the attribute that actually toggles.
+  darkMode: ['selector', '[data-theme="dark"]'],
   content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
   theme: {
     extend: {

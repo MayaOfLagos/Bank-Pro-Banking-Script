@@ -7,7 +7,22 @@ if (isset($_POST['register'])) {
     $lastname         = inputValidation($_POST['lastname']);
     $acct_limit       = inputValidation($_POST['acct_limit']);
     $limit_remain     = inputValidation($_POST['limit_remain']);
-    $acct_no          = "9909" . substr(number_format(time() * rand(), 0, '', ''), 0, 6);
+    // Account number: was "9909" . the first 6 digits of time()*rand(). On a
+    // 32-bit build that product overflows to a float and number_format() renders
+    // it in a form whose leading digits barely change between calls, and nothing
+    // ever checked the result against the table — two customers could be
+    // registered under the same account number, which is the key half the panel
+    // looks accounts up by. Draw from a CSPRNG and confirm it is free.
+    $acct_no = '';
+    $lookup  = $conn->prepare("SELECT 1 FROM users WHERE acct_no = :acct_no LIMIT 1");
+    for ($attempt = 0; $attempt < 25; $attempt++) {
+        $candidate = '9909' . str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        $lookup->execute(['acct_no' => $candidate]);
+        if ($lookup->fetchColumn() === false) {
+            $acct_no = $candidate;
+            break;
+        }
+    }
     $ssn              = inputValidation($_POST['ssn']);
     $acct_balance     = inputValidation($_POST['acct_balance']);
     $avail_balance    = inputValidation($_POST['avail_balance']);
@@ -36,6 +51,8 @@ if (isset($_POST['register'])) {
 
     if ($acct_password !== $confirm_password) {
         toast_alert('error', 'Password does not match');
+    } elseif ($acct_no === '') {
+        toast_alert('error', 'Could not allocate a free account number after 25 attempts. Nothing was saved — try again.', 'Not registered');
     } else {
         $stmt = $conn->prepare("SELECT * FROM users WHERE acct_email=:acct_email");
         $stmt->execute(['acct_email' => $acct_email]);

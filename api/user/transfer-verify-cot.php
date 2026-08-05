@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
+require_once __DIR__ . '/../../include/transfer_otp.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
@@ -27,4 +28,11 @@ if ($code !== (string)($user['acct_cot'] ?? '')) {
 security_reset_verify_attempts($conn, (int)$user['id']);
 $_SESSION['transfer_verification_stage'] = !empty($user['acct_tax']) ? 'tax' : (!empty($user['acct_imf']) ? 'imf' : 'otp');
 $nextRoute = $_SESSION['transfer_verification_stage'] === 'tax' ? '/transfer-tax' : ($_SESSION['transfer_verification_stage'] === 'imf' ? '/transfer-imf' : '/transfer-verify');
+
+// COT was the last gate — issue the code now so its 15-minute window starts
+// here rather than back at submit time.
+if ($_SESSION['transfer_verification_stage'] === 'otp') {
+  transfer_otp_issue($conn, $user, $settings, (int)$_SESSION['pending_transfer_id']);
+}
+
 api_json(200, ['ok' => true, 'message' => 'COT verified', 'data' => ['next_route' => $nextRoute]]);

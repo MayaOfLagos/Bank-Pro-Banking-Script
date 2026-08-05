@@ -149,7 +149,7 @@ $tran_status = $statusMap[(string)$row['crypto_status']] ?? '<span class="badge 
             <div class="card-body">
                 <table class="table table-bordered">
                     <tbody>
-                        <tr><th>Name</th><td><?= ucwords($fullName) ?></td></tr>
+                        <tr><th>Name</th><td><?= htmlspecialchars(ucwords($fullName)) ?></td></tr>
                         <tr><th>Amount</th><td><?= $currency . htmlspecialchars($row['amount']) ?></td></tr>
                         <tr><th>Reference ID</th><td><?= htmlspecialchars($row['refrence_id']) ?></td></tr>
                         <tr><th>Wallet Address</th><td><?= htmlspecialchars($row['wallet_address']) ?></td></tr>

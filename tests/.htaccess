@@ -1,0 +1,11 @@
+# The repository root is the document root on cPanel, so anything committed
+# here is web-reachable by default. These scripts connect to the live database
+# and transfer_otp.php writes to temp_trans, so they must never be runnable
+# over HTTP. Run them from the shell: php tests/transfer_otp.php
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order deny,allow
+    Deny from all
+</IfModule>

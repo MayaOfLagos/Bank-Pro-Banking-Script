@@ -35,6 +35,20 @@ if (!empty($_SESSION['admin_welcome_name'])) {
     echo "<script>(window.__toasts = window.__toasts || []).push(['success', 'Welcome back, {$welcomeName}!', 'Login Successful']);</script>";
     unset($_SESSION['admin_welcome_name']);
 }
+
+// Drain toasts queued by handlers that redirected (see toast_flash()). Same
+// JSON_HEX_TAG escaping as toast_alert() so a filename or customer name in the
+// message cannot break out of this <script> block.
+if (!empty($_SESSION['admin_toasts']) && is_array($_SESSION['admin_toasts'])) {
+    $flashFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE;
+    foreach ($_SESSION['admin_toasts'] as $flash) {
+        $flashType = in_array($flash[0] ?? '', ['success', 'error', 'warning', 'info'], true) ? $flash[0] : 'info';
+        echo "<script>(window.__toasts = window.__toasts || []).push("
+           . json_encode([$flashType, (string)($flash[1] ?? ''), (string)($flash[2] ?? '')], $flashFlags)
+           . ");</script>";
+    }
+    unset($_SESSION['admin_toasts']);
+}
 ?>
 <script>
     $(function () {

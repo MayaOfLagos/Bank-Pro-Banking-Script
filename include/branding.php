@@ -22,6 +22,25 @@ declare(strict_types=1);
  * @return array{href:string,type:string} URL path (absolute-from-domain)
  *                            and the matching MIME type attribute.
  */
+/**
+ * Append a content-derived cache-buster to a branding URL.
+ *
+ * The admin uploader deliberately writes to a stable filename (favicon.png,
+ * logo.png) so repeated uploads overwrite rather than pile up. That makes the
+ * URL constant, and browsers cache favicons harder than almost anything else —
+ * so a freshly uploaded icon would keep rendering as the old one with no way
+ * for the operator to tell the upload had worked. Keying the query string off
+ * the file's mtime changes the URL exactly when the bytes change.
+ */
+function branding_cache_bust(string $url, string $absolutePath): string
+{
+    $mtime = @filemtime($absolutePath);
+    if ($mtime === false) {
+        return $url;
+    }
+    return $url . (strpos($url, '?') === false ? '?' : '&') . 'v=' . $mtime;
+}
+
 function resolve_favicon(array $settings, string $repoRoot): array
 {
     $repoRoot = rtrim($repoRoot, "/\\");
@@ -34,13 +53,19 @@ function resolve_favicon(array $settings, string $repoRoot): array
               : ($ext === 'svg' ? 'image/svg+xml'
               : ($ext === 'jpg' ? 'image/jpeg' : 'image/' . $ext));
         return [
-            'href' => '/assets/settings/' . rawurlencode($field),
+            'href' => branding_cache_bust(
+                '/assets/settings/' . rawurlencode($field),
+                $repoRoot . '/assets/settings/' . $field
+            ),
             'type' => $type,
         ];
     }
 
     if (is_file($repoRoot . '/assets/settings/favicon.png')) {
-        return ['href' => '/assets/settings/favicon.png', 'type' => 'image/png'];
+        return [
+            'href' => branding_cache_bust('/assets/settings/favicon.png', $repoRoot . '/assets/settings/favicon.png'),
+            'type' => 'image/png',
+        ];
     }
 
     return $default;
@@ -56,7 +81,10 @@ function resolve_logo_url(array $settings, string $repoRoot): ?string
     $repoRoot = rtrim($repoRoot, "/\\");
     $field = trim((string)($settings['image'] ?? ''));
     if ($field !== '' && is_file($repoRoot . '/assets/settings/' . $field)) {
-        return '/assets/settings/' . rawurlencode($field);
+        return branding_cache_bust(
+            '/assets/settings/' . rawurlencode($field),
+            $repoRoot . '/assets/settings/' . $field
+        );
     }
     return null;
 }

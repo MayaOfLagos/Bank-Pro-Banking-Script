@@ -42,7 +42,7 @@ $update->execute([
     'token' => $token,
 ]);
 
-auth_send_password_changed_email($user, $appName, $mailer);
+auth_send_password_changed_email($user, $appName, $mailer, $settings);
 
 auth_json(200, [
     'ok' => true,

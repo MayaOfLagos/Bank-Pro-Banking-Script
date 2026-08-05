@@ -392,6 +392,35 @@ div[style*="margin: 16px 0;"]{margin:0!important}
         return $this->_layout('Login Verification Code', $body, $APP_NAME);
     }
 
+    public function emailChangeOtp($fullName, $code, $APP_NAME){
+        $body = '<p style="margin:0 0 16px;">Dear ' . $this->_e($fullName) . ',</p>'
+              . '<p style="margin:0 0 4px;">Use the code below to confirm this address as the new sign-in email for your <strong>' . $this->_e($APP_NAME) . '</strong> account:</p>'
+              . $this->_codeBlock($code)
+              . '<p style="margin:0;font-size:13px;color:#6b7280;">The code expires in 15 minutes. If you did not request this change, ignore this email and the address on your account stays the same.</p>';
+        return $this->_layout('Confirm Your New Email Address', $body, $APP_NAME);
+    }
+
+    public function emailChangeConfirmed($fullName, $newEmail, $APP_NAME){
+        $body = '<p style="margin:0 0 16px;">Dear ' . $this->_e($fullName) . ',</p>'
+              . '<p style="margin:0 0 16px;">This address is now the sign-in email for your <strong>' . $this->_e($APP_NAME) . '</strong> account.</p>'
+              . $this->_table(array(
+                    array('New Sign-in Email', $newEmail),
+                ));
+        return $this->_layout('Email Address Updated', $body, $APP_NAME);
+    }
+
+    // Sent to the OLD address so a customer whose account was taken over still
+    // learns the login email moved, at an inbox the attacker no longer controls.
+    public function emailChangeAlert($fullName, $newEmail, $APP_EMAIL, $APP_NAME){
+        $body = '<p style="margin:0 0 16px;">Dear ' . $this->_e($fullName) . ',</p>'
+              . '<p style="margin:0 0 16px;">The sign-in email on your <strong>' . $this->_e($APP_NAME) . '</strong> account was changed.</p>'
+              . $this->_table(array(
+                    array('New Sign-in Email', $newEmail),
+                ))
+              . '<p style="margin:16px 0 0;font-size:13px;color:#6b7280;">If you did not make this change, contact support at <strong>' . $this->_e($APP_EMAIL) . '</strong> immediately.</p>';
+        return $this->_layout('Security Alert: Email Address Changed', $body, $APP_NAME);
+    }
+
     public function regMsgUser($fullName, $acct_no, $acct_status, $acct_email, $acct_phone, $acct_type, $acct_pin, $APP_NAME, $APP_URL){
         $body = '<p style="margin:0 0 16px;">Hello, ' . $this->_e($fullName) . ',</p>'
               . '<p style="margin:0 0 16px;">Welcome to <strong>' . $this->_e($APP_NAME) . '</strong>! We are glad you chose us as your financial institution. Your account is being reviewed and we will notify you once verification is complete.</p>'

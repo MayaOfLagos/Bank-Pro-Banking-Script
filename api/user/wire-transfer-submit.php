@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
-require_once __DIR__ . '/../../include/userClass.php';
+require_once __DIR__ . '/../../include/transfer_otp.php';
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
 }
@@ -81,17 +81,6 @@ try {
     api_json(500, ['ok' => false, 'message' => 'Unable to start wire transfer']);
 }
 
-$email_message = new message();
-$sendMail = new emailMessage($settings);
-$currency = user_currency_symbol($user);
-$fullName = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
-$appName = $settings['url_name'] ?? WEB_TITLE;
-
-if (!empty($user['acct_email'])) {
-    $mailBody = $sendMail->pinRequest($currency, $amount, $fullName, $acct_otp, $appName);
-    $email_message->send_mail($user['acct_email'], $mailBody, '[OTP CODE] - ' . $appName);
-}
-
 $_SESSION['pending_transfer_id'] = $pendingTransferId;
 $_SESSION['pending_transfer_created_at'] = time();
 
@@ -107,6 +96,12 @@ if (!empty($user['acct_cot'])) {
     $nextRoute = '/transfer-imf';
 } else {
     $_SESSION['transfer_verification_stage'] = 'otp';
+}
+
+// See domestic-transfer-submit.php: the code is only mailed when the OTP
+// screen is the customer's immediate next step.
+if ($_SESSION['transfer_verification_stage'] === 'otp') {
+    transfer_otp_issue($conn, $user, $settings, $pendingTransferId);
 }
 
 api_json(200, [

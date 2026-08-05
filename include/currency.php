@@ -57,6 +57,26 @@ function currency_symbol(?string $code, string $fallback = '$'): string
     return $map[$upper]['symbol'] ?? $upper;
 }
 
+/**
+ * Symbol for a user row's account currency.
+ *
+ * Lives here rather than in api/user/_bootstrap.php so shared includes such as
+ * include/transfer_otp.php can format amounts without depending on which
+ * entrypoint happens to have loaded that bootstrap.
+ *
+ * Fixes the CAD → "¢" bug the old switch had (CAD should be "$"), and
+ * translates the two legacy free-form values ("Euro", "Yuan") to canonical
+ * ISO codes before lookup.
+ */
+function user_currency_symbol(array $user): string
+{
+    $raw = trim((string)($user['acct_currency'] ?? 'USD'));
+    if ($raw === '') return '$';
+    $alias = array('Euro' => 'EUR', 'Yuan' => 'CNY');
+    $code = isset($alias[$raw]) ? $alias[$raw] : $raw;
+    return currency_symbol($code, '$');
+}
+
 /** Human-readable currency name for a code. */
 function currency_name(?string $code): string
 {

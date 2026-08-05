@@ -77,7 +77,25 @@ function backup_ensure_dir(string $dir): bool
     if (!is_dir($dir)) {
         @mkdir($dir, 0775, true);
     }
-    return is_dir($dir) && is_writable($dir);
+    if (!is_dir($dir)) {
+        return false;
+    }
+    // assets/ is inside the document root, so every dump written here is
+    // reachable over plain HTTP by anyone who can guess the timestamped
+    // filename — and a dump contains every password hash, PIN and balance in
+    // the product. Drop a deny-all next to the files so Apache refuses to
+    // serve them; downloads still work because they are streamed by PHP in
+    // the handler below, never fetched directly.
+    $guard = $dir . DIRECTORY_SEPARATOR . '.htaccess';
+    if (!is_file($guard)) {
+        @file_put_contents(
+            $guard,
+            "# Database dumps: never serve these directly.\n"
+            . "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n"
+            . "<IfModule !mod_authz_core.c>\n    Order allow,deny\n    Deny from all\n</IfModule>\n"
+        );
+    }
+    return is_writable($dir);
 }
 
 /**
@@ -132,6 +150,16 @@ function backup_run_mysqldump(string $binary, array $creds, string $outputPath):
 // layout header so we don't spill HTML into the download stream.
 // ─────────────────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['download_backup'])) {
+    // This branch deliberately returns before layout/header.php is included, so
+    // it never reaches the panel-wide CSRF gate that lives there. Without this
+    // explicit check the single most sensitive action in the product — handing
+    // out a full database dump — would be the one POST with no token at all.
+    if (!admin_csrf_valid()) {
+        http_response_code(403);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo 'Request blocked: missing or stale security token.';
+        exit;
+    }
     $filename = (string)($_POST['filename'] ?? '');
     if (!preg_match($backupFilenamePattern, $filename)) {
         http_response_code(400);
@@ -247,7 +275,17 @@ if (isset($_POST['delete_backup'])) {
                 'Database backup deleted'
             );
         }
-        toast_alert('success', 'Backup deleted: ' . $filename, 'Removed');
+        // Report what actually happened. The old unconditional success toast
+        // claimed the dump was gone even when unlink() was refused by
+        // permissions — leaving a downloadable database dump on disk that the
+        // operator had every reason to believe was destroyed.
+        if ($insideBackupDir && is_file($resolved) && !$fileRemoved) {
+            toast_alert('error', 'The ledger entry was removed but ' . $filename . ' could not be deleted from assets/backups/ — check file permissions, the dump is still on disk.', 'Partly removed');
+        } elseif ($rowRemoved || $fileRemoved) {
+            toast_alert('success', 'Backup deleted: ' . $filename, 'Removed');
+        } else {
+            toast_alert('info', 'Nothing to delete: ' . $filename . ' has no ledger entry and no file on disk.', 'No change');
+        }
     }
 }
 

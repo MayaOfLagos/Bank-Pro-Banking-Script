@@ -16,14 +16,32 @@ if (isset($_POST['transfer'])) {
     $status       = $_POST['status'];
 
     $checkUser = $conn->prepare("SELECT * FROM users WHERE id =:user_id");
-    $checkUser->execute(['user_id' => $user_id]);
+    $checkUser->execute(['user_id' => (int)$user_id]);
     $result = $checkUser->fetch(PDO::FETCH_ASSOC);
-    $fullName = $result['firstname'] . " " . $result['lastname'];
 
-    if ($amount > $result['acct_balance']) {
+    // The result of this SELECT used to be used unchecked: an unknown user_id
+    // dereferenced null and the balance comparison ran against NULL.
+    // The amount was likewise unvalidated — a negative one passes
+    // "$amount > balance" and then computes `balance - (-100)`, crediting the
+    // account while booking and emailing an outbound wire.
+    // $status is written straight into wire_status and later read back by
+    // viewwire-trans.php's status map, so it is pinned to the four values that
+    // map actually knows about.
+    $amount = is_numeric($amount) ? (float)$amount : -1;
+    $validStatuses = ['0', '1', '2', '3'];
+
+    if (!$result) {
+        toast_alert('error', 'No such customer — pick a user from the list and try again.', 'Not found');
+    } elseif ($amount <= 0) {
+        toast_alert('error', 'Amount must be a positive number.', 'Invalid amount');
+    } elseif (!in_array((string)$status, $validStatuses, true)) {
+        toast_alert('error', 'Pick a valid transfer status.', 'Invalid status');
+    } elseif ($amount > (float)$result['acct_balance']) {
+        $fullName = $result['firstname'] . " " . $result['lastname'];
         toast_alert('error', 'Insufficient Balance on ' . ucwords($fullName) . ' Account');
     } else {
-        $available_balance = $result['acct_balance'] - $amount;
+        $fullName = $result['firstname'] . " " . $result['lastname'];
+        $available_balance = (float)$result['acct_balance'] - $amount;
 
         $addUp = $conn->prepare("UPDATE users SET acct_balance=:available_balance WHERE id=:user_id");
         $addUp->execute(['available_balance' => $available_balance, 'user_id' => $user_id]);

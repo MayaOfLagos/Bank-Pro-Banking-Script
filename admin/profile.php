@@ -3,16 +3,26 @@ include_once("./layout/header.php");
 
 $fullName = $row['firstname'] . " " . $row['lastname'];
 
-if (isset($_POST['upload_picture']) && isset($_FILES['image']) && $_FILES['image']['name']) {
-    $file = $_FILES['image'];
-    $name = $file['name'];
-    $folder = "../assets/profile/";
-    $n = $row['firstname'] . $name;
-    $destination = $folder . $n;
-    if (move_uploaded_file($file['tmp_name'], $destination)) {
+if (isset($_POST['upload_picture'])) {
+    // Previously this trusted the client filename verbatim ($firstname . $name),
+    // so "x.php" landed as an executable file inside the web root, and the
+    // destination was a CWD-relative path that silently resolves outside the
+    // document root under PHP-FPM. admin_store_upload() picks the name itself,
+    // verifies the bytes are really an image, and reports the true failure.
+    $stored = admin_store_upload(
+        $_FILES['image'] ?? [],
+        dirname(__DIR__) . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'profile',
+        ['png', 'jpg', 'jpeg', 'gif', 'webp'],
+        2 * 1024 * 1024,
+        'admin-avatar'
+    );
+    if (!$stored['ok']) {
+        toast_alert('error', $stored['error'], 'Not uploaded');
+    } else {
         $stmt = $conn->prepare("UPDATE admin SET image=:image WHERE id ='1'");
-        $stmt->execute(['image' => $n]);
-        toast_alert('success', 'Image Uploaded Successfully', 'Thanks!');
+        $stmt->execute(['image' => $stored['name']]);
+        $row['image'] = $stored['name'];
+        toast_alert('success', 'Image uploaded successfully', 'Thanks!');
     }
 }
 
@@ -89,7 +99,7 @@ if (isset($_POST['change_password'])) {
                 <div class="card card-primary card-outline">
                     <div class="card-body box-profile">
                         <div class="text-center">
-                            <img class="profile-user-img img-fluid img-circle" src="../assets/profile/<?= htmlspecialchars($row['image']) ?>" alt="Admin">
+                            <img class="profile-user-img img-fluid img-circle" src="<?= htmlspecialchars(admin_profile_src($row['image'])) ?>" alt="Admin">
                         </div>
                         <h3 class="profile-username text-center"><?= htmlspecialchars($fullName) ?></h3>
                         <p class="text-muted text-center">Administrator</p>

@@ -114,7 +114,7 @@ $tran_status = $statusMap[(string)$row['trans_status']] ?? $tran_status;
             <div class="card-body">
                 <table class="table table-bordered">
                     <tbody>
-                        <tr><th>Name</th><td><?= ucwords($fullName) ?></td></tr>
+                        <tr><th>Name</th><td><?= htmlspecialchars(ucwords($fullName)) ?></td></tr>
                         <tr><th>Transaction ID</th><td><?= htmlspecialchars($row['refrence_id']) ?></td></tr>
                         <tr><th>Amount</th><td><?= $currency . htmlspecialchars($row['amount']) ?></td></tr>
                         <tr><th>Type</th><td><?= $trans_type_label ?></td></tr>

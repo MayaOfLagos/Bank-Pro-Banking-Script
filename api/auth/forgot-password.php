@@ -50,7 +50,7 @@ $update->execute([
     'email' => $email,
 ]);
 
-auth_send_reset_email($user, $token, $appName, $appUrl, $mailer);
+auth_send_reset_email($user, $token, $appName, $appUrl, $mailer, $settings);
 
 // Alert the operators, but only on this branch — a token was really issued for
 // a real account. A burst of these across accounts is a takeover probe.

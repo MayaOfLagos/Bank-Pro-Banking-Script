@@ -21,11 +21,41 @@ const describedBy = computed(() => {
 
 <template>
   <div>
-    <label v-if="label" :for="fieldId" class="block text-xs text-slate-400 mb-1.5">
-      {{ label }}<span v-if="required" class="text-red-400 ml-0.5">*</span>
+    <label v-if="label" :for="fieldId" class="label">
+      {{ label }}<span v-if="required" class="required" aria-hidden="true">*</span>
     </label>
     <slot :id="fieldId" :error-id="errorId" :hint-id="hintId" :described-by="describedBy" />
-    <p v-if="hint && !error" :id="hintId" class="mt-1 text-xs text-slate-500">{{ hint }}</p>
-    <p v-if="error" :id="errorId" class="mt-1 text-xs text-red-400" role="alert">{{ error }}</p>
+    <p v-if="hint && !error" :id="hintId" class="hint">{{ hint }}</p>
+    <p v-if="error" :id="errorId" class="error" role="alert">{{ error }}</p>
   </div>
 </template>
+
+<style scoped>
+/* Matches the .auth-field-label treatment in style.css so labels are identical
+   whether the field is rendered inside the auth card or a portal form card.
+   Previously used fixed slate-400/red-400, which under-contrasted on the light
+   --surface these forms actually sit on. */
+.label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.5rem;
+}
+.required {
+  color: var(--danger-fg);
+  margin-left: 0.15rem;
+}
+.hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+.error {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  color: var(--danger-fg);
+}
+</style>

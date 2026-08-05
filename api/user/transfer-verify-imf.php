@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
-require_once __DIR__ . '/../../include/userClass.php';
+require_once __DIR__ . '/../../include/transfer_otp.php';
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
 }
@@ -26,19 +26,8 @@ if ($code !== (string)($user['acct_imf'] ?? '')) {
 
 security_reset_verify_attempts($conn, (int)$user['id']);
 
-$stmt = $conn->prepare('SELECT amount FROM temp_trans WHERE wire_id=:wire_id AND acct_id=:acct_id LIMIT 1');
-$stmt->execute(['wire_id' => (int)$_SESSION['pending_transfer_id'], 'acct_id' => $user['id']]);
-$temp = $stmt->fetch(PDO::FETCH_ASSOC);
-$amount = (float)($temp['amount'] ?? 0);
-
-$otp = (string)($user['acct_otp'] ?? '');
-
-if (!empty($user['acct_email'])) {
-  $email_message = new message();
-  $sendMail = new emailMessage($settings);
-  $message = $sendMail->pinRequest(user_currency_symbol($user), $amount, trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')), $otp, $settings['url_name'] ?? WEB_TITLE);
-  $email_message->send_mail($user['acct_email'], $message, '[OTP CODE] - ' . ($settings['url_name'] ?? WEB_TITLE));
-}
+// IMF is always the final gate — issue a fresh code and start its window now.
+transfer_otp_issue($conn, $user, $settings, (int)$_SESSION['pending_transfer_id']);
 
 $_SESSION['transfer_verification_stage'] = 'otp';
 api_json(200, ['ok' => true, 'message' => 'IMF verified', 'data' => ['next_route' => '/transfer-verify']]);

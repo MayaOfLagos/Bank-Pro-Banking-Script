@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
 require_once __DIR__ . '/../../include/smtp.php';
+require_once __DIR__ . '/../../include/transfer_otp.php';
 require_once __DIR__ . '/../../include/admin_alerts.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -14,13 +15,31 @@ if (($_SESSION['transfer_verification_stage'] ?? '') !== 'otp') {
 }
 
 $pendingTransferId = (int)($_SESSION['pending_transfer_id'] ?? 0);
-if ($pendingTransferId < 1 || (int)($_SESSION['pending_transfer_created_at'] ?? 0) < time() - 900) {
-  api_json(422, ['ok' => false, 'message' => 'Incorrect OTP code']);
-}
 
 security_enforce_verify_lock($conn, (int)$user['id'], 'api_json');
 
-if ($pin === '' || !hash_equals((string)($user['acct_otp'] ?? ''), $pin)) {
+$otpState = transfer_otp_check($conn, $user, $pendingTransferId, $pin);
+
+// An expired window is not a wrong code, and must not be reported as one or
+// counted against the lockout budget — the customer typed exactly what we
+// emailed them and deserves a resend, not an accusation.
+if ($otpState === 'expired') {
+  api_json(410, [
+    'ok' => false,
+    'message' => 'Your verification code has expired. Request a new one to continue.',
+    'data' => ['expired' => true, 'can_resend' => true],
+  ]);
+}
+
+if ($otpState === 'missing') {
+  api_json(409, [
+    'ok' => false,
+    'message' => 'No transfer is awaiting verification. Please start the transfer again.',
+    'data' => ['next_route' => '/dashboard'],
+  ]);
+}
+
+if ($otpState !== 'ok') {
   $result = security_record_verify_failure($conn, (int)$user['id']);
   api_json(422, [
     'ok' => false,
@@ -57,16 +76,17 @@ try {
 
   $isDomestic = ($temp['trans_type'] ?? '') === 'domestic transfer';
   $ref = bin2hex(random_bytes(16));
-  $update = $conn->prepare('UPDATE users SET limit_remain=:limit_remain,acct_balance=:acct_balance,acct_otp=NULL WHERE id=:id AND acct_otp=:otp');
+  // Single-use is enforced by the `SELECT ... FOR UPDATE` on temp_trans above
+  // combined with the DELETE below: a concurrent request blocks on the row
+  // lock, then finds the row gone and aborts with 'No pending transfer'. The
+  // guard used to hang off users.acct_otp, which could not distinguish
+  // between two pending transfers belonging to the same customer.
+  $update = $conn->prepare('UPDATE users SET limit_remain=:limit_remain,acct_balance=:acct_balance,acct_otp=NULL WHERE id=:id');
   $update->execute([
     'limit_remain' => $transferLimit - $amount,
     'acct_balance' => $acctAmount - $amount,
     'id' => $lockedUser['id'],
-    'otp' => $pin,
   ]);
-  if ($update->rowCount() !== 1) {
-    throw new RuntimeException('OTP already consumed');
-  }
 
   if ($isDomestic) {
     $insert = $conn->prepare('INSERT INTO domestic_transfer (acct_id,amount,bank_name,acct_name,acct_number,acct_type,acct_remarks,refrence_id) VALUES(:acct_id,:amount,:bank_name,:acct_name,:acct_number,:acct_type,:acct_remarks,:refrence_id)');

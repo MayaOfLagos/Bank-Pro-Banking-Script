@@ -107,7 +107,7 @@ $tran_status = $statusMap[(string)$row['loan_status']] ?? '<span class="badge ba
             <div class="card-body">
                 <table class="table table-bordered">
                     <tbody>
-                        <tr><th>Name</th><td><?= ucwords($fullName) ?></td></tr>
+                        <tr><th>Name</th><td><?= htmlspecialchars(ucwords($fullName)) ?></td></tr>
                         <tr><th>Amount Requested</th><td><?= $currency . htmlspecialchars($row['amount']) ?></td></tr>
                         <tr><th>Loan Remarks</th><td><?= htmlspecialchars($row['loan_remarks']) ?></td></tr>
                         <tr><th>Created At</th><td><?= htmlspecialchars($row['created_at']) ?></td></tr>

@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
-require_once __DIR__ . '/../../include/userClass.php';
+require_once __DIR__ . '/../../include/transfer_otp.php';
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
 }
@@ -48,17 +48,9 @@ try {
   ]);
   $pendingTransferId = (int)$conn->lastInsertId();
 
-  $otp = $transOtp;
   $update = $conn->prepare('UPDATE users SET acct_otp=:acct_otp WHERE id=:id');
-  $update->execute(['acct_otp' => $otp, 'id' => $user['id']]);
+  $update->execute(['acct_otp' => $transOtp, 'id' => $user['id']]);
   $conn->commit();
-
-  $email_message = new message();
-  $sendMail = new emailMessage($settings);
-  if (!empty($user['acct_email'])) {
-    $message = $sendMail->pinRequest(user_currency_symbol($user), $amount, trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? '')), $otp, $settings['url_name'] ?? WEB_TITLE);
-    $email_message->send_mail($user['acct_email'], $message, '[OTP CODE] - ' . ($settings['url_name'] ?? WEB_TITLE));
-  }
 
   $_SESSION['pending_transfer_id'] = $pendingTransferId;
   $_SESSION['pending_transfer_created_at'] = time();
@@ -75,6 +67,15 @@ try {
   } else {
     $_SESSION['transfer_verification_stage'] = 'otp';
   }
+
+  // Only mail the code when the customer lands on the OTP screen next. If a
+  // COT/TAX/IMF gate comes first, the code is issued by whichever handler
+  // clears the last gate — otherwise the 15-minute window would be spent on
+  // screens that do not need it.
+  if ($_SESSION['transfer_verification_stage'] === 'otp') {
+    transfer_otp_issue($conn, $user, $settings, $pendingTransferId);
+  }
+
   api_json(200, ['ok' => true, 'message' => 'Domestic transfer initialized', 'data' => ['next_route' => $nextRoute]]);
 } catch (Throwable $e) {
   $conn->rollBack();

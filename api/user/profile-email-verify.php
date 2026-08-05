@@ -1,6 +1,6 @@
 <?php
 require_once __DIR__ . '/_bootstrap.php';
-require_once __DIR__ . '/../../include/smtp.php';
+require_once __DIR__ . '/../../include/userClass.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   api_json(405, ['ok' => false, 'message' => 'Method not allowed']);
@@ -77,28 +77,16 @@ $fullName = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
 $displayName = $fullName !== '' ? $fullName : 'there';
 
 $mailer = new message();
-$safeNewEmail = htmlspecialchars($newEmail, ENT_QUOTES, 'UTF-8');
-$safeOldEmail = htmlspecialchars($oldEmail, ENT_QUOTES, 'UTF-8');
+$template = new emailMessage($settings);
 
 // Confirmation to the new (now live) address.
-$confirmBody = "
-    <div style=\"font-family:Arial,sans-serif;font-size:14px;color:#111;line-height:1.6\">
-        <h3 style=\"margin-bottom:10px\">Hi " . htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8') . ",</h3>
-        <p>Your <strong>" . htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') . "</strong> sign-in email is now <strong>{$safeNewEmail}</strong>.</p>
-        <p>Use this address next time you sign in.</p>
-    </div>
-";
+$confirmBody = $template->emailChangeConfirmed($displayName, $newEmail, $appName);
 $mailer->send_mail($newEmail, $confirmBody, "Email address updated - {$appName}");
 
 // Alert to the old (former) address so a compromise doesn't go silent.
 if ($oldEmail !== '' && strcasecmp($oldEmail, $newEmail) !== 0) {
-  $alertBody = "
-      <div style=\"font-family:Arial,sans-serif;font-size:14px;color:#111;line-height:1.6\">
-          <h3 style=\"margin-bottom:10px\">Hi " . htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8') . ",</h3>
-          <p>The sign-in email on your <strong>" . htmlspecialchars($appName, ENT_QUOTES, 'UTF-8') . "</strong> account was changed from <strong>{$safeOldEmail}</strong> to <strong>{$safeNewEmail}</strong>.</p>
-          <p>If this wasn't you, contact support immediately" . ($appEmail !== '' ? " at {$appEmail}" : '') . " and reset your password.</p>
-      </div>
-  ";
+  $supportEmail = (string)($settings['url_email'] ?? $appEmail);
+  $alertBody = $template->emailChangeAlert($displayName, $newEmail, $supportEmail, $appName);
   $mailer->send_to_both($oldEmail, $alertBody, "Email address changed - {$appName}");
 }
 

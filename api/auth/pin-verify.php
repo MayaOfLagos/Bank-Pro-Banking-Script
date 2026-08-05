@@ -63,28 +63,39 @@ unset($_SESSION['login']);
 // Rate-limited login alert: fire at most once per 10-minute window per
 // user. The UPDATE is atomic — only one concurrent PIN verify wins the
 // write, so even rapid parallel logins produce exactly one email.
-$rateLimitStmt = $conn->prepare(
-    'UPDATE users SET last_login_email_at = NOW()
-     WHERE id = :id
-       AND (last_login_email_at IS NULL
-         OR last_login_email_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE))'
-);
-$rateLimitStmt->execute(['id' => (int)$user['id']]);
-if ($rateLimitStmt->rowCount() > 0) {
-    require_once __DIR__ . '/../../include/userClass.php';
-    $alertTpl  = new emailMessage($settings);
-    $alertName = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
-    $alertBody = $alertTpl->LoginAlert(
-        $alertName,
-        (string)($_SERVER['HTTP_USER_AGENT'] ?? 'Unknown device'),
-        (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'),
-        date('Y-m-d H:i:s'),
-        $appName
+//
+// The whole block is best-effort. The customer is already authenticated by
+// this point; a notification must never be able to turn a successful login
+// into a 500. That is not hypothetical — this code references
+// users.last_login_email_at, and if its migration has not been applied yet
+// the UPDATE throws "Unknown column" and locks every customer out of the
+// platform. Deployment order must never be able to cause an outage.
+try {
+    $rateLimitStmt = $conn->prepare(
+        'UPDATE users SET last_login_email_at = NOW()
+         WHERE id = :id
+           AND (last_login_email_at IS NULL
+             OR last_login_email_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE))'
     );
-    $alertTo = (string)($user['acct_email'] ?? '');
-    if ($alertTo !== '') {
-        $mailer->send_to_both($alertTo, $alertBody, 'Login Alert - ' . $appName);
+    $rateLimitStmt->execute(['id' => (int)$user['id']]);
+    if ($rateLimitStmt->rowCount() > 0) {
+        require_once __DIR__ . '/../../include/userClass.php';
+        $alertTpl  = new emailMessage($settings);
+        $alertName = trim(($user['firstname'] ?? '') . ' ' . ($user['lastname'] ?? ''));
+        $alertBody = $alertTpl->LoginAlert(
+            $alertName,
+            (string)($_SERVER['HTTP_USER_AGENT'] ?? 'Unknown device'),
+            (string)($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'),
+            date('Y-m-d H:i:s'),
+            $appName
+        );
+        $alertTo = (string)($user['acct_email'] ?? '');
+        if ($alertTo !== '') {
+            $mailer->send_to_both($alertTo, $alertBody, 'Login Alert - ' . $appName);
+        }
     }
+} catch (Throwable $loginAlertError) {
+    error_log('[pin-verify] login alert skipped: ' . $loginAlertError->getMessage());
 }
 
 auth_json(200, [

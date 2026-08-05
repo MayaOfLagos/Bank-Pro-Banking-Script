@@ -30,7 +30,10 @@ $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
 $title = new pageTitle();
 $email_message = new message();
-$sendMail = new emailMessage();
+// The settings row carries the support email, phone and office address that
+// the shared email layout prints in its footer. Constructing without it left
+// every message sent from the public site with an empty footer.
+$sendMail = new emailMessage($page ?: []);
 
 ?>
 <!DOCTYPE html>

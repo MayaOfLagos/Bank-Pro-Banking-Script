@@ -1,44 +1,128 @@
 <?php
 include_once("./layout/header.php");
 
-if (isset($_POST['upload_picture']) && isset($_FILES['image']) && $_FILES['image']['name']) {
-    $file = $_FILES['image'];
-    $name = $file['name'];
-    $folder = "../assets/settings/";
-    $destination = $folder . $name;
-    if (!is_dir($folder)) {
-        @mkdir($folder, 0775, true);
+/**
+ * Branding asset directory.
+ *
+ * Absolute, derived from __DIR__ — NOT the "../assets/settings/" relative path
+ * both handlers below used to use. A relative path is resolved against the
+ * process working directory, which equals the script directory under mod_php
+ * (so it worked on the developer's XAMPP box) but is the server root or an
+ * arbitrary directory under PHP-FPM / FastCGI / suPHP, which is what cPanel
+ * runs. There, "../assets/settings/" pointed at a directory that does not
+ * exist; mkdir() was suppressed with @, move_uploaded_file() failed, and the
+ * logo branch reported nothing at all while the favicon branch's failure
+ * message was the only clue.
+ */
+$brandingDir = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'settings';
+
+/**
+ * Persist a branding filename and confirm the row actually moved.
+ *
+ * settings.favicon arrived in SQL File/migrations/2026_08_04_01_settings_favicon.sql.
+ * On an installation where that migration has not been applied the UPDATE
+ * throws (PDO::ERRMODE_EXCEPTION), which previously produced a blank 500 with
+ * the file already written to disk — the operator saw neither a success nor a
+ * useful failure. Catch it and name the migration instead.
+ *
+ * @return array{ok:bool,error:string}
+ */
+$saveBrandingColumn = static function (PDO $conn, string $column, string $value): array {
+    $allowed = ['image', 'favicon'];
+    if (!in_array($column, $allowed, true)) {
+        return ['ok' => false, 'error' => 'Unknown branding column.'];
     }
-    if (move_uploaded_file($file['tmp_name'], $destination)) {
-        $stmt = $conn->prepare("UPDATE settings SET image=:image WHERE id ='1'");
-        $stmt->execute(['image' => $name]);
-        toast_alert('success', 'Logo uploaded successfully', 'Thanks!');
+    try {
+        // $column is whitelisted above, never interpolated from request data.
+        $stmt = $conn->prepare("UPDATE settings SET {$column} = :value WHERE id = 1");
+        $stmt->execute(['value' => $value]);
+    } catch (Throwable $e) {
+        if (stripos($e->getMessage(), 'unknown column') !== false) {
+            return ['ok' => false, 'error' => 'The settings.' . $column . ' column does not exist yet. Apply SQL File/migrations/2026_08_04_01_settings_favicon.sql via the migration console, then upload again.'];
+        }
+        error_log('[admin settings] branding save failed: ' . $e->getMessage());
+        return ['ok' => false, 'error' => 'The file was saved but the database rejected the update. See error_log.'];
+    }
+
+    // rowCount() is 0 both when nothing matched AND when the stored value was
+    // already identical, so confirm by reading the column back rather than
+    // trusting the affected-row count.
+    $check = $conn->prepare("SELECT {$column} FROM settings WHERE id = 1");
+    $check->execute();
+    $stored = $check->fetchColumn();
+    if ($stored === false) {
+        return ['ok' => false, 'error' => 'There is no settings row with id = 1 to update.'];
+    }
+    if ((string)$stored !== $value) {
+        return ['ok' => false, 'error' => 'The database did not retain the new filename.'];
+    }
+
+    return ['ok' => true, 'error' => ''];
+};
+
+if (isset($_POST['upload_picture'])) {
+    // Hardened to the same standard as the favicon handler below. Previously
+    // this branch had no extension allowlist, no size ceiling, no upload-error
+    // check, and built its destination from the RAW client filename — an
+    // unrestricted file upload that would happily write `evil.php` into a
+    // web-served directory.
+    $stored = admin_store_upload(
+        $_FILES['image'] ?? [],
+        $brandingDir,
+        ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'],
+        2 * 1024 * 1024,
+        'logo'
+    );
+
+    if (!$stored['ok']) {
+        toast_alert('error', $stored['error'], 'Logo not uploaded');
+    } else {
+        $saved = $saveBrandingColumn($conn, 'image', $stored['name']);
+        if (!$saved['ok']) {
+            toast_alert('error', $saved['error'], 'Logo not saved');
+        } else {
+            $page['image'] = $stored['name'];
+            if (function_exists('audit_log')) {
+                audit_log('settings.logo_uploaded', 'settings', '1', ['filename' => $stored['name']]);
+            }
+            toast_alert('success', 'Logo uploaded and saved as ' . $stored['name'] . '.', 'Done');
+        }
     }
 }
 
-if (isset($_POST['upload_favicon']) && isset($_FILES['favicon']) && $_FILES['favicon']['name']) {
-    $file = $_FILES['favicon'];
-    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-    $allowed = ['ico', 'png', 'svg', 'jpg', 'jpeg'];
-    $folder = "../assets/settings/";
-    if (!in_array($ext, $allowed, true)) {
-        toast_alert('error', 'Favicon must be .ico, .png, .svg, .jpg, or .jpeg', 'Invalid');
-    } elseif ($file['size'] > 2 * 1024 * 1024) {
-        toast_alert('error', 'Favicon must be smaller than 2 MB', 'Too large');
+if (isset($_POST['upload_favicon'])) {
+    // The on-disk name is standardised so repeated uploads overwrite the
+    // current favicon instead of piling up. Note the extension still varies,
+    // so a .png upload after a .ico leaves the stale .ico behind — the DB
+    // column decides which one is served, and stale siblings are cleaned up
+    // below so resolve_favicon()'s legacy favicon.png fallback can't resurrect
+    // an old file.
+    $stored = admin_store_upload(
+        $_FILES['favicon'] ?? [],
+        $brandingDir,
+        ['ico', 'png', 'svg', 'jpg', 'jpeg'],
+        2 * 1024 * 1024,
+        'favicon'
+    );
+
+    if (!$stored['ok']) {
+        toast_alert('error', $stored['error'], 'Favicon not uploaded');
     } else {
-        // Standardise the on-disk name so repeated uploads always overwrite
-        // the current favicon instead of piling up.
-        $name = 'favicon.' . $ext;
-        $destination = $folder . $name;
-        if (!is_dir($folder)) {
-            @mkdir($folder, 0775, true);
-        }
-        if (move_uploaded_file($file['tmp_name'], $destination)) {
-            $stmt = $conn->prepare("UPDATE settings SET favicon=:favicon WHERE id='1'");
-            $stmt->execute(['favicon' => $name]);
-            toast_alert('success', 'Favicon uploaded successfully', 'Thanks!');
+        $saved = $saveBrandingColumn($conn, 'favicon', $stored['name']);
+        if (!$saved['ok']) {
+            toast_alert('error', $saved['error'], 'Favicon not saved');
         } else {
-            toast_alert('error', 'Failed to save favicon', 'Upload error');
+            foreach (['ico', 'png', 'svg', 'jpg', 'jpeg'] as $staleExt) {
+                $stale = $brandingDir . DIRECTORY_SEPARATOR . 'favicon.' . $staleExt;
+                if ('favicon.' . $staleExt !== $stored['name'] && is_file($stale)) {
+                    @unlink($stale);
+                }
+            }
+            $page['favicon'] = $stored['name'];
+            if (function_exists('audit_log')) {
+                audit_log('settings.favicon_uploaded', 'settings', '1', ['filename' => $stored['name']]);
+            }
+            toast_alert('success', 'Favicon uploaded and saved as ' . $stored['name'] . '. Browsers cache favicons hard — force-reload if the tab icon looks unchanged.', 'Done');
         }
     }
 }
@@ -221,7 +305,15 @@ if (isset($_POST['save_settings'])) {
                 <div class="card card-primary card-outline">
                     <div class="card-header"><h3 class="card-title">Logo</h3></div>
                     <div class="card-body text-center">
-                        <img src="../assets/settings/<?= htmlspecialchars($page['image']) ?>" alt="logo" class="img-fluid mb-3" style="max-height:160px;">
+                        <?php // ?v= keys off the file's mtime. Uploads now overwrite a stable
+                              // filename, so without this the preview would keep showing the
+                              // previous image and make a successful upload look like a no-op.
+                              $logoName = trim((string)($page['image'] ?? '')); ?>
+                        <?php if ($logoName !== '' && is_file($brandingDir . DIRECTORY_SEPARATOR . $logoName)): ?>
+                            <img src="../assets/settings/<?= htmlspecialchars($logoName) ?>?v=<?= (int)filemtime($brandingDir . DIRECTORY_SEPARATOR . $logoName) ?>" alt="logo" class="img-fluid mb-3" style="max-height:160px;">
+                        <?php else: ?>
+                            <p class="text-muted small mb-3">No logo uploaded yet.</p>
+                        <?php endif; ?>
                         <form method="post" enctype="multipart/form-data">
                             <div class="form-group">
                                 <input type="file" name="image" class="form-control-file" accept="image/*">
@@ -235,8 +327,12 @@ if (isset($_POST['save_settings'])) {
                     <div class="card-header"><h3 class="card-title">Favicon</h3></div>
                     <div class="card-body text-center">
                         <?php $faviconName = trim((string)($page['favicon'] ?? '')); ?>
-                        <?php if ($faviconName !== '' && is_file('../assets/settings/' . $faviconName)): ?>
-                            <img src="../assets/settings/<?= htmlspecialchars($faviconName) ?>" alt="favicon" class="mb-3" style="max-height:64px; max-width:64px; image-rendering:auto;">
+                        <?php // is_file() on a CWD-relative path is the same trap the upload handler
+                              // fell into: under PHP-FPM it can resolve outside the document root,
+                              // so the preview reported "no favicon" for one that exists. Absolute.
+                              ?>
+                        <?php if ($faviconName !== '' && is_file($brandingDir . DIRECTORY_SEPARATOR . $faviconName)): ?>
+                            <img src="../assets/settings/<?= htmlspecialchars($faviconName) ?>?v=<?= (int)filemtime($brandingDir . DIRECTORY_SEPARATOR . $faviconName) ?>" alt="favicon" class="mb-3" style="max-height:64px; max-width:64px; image-rendering:auto;">
                         <?php else: ?>
                             <p class="text-muted small mb-3">No favicon uploaded yet.</p>
                         <?php endif; ?>

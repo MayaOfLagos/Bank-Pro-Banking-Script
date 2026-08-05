@@ -28,8 +28,8 @@ if (isset($_POST['hold_card'])) {
         (new AdminAlert)->adminCardStatusChangedMsg(admin_actor_name(), (string)($cardCheck['card_name'] ?? ''), '**** ' . substr(preg_replace('/\D+/', '', (string)($cardCheck['card_number'] ?? '')), -4), 'paused', admin_actor_ip()),
         'Customer card paused'
     );
-    toast_alert('success', 'Card placed on hold', 'Done');
-    header('Location:' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
+    toast_flash('success', 'Card placed on hold', 'Done');
+    header('Location: ./viewcard.php?id=' . rawurlencode((string)$id));
     exit;
 }
 
@@ -49,8 +49,8 @@ if (isset($_POST['active_card'])) {
         (new AdminAlert)->adminCardStatusChangedMsg(admin_actor_name(), (string)($cardCheck['card_name'] ?? ''), '**** ' . substr(preg_replace('/\D+/', '', (string)($cardCheck['card_number'] ?? '')), -4), 'activated', admin_actor_ip()),
         'Customer card activated'
     );
-    toast_alert('success', 'Card activated', 'Done');
-    header('Location:' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
+    toast_flash('success', 'Card activated', 'Done');
+    header('Location: ./viewcard.php?id=' . rawurlencode((string)$id));
     exit;
 }
 
@@ -125,7 +125,11 @@ $card_number = explode(' ', $cardCheck['card_number']);
                         <form method="post" class="mt-3">
                             <?php if ((string)$cardCheck['card_status'] === '1'): ?>
                                 <button class="btn btn-danger btn-block" name="hold_card">Deactivate Card</button>
-                            <?php elseif (in_array((string)$cardCheck['card_status'], ['2','3'], true)): ?>
+                            <?php else: ?>
+                                <?php // Status 4 (PAUSE) was omitted from this list, so a paused card
+                                      // rendered an empty form with no button — a dead end that could
+                                      // only be undone with a manual UPDATE. Any non-active status can
+                                      // now be reactivated. ?>
                                 <button class="btn btn-success btn-block" name="active_card">Activate Card</button>
                             <?php endif; ?>
                         </form>
