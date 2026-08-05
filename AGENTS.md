@@ -23,27 +23,34 @@ again when you finish. Merge coordinators check this before touching `main` or
 
 ## Current `main` tip
 
-`1a08f8e` — Fix white-flash/stuck boot + type-driven transaction avatars  
+`e27172d` — Rebuild admin email templates on a shared Laravel-style layout  
 Committed: 2026-08-05
 
-### What landed in that commit (customer portal only)
+### Recent commits
 
-| Area | What changed |
+| Commit | Description |
+|--------|-------------|
+| `e27172d` | Rebuild admin email templates on a shared Laravel-style layout (merge of admin agent branch) |
+| `e19dcd0` | Rebuild user email templates + rate-limited login alert |
+| `45c792f` | Rebuild admin email templates (admin agent commit — now merged) |
+| `eeb3cf4` | Upgrade PHPMailer 6.0.5 → 6.12.0; drop Twilio and object.php |
+| `126cfcf` | Add agent coordination board (AGENTS.md) |
+| `1a08f8e` | Fix white-flash/stuck boot + type-driven transaction avatars |
+
+### What landed in `e19dcd0` + `e27172d`
+
+| File | What changed |
 |------|-------------|
-| `api/client.js` | 30 s global timeout; `UPLOAD_TIMEOUT` (120 s) for file posts |
-| `main.js` | `siteStore.load()` kicked but not awaited; `router.isReady()` stays blocking |
-| `stores/site.js` | New `settled` ref (set in `finally`) so AuthShell can gate on "tried" not "succeeded" |
-| `AuthShell.vue` | Holds brand block until `settled`; reserves 4.5 rem to prevent layout shift |
-| `LoginView.vue` | Footer held until `settled` to avoid flashing a registration link on banks with it disabled |
-| `index.html` + `user-app.php` | CSS-only boot placeholder: themed background + delayed spinner; `<noscript>` fallback |
-| `TransactionAvatar.vue` | New shared component keyed off ledger `source` + direction — no merchant-name matching |
-| `TransactionItem.vue` | Removed hardcoded avatar logic; now uses `TransactionAvatar` |
-| `TransactionDetailView.vue` | Same removal; `isCounterparty` computed prevents "To: Wire Transfer" bug |
-| `api/user/dashboard.php` | Exposes `source` + `record_id` for the recent-transaction list |
-| `assets/user-app/` | Rebuilt bundle (entry `app-a8DEObhV.js`) |
-
-**Admin files touched in `1a08f8e`: none.** All admin paths are clean for the
-new agent to work on.
+| `include/userClass.php` | Complete rewrite of `emailMessage` — shared `_layout()` engine, 20 methods rebuilt, new `LoginAlert()` method |
+| `include/mail_template.php` | New fluent `MailTemplate` builder (Laravel markdown theme) shared by admin emails |
+| `admin/include/adminClass.php` | 2 700 → ~1 200 lines; all templates replaced with MailTemplate calls |
+| `admin/include/adminFunction.php` | Updated call sites; no behavioural change |
+| `admin/include/adminloginFunction.php` | Session hardening before `session_start()`; 5-attempt / 15-min rate limit |
+| `api/auth/pin-verify.php` | Rate-limited login alert fires here (post-PIN, 10-min window) |
+| `api/auth/login.php` | Removed old password-stage login email |
+| `api/user/*.php` (12 files) | `new emailMessage()` → `new emailMessage($settings)` |
+| `SQL File/migrations/2026_08_05_01_login_email_rate_limit.sql` | Adds `last_login_email_at` to users table |
+| `SQL File/migrations/2026_08_05_01_admin_login_rate_limit.sql` | Adds rate-limit + audit columns to admin_users table |
 
 ---
 
@@ -63,30 +70,11 @@ new agent to work on.
 
 ---
 
-### Agent: admin-function-email-cleanup (IN PROGRESS)
+### Agent: admin-function-email-cleanup (COMPLETE — merged)
 
-- **Branch:** to be created from `main` tip (`1a08f8e`)
-- **Worktree:** `.claude/worktrees/admin-notifications-cleanup` (currently locked)
-- **Files in scope:**
-  - `admin/include/adminFunction.php`
-  - `admin/include/adminloginFunction.php`
-  - `admin/include/adminClass.php` (email template methods)
-  - Any admin page that should trigger a notification email but currently does not
-- **Tasks:**
-  1. Audit `adminFunction.php` and `adminloginFunction.php` — remove dead code,
-     wire any useful-but-unconnected logic, improve what's kept
-  2. Inventory all `public function` email methods in `adminClass.php`
-  3. Replace email template bodies with clean, Laravel-markdown-style HTML
-     (single-column card, header/body/footer, responsive)
-  4. Identify missing notification hooks across all admin pages and add them
-  5. Pass a PHP syntax check (`php -l`) and a smoke-read of every changed file
-     before marking done
-- **Do not touch:**
-  - Anything under `frontend/` or `assets/user-app/`
-  - `user-app.php` auth gate
-  - `api/user/**` (customer API layer)
-  - `include/config.php`
-- **Status:** PENDING — update this line when work begins and when done
+- **Branch:** `worktree-admin-notifications-cleanup` (now merged into `main`)
+- **Merged as:** commits `45c792f` + `e27172d` on `main`
+- **Status:** DONE
 
 ---
 
@@ -94,9 +82,9 @@ new agent to work on.
 
 | Branch | Owner | Status | Notes |
 |--------|-------|--------|-------|
-| `main` | main-session | ✅ current | Boot fix + avatars landed |
-| `worktree-admin-notifications-cleanup` | admin-function-email-cleanup | ⏳ pending | Branch from `1a08f8e` |
+| `main` | — | ✅ current tip `e27172d` | Both email rewrites landed |
+| `production` | owner | ⏳ awaiting push permission | ff-only from `main` |
 
-When the admin agent marks its branch READY: verify no conflicts with `main`,
-run `php -l` across changed files, then ff-merge to `main` before promoting
-`production`.
+**Pending owner action:** apply migrations via the web migration console —  
+`2026_08_05_01_login_email_rate_limit.sql` (users table) and  
+`2026_08_05_01_admin_login_rate_limit.sql` (admin_users table).
