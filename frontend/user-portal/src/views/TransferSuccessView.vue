@@ -4,6 +4,9 @@ import { useRouter } from 'vue-router'
 import { CheckCircleIcon, ArrowRightIcon, PlusCircleIcon } from '@heroicons/vue/24/solid'
 import client from '../api/client'
 import ErrorState from '../components/ui/ErrorState.vue'
+import LoadingRegion from '../components/skeletons/LoadingRegion.vue'
+import SkeletonText from '../components/skeletons/SkeletonText.vue'
+import SkeletonDetailRows from '../components/skeletons/SkeletonDetailRows.vue'
 import { countryName } from '../utils/countries'
 import { formatMoneyInline } from '../utils/format'
 
@@ -68,10 +71,24 @@ function newTransferRoute() {
 <template>
   <div class="page">
     <div class="content">
-      <template v-if="loading">
-        <div class="skeleton skeleton-hero" />
-        <div class="skeleton skeleton-card" />
-      </template>
+      <LoadingRegion v-if="loading" label="your transfer receipt">
+        <section class="hero">
+          <div class="skeleton sk-check" />
+          <SkeletonText size="1.4rem" width="12rem" />
+          <SkeletonText size="0.9rem" width="14rem" />
+          <SkeletonText class="sk-amount" size="2.25rem" :line-height="1" width="9rem" />
+          <div class="skeleton sk-status" />
+        </section>
+
+        <!-- Reference, beneficiary and bank always render; account number is
+             present on every transfer type this screen can be reached from. -->
+        <SkeletonDetailRows :rows="4" />
+
+        <div class="actions">
+          <div class="skeleton sk-btn" />
+          <div class="skeleton sk-btn" />
+        </div>
+      </LoadingRegion>
 
       <template v-else-if="transfer">
         <section class="hero">
@@ -260,8 +277,9 @@ function newTransferRoute() {
 .btn--full { flex: 1 1 100%; margin-top: var(--space-3); }
 .btn-icon { width: 1.15rem; height: 1.15rem; }
 
-.skeleton { border-radius: var(--radius-lg); background: var(--surface-muted); animation: pulse 1.6s ease-in-out infinite; }
-.skeleton-hero { height: 14rem; }
-.skeleton-card { height: 14rem; }
-@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.85; } }
+/* Skeleton — .hero and .actions are reused as-is. */
+.sk-check { width: 4.5rem; height: 4.5rem; border-radius: var(--radius-pill); }
+.sk-amount { margin-top: 0.35rem; }
+.sk-status { width: 6rem; height: 1.72rem; border-radius: var(--radius-pill); }
+.sk-btn { flex: 1 1 0; height: 3rem; border-radius: var(--radius-pill); }
 </style>

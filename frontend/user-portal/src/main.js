@@ -5,11 +5,11 @@ import App from './App.vue'
 import router from './router'
 import { registerAuthHandlers, setCsrfToken } from './api/client'
 import { useAuthStore } from './stores/auth'
-import { useProfileStore } from './stores/profile'
 import { useSettingsStore } from './stores/settings'
 import { useAccountStatusStore } from './stores/accountStatus'
 import { useSiteStore } from './stores/site'
 import { applyThemeAtBoot } from './composables/useTheme'
+import { clearSession } from './composables/useSession'
 import 'vue-toastification/dist/index.css'
 import './style.css'
 
@@ -36,16 +36,13 @@ app.use(Toast, {
 // Pinia + the router + toast without pulling those into the axios module.
 const toast = useToast()
 const authStore = useAuthStore()
-const profileStore = useProfileStore()
 const settingsStore = useSettingsStore()
 const accountStatusStore = useAccountStatusStore()
 settingsStore.hydrateFromDocument()
 
 registerAuthHandlers({
 	unauthorized: (message) => {
-		authStore.reset()
-		profileStore.reset()
-		accountStatusStore.reset()
+		clearSession()
 		toast.error(message || 'Session expired. Sign in again.')
 		if (router.currentRoute.value.path !== '/login') {
 			router.push('/login')

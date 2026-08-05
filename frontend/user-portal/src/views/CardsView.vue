@@ -17,6 +17,9 @@ import OptionsList from '../components/dashboard/OptionsList.vue'
 import TransactionList from '../components/dashboard/TransactionList.vue'
 import ErrorState from '../components/ui/ErrorState.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
+import LoadingRegion from '../components/skeletons/LoadingRegion.vue'
+import SkeletonText from '../components/skeletons/SkeletonText.vue'
+import SkeletonTransactionRows from '../components/skeletons/SkeletonTransactionRows.vue'
 import { useProfileStore } from '../stores/profile'
 import { useCards } from '../composables/useCards'
 import { formatMoney, formatMoneyInline } from '../utils/format'
@@ -44,10 +47,16 @@ watch(hideBalance, (val) => {
   }
 })
 
+// useCards() exposes `loading`, but it is still false on the first paint — long
+// enough to flash the "No card linked to your account yet." empty state at
+// customers who do have one. Track settlement explicitly instead; load()
+// swallows its own errors, so `finally` is the honest hook.
+const cardsSettled = ref(false)
+
 onMounted(() => {
   profileStore.loadDashboard().catch(() => {})
   profileStore.loadProfile().catch(() => {})
-  cardsBundle.load()
+  cardsBundle.load().finally(() => { cardsSettled.value = true })
 })
 
 const profile = computed(() => profileStore.profile ?? {})
@@ -76,6 +85,10 @@ const detailActions = [
   { label: 'Transfer', icon: PlusIcon, variant: 'outlined', to: '/wire-transfer' },
   { label: 'Withdraw', icon: ArrowUpRightIcon, variant: 'outlined', to: '/withdrawals' },
 ]
+
+// Roughly the rendered width of "Card details" / "Tariff information" /
+// "Spending statistics" at 0.95rem.
+const OPTION_WIDTHS = ['6.5rem', '9rem', '9.5rem']
 
 const cardOptions = [
   { label: 'Card details', icon: InformationCircleIcon, onClick: () => {} },
@@ -185,7 +198,57 @@ async function submitRequest() {
         :has-unread="false"
       />
 
-      <template v-if="card">
+      <!-- BalanceHeader above stays live: it degrades to "Hi there" on its own
+           and owns the theme toggle, which should never be inert. Everything
+           below it is card data, so it gets placeholders.
+           The limit block is included because a card row normally carries a
+           limit; on the minority of cards without one the page settles one
+           block shorter. -->
+      <LoadingRegion v-if="!card && !cardsSettled" label="your card">
+        <div class="skeleton sk-hero" />
+
+        <div class="status-row">
+          <div class="skeleton sk-status" />
+          <SkeletonText size="0.8rem" width="5.5rem" />
+        </div>
+
+        <section class="balance-block">
+          <SkeletonText size="0.85rem" width="6.5rem" />
+          <div class="amount-row">
+            <SkeletonText size="2.5rem" :line-height="1" width="9rem" />
+            <div class="skeleton sk-reveal" />
+          </div>
+          <div class="sk-actions">
+            <div v-for="i in 2" :key="i" class="skeleton sk-action" />
+          </div>
+        </section>
+
+        <section class="limit-block">
+          <div class="limit-head">
+            <SkeletonText size="0.9rem" width="5rem" />
+            <SkeletonText size="0.9rem" width="8rem" />
+          </div>
+          <div class="skeleton sk-track" />
+        </section>
+
+        <div class="sk-options">
+          <div v-for="i in 3" :key="i" class="sk-option">
+            <div class="skeleton sk-option-icon" />
+            <SkeletonText class="sk-grow" size="0.95rem" :width="OPTION_WIDTHS[i - 1]" />
+            <div class="skeleton sk-chev" />
+          </div>
+        </div>
+
+        <div class="sk-tx-card">
+          <div class="sk-tx-head">
+            <SkeletonText size="1rem" width="7rem" />
+            <div class="skeleton sk-chev" />
+          </div>
+          <SkeletonTransactionRows :rows="4" />
+        </div>
+      </LoadingRegion>
+
+      <template v-else-if="card">
         <CardDetailHero :card="cardWithHolder" :masked="hideBalance" />
 
         <div v-if="cardStatusLabel" class="status-row">
@@ -600,4 +663,24 @@ async function submitRequest() {
 .btn--filled:hover:not(:disabled) { opacity: 0.92; }
 .btn--outlined { background: var(--btn-outline-bg); color: var(--btn-outline-fg); border-color: var(--btn-outline-border); }
 .btn--outlined:hover:not(:disabled) { background: color-mix(in srgb, var(--text-primary) 5%, transparent); }
+
+/* Skeleton — .status-row, .balance-block, .amount-row, .limit-block and
+   .limit-head are reused, so only the leaf shapes and the two child-component
+   surfaces (OptionsList, TransactionList) are restated here. */
+.sk-hero { min-height: 12.5rem; border-radius: var(--radius-lg); }
+.sk-status { width: 4.5rem; height: 1.63rem; border-radius: var(--radius-pill); }
+.sk-reveal { align-self: center; width: 2.25rem; height: 2.25rem; border-radius: var(--radius-pill); }
+.sk-actions { display: flex; gap: var(--space-3); width: 100%; }
+.sk-action { flex: 1 1 0; height: 3rem; border-radius: var(--radius-pill); }
+.sk-track { width: 100%; height: 0.4rem; border-radius: var(--radius-pill); }
+
+.sk-options { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); overflow: hidden; }
+.sk-option { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4); }
+.sk-option + .sk-option { border-top: 1px solid var(--divider); }
+.sk-option-icon { width: 2.5rem; height: 2.5rem; border-radius: var(--radius-md); }
+.sk-grow { flex: 1; min-width: 0; }
+.sk-chev { width: 1.1rem; height: 1.1rem; border-radius: var(--radius-sm); }
+
+.sk-tx-card { background: var(--surface); border-radius: var(--radius-lg); padding: var(--space-4); box-shadow: var(--shadow-card); }
+.sk-tx-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2); }
 </style>

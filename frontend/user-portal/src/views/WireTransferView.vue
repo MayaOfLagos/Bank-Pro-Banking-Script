@@ -9,6 +9,9 @@ import {
 } from '@heroicons/vue/24/solid'
 import FormField from '../components/ui/FormField.vue'
 import ErrorState from '../components/ui/ErrorState.vue'
+import LoadingRegion from '../components/skeletons/LoadingRegion.vue'
+import SkeletonBalanceCard from '../components/skeletons/SkeletonBalanceCard.vue'
+import SkeletonField from '../components/skeletons/SkeletonField.vue'
 import { useTransferForm } from '../composables/useTransferForm'
 import {
   moneyAmount, nonEmptyString, accountNumber, swiftCode, routingNumber,
@@ -92,10 +95,27 @@ const limitDisplay = computed(() => {
         </div>
       </header>
 
-      <template v-if="loading">
-        <div class="skeleton skeleton-balance" />
-        <div class="skeleton skeleton-form" />
-      </template>
+      <LoadingRegion v-if="loading" label="the transfer form">
+        <SkeletonBalanceCard />
+        <div class="form">
+          <section class="form-card">
+            <SkeletonField label="4.5rem" height="3.55rem" />
+            <SkeletonField label="9rem" />
+            <SkeletonField label="5.5rem" />
+            <SkeletonField label="11rem" />
+            <SkeletonField label="10rem" />
+            <!-- SWIFT and Routing share a 1fr 1fr grid and both carry the
+                 "Optional" hint, so the pair is a line taller than a plain row. -->
+            <div class="pair">
+              <SkeletonField label="6rem" hint="3.2rem" />
+              <SkeletonField label="6.5rem" hint="3.2rem" />
+            </div>
+            <SkeletonField label="7rem" />
+            <SkeletonField label="8rem" height="6.1rem" hint="3.2rem" />
+          </section>
+          <div class="skeleton sk-submit" />
+        </div>
+      </LoadingRegion>
 
       <template v-else>
         <section class="balance-card">
@@ -387,11 +407,7 @@ const limitDisplay = computed(() => {
 .submit:active:not(:disabled) { transform: scale(0.98); }
 .submit:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.skeleton {
-  border-radius: var(--radius-lg); background: var(--surface-muted);
-  animation: pulse 1.6s ease-in-out infinite;
-}
-.skeleton-balance { height: 5.5rem; }
-.skeleton-form { height: 28rem; }
-@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.85; } }
+/* Skeleton — .form, .form-card and .pair are reused so the grid and the
+   var(--space-4) field rhythm come from the same rules the real form uses. */
+.sk-submit { width: 100%; height: 3.1rem; border-radius: var(--radius-pill); }
 </style>

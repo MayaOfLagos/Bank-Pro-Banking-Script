@@ -15,7 +15,14 @@ import {
 import ErrorState from '../components/ui/ErrorState.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
 import FormField from '../components/ui/FormField.vue'
+import LoadingRegion from '../components/skeletons/LoadingRegion.vue'
+import SkeletonText from '../components/skeletons/SkeletonText.vue'
 import { useTickets } from '../composables/useTickets'
+
+// Ragged widths so the placeholder cards read as distinct subjects rather than
+// a stack of identical bars.
+const SUBJECT_WIDTHS = ['70%', '52%', '84%']
+const PREVIEW_WIDTHS = ['92%', '68%', '80%']
 
 const router = useRouter()
 const toast = useToast()
@@ -252,11 +259,25 @@ onMounted(async () => {
           <span>New ticket</span>
         </button>
 
-        <template v-if="tickets.loading.value">
-          <div class="skeleton-group">
-            <div v-for="i in 3" :key="i" class="skeleton-row" />
+        <!-- `.list` and `.ticket-card` are reused so the card padding, radius
+             and 3-block rhythm (head / meta / preview / count) match. -->
+        <LoadingRegion v-if="tickets.loading.value" label="your support tickets">
+          <div class="list">
+            <div v-for="i in 3" :key="i" class="ticket-card" aria-hidden="true">
+              <div class="ticket-head">
+                <SkeletonText class="sk-subject" size="0.95rem" :width="SUBJECT_WIDTHS[i - 1]" />
+                <div class="skeleton sk-badge" />
+              </div>
+              <div class="ticket-meta">
+                <div class="skeleton sk-tag" />
+                <SkeletonText size="0.7rem" width="5rem" />
+                <SkeletonText size="0.75rem" width="3.5rem" />
+              </div>
+              <SkeletonText size="0.8rem" :line-height="1.4" :width="PREVIEW_WIDTHS[i - 1]" />
+              <SkeletonText size="0.7rem" width="5.5rem" />
+            </div>
           </div>
-        </template>
+        </LoadingRegion>
 
         <ErrorState v-else-if="tickets.error.value" :message="tickets.error.value" />
 
@@ -810,18 +831,10 @@ onMounted(async () => {
   box-shadow: var(--shadow-card);
 }
 
-/* Skeleton */
-.skeleton-group { display: flex; flex-direction: column; gap: var(--space-3); }
-.skeleton-row {
-  height: 6rem;
-  border-radius: var(--radius-lg);
-  background: var(--surface-muted);
-  animation: pulse 1.6s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 0.85; }
-}
+/* Skeleton — .list, .ticket-card, .ticket-head and .ticket-meta are reused. */
+.sk-subject { flex: 1; min-width: 0; }
+.sk-badge { width: 4.5rem; height: 1.55rem; border-radius: var(--radius-pill); }
+.sk-tag { width: 4rem; height: 1.43rem; border-radius: var(--radius-pill); }
 
 /* Modal */
 .modal {

@@ -1,21 +1,44 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { BellIcon, SunIcon, MoonIcon } from '@heroicons/vue/24/solid'
 import { merchantInitials } from '../../utils/format'
 import { useTheme } from '../../composables/useTheme'
+import NotificationDrawer from '../layout/NotificationDrawer.vue'
+import { useNotificationsStore } from '../../stores/notifications'
 
 const props = defineProps({
   firstName: { type: String, default: '' },
   subtitle: { type: String, default: 'Welcome back!' },
   avatarUrl: { type: String, default: '' },
+  // Retained so existing call sites keep compiling; the real signal is the
+  // store's live unread count, and either source lights the dot.
   hasUnread: { type: Boolean, default: false },
   profileHref: { type: String, default: '/profile' },
-  notificationsHref: { type: String, default: '/tickets' },
 })
 
 const initials = computed(() => merchantInitials(props.firstName || 'A'))
 const { isDark, toggleTheme } = useTheme()
+
+/**
+ * The header owns the drawer rather than emitting upward. Its two call sites
+ * (DashboardView, CardsView) are plain content screens that hold no layout
+ * state, so lifting an `open` flag into each of them would duplicate the same
+ * boilerplate twice and leave any future third screen with a dead bell. This
+ * also mirrors FloatingActionBar, which renders TransferDrawer/MoreDrawer
+ * itself for the same reason. The sheet teleports to <body>, so nesting it
+ * here costs nothing in stacking terms.
+ */
+const notifications = useNotificationsStore()
+const showDot = computed(() => props.hasUnread || notifications.hasUnread)
+
+// Polling is reference-counted in the store; the bell is only ever mounted on
+// authenticated screens, so subscribing here keeps auth pages request-free.
+// subscribe() also triggers the store's own stale-check fetch, so there is
+// deliberately no extra loadFeed() call here — that would double-request on
+// every mount.
+onMounted(() => notifications.subscribe())
+onBeforeUnmount(() => notifications.unsubscribe())
 </script>
 
 <template>
@@ -32,10 +55,17 @@ const { isDark, toggleTheme } = useTheme()
     </RouterLink>
 
     <div class="actions">
-      <RouterLink :to="notificationsHref" class="icon-plain" aria-label="Notifications">
+      <button
+        type="button"
+        class="icon-plain"
+        aria-label="Notifications"
+        aria-haspopup="dialog"
+        :aria-expanded="notifications.drawerOpen"
+        @click="notifications.openDrawer()"
+      >
         <BellIcon class="icon" aria-hidden="true" />
-        <span v-if="hasUnread" class="dot" aria-hidden="true"></span>
-      </RouterLink>
+        <span v-if="showDot" class="dot" aria-hidden="true"></span>
+      </button>
       <button
         type="button"
         class="icon-bordered"
@@ -48,6 +78,8 @@ const { isDark, toggleTheme } = useTheme()
       </button>
     </div>
   </header>
+
+  <NotificationDrawer />
 </template>
 
 <style scoped>
@@ -106,39 +138,29 @@ const { isDark, toggleTheme } = useTheme()
   gap: var(--space-3);
   flex-shrink: 0;
 }
-.icon-plain {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.4rem;
-  color: var(--text-primary);
-  text-decoration: none;
-  cursor: pointer;
-  transition: transform 0.1s ease, color 0.15s ease;
-}
-.icon-plain:hover {
-  color: var(--accent-strong);
-}
-.icon-plain:active {
-  transform: scale(0.94);
-}
+/* Both header actions are the same circular chip so the bell and the theme
+   toggle read as a matched pair. */
+.icon-plain,
 .icon-bordered {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: 0.7rem;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-primary);
+  text-decoration: none;
   cursor: pointer;
-  transition: transform 0.1s ease, background-color 0.15s ease;
+  transition: transform 0.1s ease, background-color 0.15s ease, color 0.15s ease;
 }
+.icon-plain:hover,
 .icon-bordered:hover {
   background: color-mix(in srgb, var(--text-primary) 6%, transparent);
 }
+.icon-plain:active,
 .icon-bordered:active {
   transform: scale(0.94);
 }
@@ -146,14 +168,15 @@ const { isDark, toggleTheme } = useTheme()
   width: 1.4rem;
   height: 1.4rem;
 }
+/* Sits on the circle's edge rather than the corner of its bounding box, which
+   on a round chip would float in empty space. */
 .dot {
   position: absolute;
-  top: 0.15rem;
-  right: 0.2rem;
+  top: 0.3rem;
+  right: 0.35rem;
   width: 0.5rem;
   height: 0.5rem;
   border-radius: var(--radius-pill);
   background: var(--danger-fg);
-  border: 2px solid transparent;
 }
 </style>

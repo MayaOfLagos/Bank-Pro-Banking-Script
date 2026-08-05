@@ -155,14 +155,4 @@ watch(() => route.fullPath, () => {
   .bar { gap: 0.3rem; padding: 0.3rem; }
   .tab { width: 2.5rem; height: 2.5rem; }
 }
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  border: 0;
-}
 </style>

@@ -208,8 +208,6 @@ defineExpose({ reshuffle, clear })
         <BackspaceIcon class="key-icon" aria-hidden="true" />
       </button>
     </div>
-
-    <p class="hint">Key positions change every time for your security.</p>
   </div>
 </template>
 
@@ -220,17 +218,6 @@ defineExpose({ reshuffle, clear })
   gap: var(--space-5);
 }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
 
 /* Masked display */
 .dots {
@@ -259,10 +246,15 @@ defineExpose({ reshuffle, clear })
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--space-3);
+  justify-items: center;
 }
 .key {
-  min-height: 3.5rem; /* comfortable touch target */
-  border-radius: var(--radius-md);
+  /* Circular keys. Sized off the column so the pad scales with the card, but
+     clamped: below 3rem the target stops being comfortably tappable, above
+     4.5rem the three columns start crowding on small phones. */
+  width: clamp(3rem, 20vw, 4.5rem);
+  aspect-ratio: 1;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: var(--surface-muted);
   color: var(--text-primary);
@@ -276,6 +268,9 @@ defineExpose({ reshuffle, clear })
   justify-content: center;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  /* Stops the double-tap-to-zoom gesture, which on a keypad fires constantly
+     because entering a PIN is by nature a fast sequence of taps. */
+  touch-action: manipulation;
   transition: background-color 0.12s ease, transform 0.08s ease, border-color 0.12s ease;
 }
 .key:hover:not(:disabled) {
@@ -309,13 +304,6 @@ defineExpose({ reshuffle, clear })
 .key-icon {
   width: 1.35rem;
   height: 1.35rem;
-}
-
-.hint {
-  margin: 0;
-  text-align: center;
-  font-size: 0.72rem;
-  color: var(--text-muted);
 }
 
 @media (prefers-reduced-motion: reduce) {

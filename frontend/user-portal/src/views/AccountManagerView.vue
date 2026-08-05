@@ -7,6 +7,9 @@ import {
 import client from '../api/client'
 import ErrorState from '../components/ui/ErrorState.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
+import LoadingRegion from '../components/skeletons/LoadingRegion.vue'
+import SkeletonText from '../components/skeletons/SkeletonText.vue'
+import SkeletonDetailRows from '../components/skeletons/SkeletonDetailRows.vue'
 import { merchantInitials, formatMoneyInline } from '../utils/format'
 
 const router = useRouter()
@@ -70,10 +73,29 @@ const accountRows = computed(() => [
         </div>
       </header>
 
-      <template v-if="loading">
-        <div class="skeleton skeleton-hero" />
-        <div class="skeleton skeleton-card" />
-      </template>
+      <LoadingRegion v-if="loading" label="your account manager">
+        <section class="hero">
+          <div class="skeleton sk-avatar" />
+          <SkeletonText class="sk-name" size="1.15rem" :line-height="1.2" width="10rem" />
+          <SkeletonText size="0.85rem" width="9rem" />
+          <div class="contact-actions">
+            <div class="skeleton sk-contact" />
+            <div class="skeleton sk-contact" />
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="rows">
+            <SkeletonDetailRows :rows="2" :card="false" />
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="rows">
+            <SkeletonDetailRows :rows="3" :card="false" />
+          </div>
+        </section>
+      </LoadingRegion>
 
       <ErrorState v-else-if="error" :message="error" />
 
@@ -191,8 +213,10 @@ const accountRows = computed(() => [
 }
 .support-icon { width: 1.1rem; height: 1.1rem; }
 
-.skeleton { border-radius: var(--radius-lg); background: var(--surface-muted); animation: pulse 1.6s ease-in-out infinite; }
-.skeleton-hero { height: 14rem; }
-.skeleton-card { height: 10rem; }
-@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.85; } }
+/* Skeleton — .hero, .card, .rows and .contact-actions are reused as-is.
+   Assumes a manager *is* assigned; the unassigned case swaps in an EmptyState
+   of a different height, which no placeholder can predict. */
+.sk-avatar { width: 5.5rem; height: 5.5rem; border-radius: var(--radius-pill); }
+.sk-name { margin-top: 0.4rem; }
+.sk-contact { flex: 1 1 0; height: 2.75rem; border-radius: var(--radius-pill); }
 </style>

@@ -10,6 +10,9 @@ import {
 import client from '../api/client'
 import ErrorState from '../components/ui/ErrorState.vue'
 import EmailChangeModal from '../components/EmailChangeModal.vue'
+import LoadingRegion from '../components/skeletons/LoadingRegion.vue'
+import SkeletonText from '../components/skeletons/SkeletonText.vue'
+import SkeletonField from '../components/skeletons/SkeletonField.vue'
 import { countryList, countryName } from '../utils/countries'
 
 const router = useRouter()
@@ -114,6 +117,10 @@ async function save() {
   }
 }
 
+// This view hand-rolls `.field` rather than using <FormField>: a 0.72rem
+// uppercase label, a 0.4rem gap and a 0.8rem-padded input (3.15rem tall).
+const fieldMetrics = { labelSize: '0.72rem', gap: '0.4rem', height: '3.15rem' }
+
 function openEmailModal() { emailModalOpen.value = true }
 function onEmailUpdated(newAddress) {
   if (newAddress) emailReadonly.value = newAddress
@@ -134,9 +141,44 @@ function onEmailUpdated(newAddress) {
         </div>
       </header>
 
-      <template v-if="loading">
-        <div class="skeleton skeleton-form" />
-      </template>
+      <!-- The real form is fixed — every field renders regardless of the payload
+           — so the skeleton can mirror it row for row. `.card`, `.grid-2`,
+           `.field` and `.ref-rows` are reused so padding, gaps and the 480px
+           column break stay in sync with the live layout. -->
+      <LoadingRegion v-if="loading" label="your personal details">
+        <section class="card">
+          <SkeletonText size="1rem" width="4.5rem" />
+          <div v-for="row in 3" :key="row" class="grid-2">
+            <SkeletonField v-bind="fieldMetrics" label="5.5rem" />
+            <SkeletonField v-bind="fieldMetrics" label="5rem" />
+          </div>
+        </section>
+
+        <section class="card">
+          <SkeletonText size="1rem" width="4rem" />
+          <SkeletonField v-bind="fieldMetrics" label="7rem" />
+          <SkeletonField v-bind="fieldMetrics" label="9.5rem" hint="16rem" hint-gap="0.1rem" />
+          <div class="grid-2">
+            <SkeletonField v-bind="fieldMetrics" label="4.5rem" />
+            <SkeletonField v-bind="fieldMetrics" label="6.5rem" />
+          </div>
+          <SkeletonField v-bind="fieldMetrics" label="7.5rem" height="5.9rem" />
+        </section>
+
+        <section class="card card--muted">
+          <SkeletonText size="1rem" width="9rem" />
+          <SkeletonText class="sk-card-sub" size="0.8rem" :line-height="1.45" :lines="2"
+                        :width="['100%', '58%']" />
+          <div class="ref-rows">
+            <div class="ref-row">
+              <SkeletonText size="0.8rem" width="8rem" />
+              <SkeletonText size="0.9rem" width="7rem" />
+            </div>
+          </div>
+        </section>
+
+        <div class="skeleton sk-submit" />
+      </LoadingRegion>
 
       <ErrorState v-else-if="error" :message="error" />
 
@@ -371,7 +413,7 @@ function onEmailUpdated(newAddress) {
 .submit:active:not(:disabled) { transform: scale(0.98); }
 .submit:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.skeleton { border-radius: var(--radius-lg); background: var(--surface-muted); animation: pulse 1.6s ease-in-out infinite; }
-.skeleton-form { height: 32rem; }
-@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.85; } }
+/* Skeleton — .card, .grid-2 and .ref-rows are reused as-is. */
+.sk-card-sub { margin: -0.2rem 0 var(--space-2); }
+.sk-submit { width: 100%; height: 3rem; border-radius: var(--radius-pill); margin-top: var(--space-1); }
 </style>

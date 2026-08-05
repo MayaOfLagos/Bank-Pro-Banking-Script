@@ -9,6 +9,9 @@ import {
 } from '@heroicons/vue/24/solid'
 import client from '../api/client'
 import ErrorState from '../components/ui/ErrorState.vue'
+import LoadingRegion from '../components/skeletons/LoadingRegion.vue'
+import SkeletonBalanceCard from '../components/skeletons/SkeletonBalanceCard.vue'
+import SkeletonField from '../components/skeletons/SkeletonField.vue'
 import { currencySymbol } from '../utils/currency'
 import { formatMoneyInline } from '../utils/format'
 
@@ -150,10 +153,28 @@ async function copyWallet() {
         </div>
       </header>
 
-      <template v-if="loading">
-        <div class="skeleton skeleton-balance" />
-        <div class="skeleton skeleton-form" />
-      </template>
+      <!-- Mirrors the Bank tab, which is what `activeTab` defaults to. The
+           balance card here carries no remaining-limit line, hence :limit="false".
+           Fields are hand-rolled (0.8rem label, 0.4rem gap) rather than
+           <FormField>, so the caption metrics are passed explicitly. -->
+      <LoadingRegion v-if="loading" label="withdrawal options">
+        <SkeletonBalanceCard :limit="false" />
+
+        <div class="tabs">
+          <div v-for="tab in TABS" :key="tab" class="skeleton sk-tab" />
+        </div>
+
+        <section class="form-card">
+          <div class="form">
+            <SkeletonField label="4rem" label-size="0.8rem" gap="0.4rem" height="3.55rem" />
+            <SkeletonField label="5.5rem" label-size="0.8rem" gap="0.4rem" />
+            <SkeletonField label="7.5rem" label-size="0.8rem" gap="0.4rem" />
+            <SkeletonField label="7rem" label-size="0.8rem" gap="0.4rem" />
+            <div class="skeleton sk-hint" />
+            <div class="skeleton sk-submit" />
+          </div>
+        </section>
+      </LoadingRegion>
 
       <ErrorState v-else-if="error" :message="error" />
 
@@ -374,8 +395,9 @@ async function copyWallet() {
 .submit:active:not(:disabled) { transform: scale(0.98); }
 .submit:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.skeleton { border-radius: var(--radius-lg); background: var(--surface-muted); animation: pulse 1.6s ease-in-out infinite; }
-.skeleton-balance { height: 5.5rem; }
-.skeleton-form { height: 24rem; }
-@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.85; } }
+/* Skeleton — .tabs, .form-card and .form are reused so the gaps and padding
+   come from the same rules as the live form. */
+.sk-tab { flex: 1; height: 2.8rem; border-radius: var(--radius-pill); }
+.sk-hint { height: 2.5rem; border-radius: var(--radius-md); }
+.sk-submit { height: 3.1rem; border-radius: var(--radius-pill); margin-top: var(--space-2); }
 </style>

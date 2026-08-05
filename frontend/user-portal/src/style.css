@@ -148,6 +148,43 @@ body {
   @apply antialiased;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* iOS bumps the base font when a page is rotated to landscape, which shifts
+     every layout that sizes off rem. Pin it. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/*
+ * Focus-zoom suppression.
+ *
+ * Mobile Safari zooms the viewport whenever a focused form control renders
+ * below 16px, and it does not zoom back out on blur — which is exactly the
+ * "screen zooms in when I tap a field and I have to pinch out" report. The
+ * viewport meta cannot prevent this (iOS has ignored user-scalable=no since
+ * iOS 10); only the computed font size does.
+ *
+ * Scoped to coarse pointers so the smaller type the design uses on desktop is
+ * untouched — phones and tablets are the only place the zoom happens.
+ */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Double-tap-to-zoom also fires on ordinary controls, and costs every tap a
+   ~300ms wait while the browser watches for a second tap. Neither is wanted in
+   an app-shell UI. */
+button,
+[role='button'],
+a,
+input,
+select,
+textarea,
+label {
+  touch-action: manipulation;
 }
 
 #app {
@@ -470,19 +507,20 @@ body {
 }
 .auth-footer-note a { color: var(--accent-strong); font-weight: 600; text-decoration: none; }
 .auth-footer-note a:hover { text-decoration: underline; }
+/* Identity block above the PIN pad: avatar centred, name directly below.
+   Deliberately carries no account number — this screen is only reached after
+   the password step, so it tells the legitimate customer nothing they don't
+   know while printing an account number for anyone reading over a shoulder. */
 .auth-context {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: var(--space-3);
-  background: var(--surface-muted);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
+  gap: var(--space-2);
   margin-bottom: var(--space-5);
 }
 .auth-context-avatar {
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 4.5rem;
+  height: 4.5rem;
   border-radius: var(--radius-pill);
   background: var(--accent-soft);
   color: var(--accent-strong);
@@ -490,22 +528,26 @@ body {
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 0.8rem;
+  font-size: 1.4rem;
+  letter-spacing: 0.02em;
   flex-shrink: 0;
+  overflow: hidden;
+}
+.auth-context-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .auth-context-name {
   color: var(--text-primary);
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 1rem;
   margin: 0;
+  max-width: 100%;
+  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.auth-context-meta {
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  margin: 0.15rem 0 0;
 }
 .auth-cancel {
   background: transparent;
@@ -550,6 +592,97 @@ body {
 .auth-strength-label--fair { color: var(--warning-fg); }
 .auth-strength-label--good,
 .auth-strength-label--strong { color: var(--success-fg); }
+
+/*
+ * Skeletons.
+ *
+ * One shared implementation, because thirteen views had each hand-rolled their
+ * own `.skeleton` + `@keyframes pulse` and only one of them honoured
+ * prefers-reduced-motion.
+ *
+ * Both the fill and the shimmer sweep are mixed from --text-primary, which is
+ * the one token guaranteed to contrast with whatever surface it sits on. In the
+ * light theme that yields a grey slightly darker than the card; in the dark
+ * theme --text-primary is near-white so the same expression yields a lighter
+ * grey and a light sweep. No hardcoded colours, no per-theme overrides.
+ *
+ * Skeleton elements are always aria-hidden; the *container* carries
+ * role="status" + aria-busy and a single .sr-only label, so screen readers hear
+ * "Loading transactions" once instead of dozens of empty boxes.
+ */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--text-primary) 8%, var(--surface-muted));
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--text-primary) 7%, transparent) 50%,
+    transparent 100%
+  );
+  animation: skeleton-sweep 1.6s ease-in-out infinite;
+}
+/* Text lines read as type, not as boxes: tighter radius, and the last line of a
+   paragraph is short so the block has the ragged edge real copy has. */
+.skeleton--text {
+  border-radius: var(--radius-sm);
+}
+.skeleton--circle {
+  border-radius: var(--radius-pill);
+  aspect-ratio: 1;
+}
+.skeleton--pill {
+  border-radius: var(--radius-pill);
+}
+
+@keyframes skeleton-sweep {
+  0% { transform: translateX(-100%); }
+  60%, 100% { transform: translateX(100%); }
+}
+
+/* Containers used to compose page skeletons. Deliberately generic — anything
+   layout-specific lives in the view's own scoped styles next to the real
+   markup it is mirroring, so the two stay in sync. */
+.sk-card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-card);
+}
+.sk-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sk-gap, var(--space-3));
+}
+.sk-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sk-gap, var(--space-3));
+}
+.sk-spread {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sk-gap, var(--space-3));
+}
+.sk-grow { flex: 1 1 auto; min-width: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation: none; opacity: 0; }
+}
+
+/* `.sr-only` is Tailwind's utility, emitted globally by @tailwind utilities
+   above. Do not redeclare it inside a component's <style scoped> — that
+   compiles to `.sr-only[data-v-…]` and only shadows the global one for that
+   component, which is how four copies of it accumulated. */
 
 /*
  * Print — the transaction and loan detail views double as receipts.

@@ -13,6 +13,8 @@ import {
 import { useDeposit } from '../composables/useDeposit'
 import { formatMoneyInline } from '../utils/format'
 import ErrorState from '../components/ui/ErrorState.vue'
+import LoadingRegion from '../components/skeletons/LoadingRegion.vue'
+import SkeletonText from '../components/skeletons/SkeletonText.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -189,7 +191,43 @@ const limitHint = computed(() => {
 
       <ErrorState v-if="dep.error.value" :message="dep.error.value" compact />
 
-      <section v-if="activeTab === 'Crypto'" class="card" aria-label="Crypto deposit">
+      <!-- Mirrors the Crypto tab, which is the tab this view always opens on.
+           The tab strip itself is deliberately absent: it only renders once meta
+           says bank deposits are enabled, so drawing it here would guarantee a
+           shift for every account that has them switched off. -->
+      <LoadingRegion v-if="dep.loading.value" label="deposit options">
+        <section class="card">
+          <div class="form">
+            <div class="field">
+              <SkeletonText size="0.8rem" :line-height="1.2" width="4rem" />
+              <div class="skeleton sk-input" />
+              <SkeletonText size="0.75rem" width="11rem" />
+            </div>
+
+            <div class="field">
+              <SkeletonText size="0.8rem" :line-height="1.2" width="7.5rem" />
+              <div class="skeleton sk-input" />
+            </div>
+
+            <div class="field">
+              <SkeletonText size="0.8rem" :line-height="1.2" width="7rem" />
+              <div class="copy-row">
+                <div class="skeleton sk-input" />
+                <div class="skeleton sk-copy" />
+              </div>
+            </div>
+
+            <div class="field">
+              <SkeletonText size="0.8rem" :line-height="1.2" width="9.5rem" />
+              <div class="skeleton sk-upload" />
+            </div>
+
+            <div class="skeleton sk-submit" />
+          </div>
+        </section>
+      </LoadingRegion>
+
+      <section v-else-if="activeTab === 'Crypto'" class="card" aria-label="Crypto deposit">
         <form class="form" @submit.prevent="onSubmit">
           <div class="field">
             <label for="dep-amount" class="label">Amount</label>
@@ -586,4 +624,11 @@ const limitHint = computed(() => {
   margin: 0.2rem 0 0;
   word-break: break-all;
 }
+
+/* Skeleton — .card, .form, .field and .copy-row are reused as-is. */
+.sk-input { width: 100%; height: 2.95rem; border-radius: var(--radius-md); }
+.copy-row .sk-input { flex: 1; }
+.sk-copy { width: 2.75rem; border-radius: var(--radius-md); flex-shrink: 0; }
+.sk-upload { width: 100%; height: 8rem; border-radius: var(--radius-md); }
+.sk-submit { width: 100%; height: 3.13rem; border-radius: var(--radius-pill); }
 </style>

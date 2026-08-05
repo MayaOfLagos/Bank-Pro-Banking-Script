@@ -9,10 +9,14 @@ import {
 } from '@heroicons/vue/24/solid'
 import client, { UPLOAD_TIMEOUT } from '../api/client'
 import { authApi } from '../api/auth'
+import { clearSession } from '../composables/useSession'
 import { merchantInitials } from '../utils/format'
 import { currencySymbol } from '../utils/currency'
 import { countryName } from '../utils/countries'
 import ErrorState from '../components/ui/ErrorState.vue'
+import LoadingRegion from '../components/skeletons/LoadingRegion.vue'
+import SkeletonText from '../components/skeletons/SkeletonText.vue'
+import SkeletonDetailRows from '../components/skeletons/SkeletonDetailRows.vue'
 
 const router = useRouter()
 const toast = useToast()
@@ -131,6 +135,9 @@ async function handleLogout() {
   try {
     await authApi.logout()
   } finally {
+    // Cleared even if the request failed: the customer asked to leave, so the
+    // local copy of their account must go regardless of what the server said.
+    clearSession()
     router.push('/login')
   }
 }
@@ -151,11 +158,48 @@ onMounted(loadProfile)
         </div>
       </header>
 
-      <template v-if="loading">
-        <div class="skeleton skeleton-hero" />
-        <div class="skeleton skeleton-card" />
-        <div class="skeleton skeleton-card-sm" />
-      </template>
+      <LoadingRegion v-if="loading" label="your profile">
+        <section class="hero">
+          <div class="skeleton sk-avatar" />
+          <SkeletonText class="sk-name" size="1.15rem" :line-height="1.2" width="11rem" />
+          <SkeletonText size="0.85rem" width="8rem" />
+          <div class="skeleton sk-status" />
+        </section>
+
+        <!-- Eight rows: the six always-present fields plus the two optional
+             ones (DOB, occupation) a typical account has filled in. -->
+        <section class="card">
+          <div class="rows">
+            <SkeletonDetailRows :rows="8" :card="false" />
+          </div>
+        </section>
+
+        <SkeletonText class="group-label" size="0.7rem" :line-height="1.5" width="4rem" />
+        <nav class="card manage-card">
+          <div v-for="i in 3" :key="i" class="sk-manage-row">
+            <div class="skeleton sk-manage-icon" />
+            <div class="manage-body">
+              <SkeletonText size="0.95rem" width="9rem" />
+              <SkeletonText size="0.75rem" width="12rem" />
+            </div>
+            <div class="skeleton sk-chev" />
+          </div>
+        </nav>
+
+        <SkeletonText class="group-label" size="0.7rem" :line-height="1.5" width="4.6rem" />
+        <nav class="card manage-card">
+          <div v-for="i in 2" :key="i" class="sk-manage-row">
+            <div class="skeleton sk-manage-icon" />
+            <div class="manage-body">
+              <SkeletonText size="0.95rem" width="6rem" />
+              <SkeletonText size="0.75rem" width="13rem" />
+            </div>
+            <div class="skeleton sk-chev" />
+          </div>
+        </nav>
+
+        <div class="skeleton sk-signout" />
+      </LoadingRegion>
 
       <ErrorState v-else-if="error" :message="error" />
 
@@ -353,9 +397,19 @@ onMounted(loadProfile)
 .signout:disabled { opacity: 0.5; cursor: not-allowed; }
 .signout-icon { width: 1.15rem; height: 1.15rem; }
 
-.skeleton { border-radius: var(--radius-lg); background: var(--surface-muted); animation: pulse 1.6s ease-in-out infinite; }
-.skeleton-hero { height: 12rem; }
-.skeleton-card { height: 14rem; }
-.skeleton-card-sm { height: 8rem; }
-@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.85; } }
+/* Skeleton — .hero, .card, .manage-card, .manage-body and .group-label are
+   reused as-is; only the leaf shapes differ. .sk-manage-row instead of
+   .manage-row so the placeholder has no hover/tap affordance. */
+.sk-avatar { width: 5.5rem; height: 5.5rem; border-radius: var(--radius-pill); }
+.sk-name { margin-top: 0.2rem; }
+.sk-status { width: 5rem; height: 1.72rem; border-radius: var(--radius-pill); }
+.sk-manage-row {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) 0;
+  margin: 0 calc(var(--space-2) * -1); padding-inline: var(--space-2);
+}
+.sk-manage-row + .sk-manage-row { border-top: 1px solid var(--divider); }
+.sk-manage-icon { width: 2.5rem; height: 2.5rem; border-radius: var(--radius-md); flex-shrink: 0; }
+.sk-chev { width: 1.1rem; height: 1.1rem; border-radius: var(--radius-sm); flex-shrink: 0; }
+.sk-signout { width: 100%; height: 3rem; border-radius: var(--radius-pill); }
 </style>

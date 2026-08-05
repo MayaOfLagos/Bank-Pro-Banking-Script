@@ -8,6 +8,8 @@ import {
 } from '@heroicons/vue/24/solid'
 import client from '../api/client'
 import ErrorState from '../components/ui/ErrorState.vue'
+import LoadingRegion from '../components/skeletons/LoadingRegion.vue'
+import SkeletonText from '../components/skeletons/SkeletonText.vue'
 import { currencySymbol } from '../utils/currency'
 import { formatMoneyInline } from '../utils/format'
 
@@ -142,10 +144,33 @@ async function submitLoanRequest() {
         </div>
       </header>
 
-      <template v-if="loading">
-        <div class="skeleton skeleton-stats" />
-        <div class="skeleton skeleton-list" />
-      </template>
+      <LoadingRegion v-if="loading" label="loans">
+        <section class="stats">
+          <div v-for="i in 3" :key="i" class="stat-card">
+            <div class="skeleton sk-stat-icon" />
+            <SkeletonText size="1.35rem" :line-height="1" width="2.2rem" />
+            <SkeletonText size="0.7rem" :line-height="1.2" width="90%" />
+          </div>
+        </section>
+
+        <div class="skeleton sk-apply" />
+
+        <section class="list">
+          <div v-for="i in 3" :key="i" class="sk-loan-card">
+            <div class="loan-head">
+              <div class="loan-category">
+                <div class="skeleton sk-tag" />
+                <SkeletonText size="0.75rem" width="7rem" />
+              </div>
+              <div class="skeleton sk-status" />
+            </div>
+            <div class="loan-amount-row">
+              <SkeletonText size="1.5rem" :line-height="1.5" width="8rem" />
+              <div class="skeleton sk-chev" />
+            </div>
+          </div>
+        </section>
+      </LoadingRegion>
 
       <ErrorState v-else-if="error" :message="error" />
 
@@ -508,8 +533,22 @@ async function submitLoanRequest() {
 .btn--outlined { background: var(--btn-outline-bg); color: var(--btn-outline-fg); border-color: var(--btn-outline-border); }
 .btn--outlined:hover:not(:disabled) { background: color-mix(in srgb, var(--text-primary) 5%, transparent); }
 
-.skeleton { border-radius: var(--radius-lg); background: var(--surface-muted); animation: pulse 1.6s ease-in-out infinite; }
-.skeleton-stats { height: 6rem; }
-.skeleton-list { height: 20rem; }
-@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.85; } }
+/* Skeleton — .stats / .stat-card / .loan-head / .loan-amount-row above are
+   reused directly, so only the leaf shapes and the card shell live here.
+   .sk-loan-card rather than .loan-card because the real one is a RouterLink
+   with hover lift and pointer affordances a placeholder must not advertise. */
+.sk-stat-icon { width: 2rem; height: 2rem; border-radius: var(--radius-md); }
+.sk-apply { width: 100%; height: 3rem; border-radius: var(--radius-pill); }
+.sk-loan-card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.sk-tag { width: 4.5rem; height: 1.35rem; border-radius: var(--radius-pill); align-self: flex-start; }
+.sk-status { width: 5.5rem; height: 1.68rem; border-radius: var(--radius-pill); flex-shrink: 0; }
+.sk-chev { width: 1.1rem; height: 1.1rem; border-radius: var(--radius-sm); flex-shrink: 0; }
 </style>

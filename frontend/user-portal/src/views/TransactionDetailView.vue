@@ -5,6 +5,9 @@ import { ChevronLeftIcon, PrinterIcon } from '@heroicons/vue/24/solid'
 import client from '../api/client'
 import ErrorState from '../components/ui/ErrorState.vue'
 import TransactionAvatar from '../components/ui/TransactionAvatar.vue'
+import LoadingRegion from '../components/skeletons/LoadingRegion.vue'
+import SkeletonText from '../components/skeletons/SkeletonText.vue'
+import SkeletonDetailRows from '../components/skeletons/SkeletonDetailRows.vue'
 import { formatMoney, coerceNumber } from '../utils/format'
 
 const route = useRoute()
@@ -114,10 +117,23 @@ const detailRows = computed(() => [
         </div>
       </header>
 
-      <template v-if="loading">
-        <div class="skeleton skeleton-hero" />
-        <div class="skeleton skeleton-rows" />
-      </template>
+      <LoadingRegion v-if="loading" label="this transaction">
+        <section class="hero">
+          <div class="skeleton sk-avatar" />
+          <SkeletonText size="2.5rem" :line-height="1" width="10rem" />
+          <SkeletonText size="0.95rem" width="11rem" />
+          <div class="skeleton sk-badge" />
+        </section>
+
+        <!-- Seven rows: Type, Reference, To/From, Description, Date, Time plus
+             the one source-specific `extra` row most feeds carry. -->
+        <SkeletonDetailRows :rows="7" />
+
+        <div class="actions">
+          <div class="skeleton sk-action" />
+          <div class="skeleton sk-action sk-action--narrow" />
+        </div>
+      </LoadingRegion>
 
       <ErrorState v-else-if="error" :message="error" />
 
@@ -340,19 +356,25 @@ const detailRows = computed(() => [
 .action:hover {
   background: color-mix(in srgb, var(--text-primary) 4%, var(--surface));
 }
-.skeleton {
-  border-radius: var(--radius-lg);
-  background: var(--surface-muted);
-  animation: pulse 1.6s ease-in-out infinite;
+
+/* Skeleton. The hero block reuses the real .hero rule above, so its padding,
+   radius and 4rem --tx-avatar-size come along for free. */
+.sk-avatar {
+  width: var(--tx-avatar-size);
+  height: var(--tx-avatar-size);
+  border-radius: var(--radius-pill);
 }
-.skeleton-hero {
-  height: 12rem;
+.sk-badge {
+  width: 6rem;
+  height: 1.6rem;
+  border-radius: var(--radius-pill);
 }
-.skeleton-rows {
-  height: 18rem;
+.sk-action {
+  width: 10.75rem;
+  height: 2.9rem;
+  border-radius: var(--radius-pill);
 }
-@keyframes pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 0.85; }
+.sk-action--narrow {
+  width: 10rem;
 }
 </style>

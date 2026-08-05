@@ -10,6 +10,7 @@ import {
 import SwipeDrawer from '../ui/SwipeDrawer.vue'
 import { useProfileStore } from '../../stores/profile'
 import { useTheme } from '../../composables/useTheme'
+import { clearSession } from '../../composables/useSession'
 import { authApi } from '../../api/auth'
 
 const props = defineProps({
@@ -79,6 +80,9 @@ async function handleLogout() {
   try {
     await authApi.logout()
   } finally {
+    // Cleared even if the request failed: the customer asked to leave, so the
+    // local copy of their account must go regardless of what the server said.
+    clearSession()
     loggingOut.value = false
     emit('close')
     router.push('/login')

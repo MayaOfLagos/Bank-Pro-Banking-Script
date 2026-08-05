@@ -9,11 +9,11 @@
 
     <template v-else>
       <div v-if="profile.fullname" class="auth-context">
-        <div class="auth-context-avatar">{{ initials }}</div>
-        <div>
-          <p class="auth-context-name">{{ profile.fullname }}</p>
-          <p class="auth-context-meta">Account {{ profile.acct_no }}</p>
+        <div class="auth-context-avatar">
+          <img v-if="profile.image" :src="profile.image" alt="" aria-hidden="true" @error="profile.image = ''" />
+          <span v-else aria-hidden="true">{{ initials }}</span>
         </div>
+        <p class="auth-context-name">{{ profile.fullname }}</p>
       </div>
 
       <form @submit.prevent="onSubmit" class="auth-form">
@@ -59,6 +59,8 @@ import { authApi } from '../../api/auth'
 import { useAuthStore } from '../../stores/auth'
 import { useProfileStore } from '../../stores/profile'
 import { useValidatedForm } from '../../composables/useValidatedForm'
+import { clearSession } from '../../composables/useSession'
+import { personInitials } from '../../utils/format'
 import { z } from 'zod'
 import { pin as pinSchema } from '../../validation/schemas'
 
@@ -70,16 +72,9 @@ const contextLoading = ref(true)
 const serverError = ref('')
 const attemptsRemaining = ref(null)
 
-const profile = reactive({ fullname: '', acct_no: '' })
+const profile = reactive({ fullname: '', image: '' })
 
-const initials = computed(() =>
-  profile.fullname
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join('')
-)
+const initials = computed(() => personInitials(profile.fullname))
 
 const PIN_LENGTH = 4
 
@@ -96,7 +91,7 @@ onMounted(async () => {
     const { data } = await authApi.pinContext()
     if (data?.data) {
       profile.fullname = data.data.fullname || ''
-      profile.acct_no = data.data.acct_no || ''
+      profile.image = data.data.image || ''
     }
   } catch (err) {
     serverError.value = err?.response?.data?.message || 'Session expired. Please log in again.'
@@ -129,8 +124,7 @@ const logout = async () => {
   try {
     await authApi.logout()
   } finally {
-    auth.reset()
-    profileStore.reset()
+    clearSession()
     await router.push('/login')
   }
 }

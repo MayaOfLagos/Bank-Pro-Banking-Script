@@ -6,7 +6,14 @@
     <!-- Admin-authored copy. Save handler in admin/settings.php whitelists
          a fixed vocabulary of tags via strip_tags(), so v-html here is
          trust-scoped to the admin, not to arbitrary user input. -->
-    <div v-if="html" class="legal-body" v-html="html"></div>
+    <!-- Hold the placeholder until the store has *settled*, not until it has
+         loaded: `loaded` never flips on a failed fetch, and without this gate
+         the "not published yet" notice flashes on every visit before the copy
+         arrives. -->
+    <LoadingRegion v-if="!site.settled" label="the terms of service">
+      <SkeletonLegalBody />
+    </LoadingRegion>
+    <div v-else-if="html" class="legal-body" v-html="html"></div>
     <div v-else class="legal-body legal-body--empty">
       <p>No Terms of Service have been published yet. Please check back soon.</p>
     </div>
@@ -25,6 +32,8 @@
 import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import AuthShell from '../../components/auth/AuthShell.vue'
+import LoadingRegion from '../../components/skeletons/LoadingRegion.vue'
+import SkeletonLegalBody from '../../components/skeletons/SkeletonLegalBody.vue'
 import { useSiteStore } from '../../stores/site'
 
 const site = useSiteStore()

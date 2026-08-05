@@ -4,6 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeftIcon, PrinterIcon } from '@heroicons/vue/24/solid'
 import client from '../api/client'
 import ErrorState from '../components/ui/ErrorState.vue'
+import LoadingRegion from '../components/skeletons/LoadingRegion.vue'
+import SkeletonText from '../components/skeletons/SkeletonText.vue'
+import SkeletonDetailRows from '../components/skeletons/SkeletonDetailRows.vue'
 import { formatMoney } from '../utils/format'
 
 const route = useRoute()
@@ -90,10 +93,22 @@ const detailRows = computed(() => [
         </div>
       </header>
 
-      <template v-if="loading">
-        <div class="skeleton skeleton-hero" />
-        <div class="skeleton skeleton-rows" />
-      </template>
+      <LoadingRegion v-if="loading" label="this loan">
+        <section class="hero">
+          <SkeletonText size="0.7rem" width="9rem" />
+          <SkeletonText size="2.25rem" :line-height="1.1" width="9.5rem" />
+          <div class="skeleton sk-status" />
+        </section>
+
+        <section class="detail-card">
+          <SkeletonDetailRows :rows="5" :card="false" />
+        </section>
+
+        <div class="actions">
+          <div class="skeleton sk-action" />
+          <div class="skeleton sk-action" />
+        </div>
+      </LoadingRegion>
 
       <ErrorState v-else-if="error" :message="error" />
 
@@ -168,8 +183,7 @@ const detailRows = computed(() => [
 .action:active { transform: scale(0.98); }
 .action-icon { width: 1.1rem; height: 1.1rem; }
 
-.skeleton { border-radius: var(--radius-lg); background: var(--surface-muted); animation: pulse 1.6s ease-in-out infinite; }
-.skeleton-hero { height: 11rem; }
-.skeleton-rows { height: 16rem; }
-@keyframes pulse { 0%, 100% { opacity: 0.5; } 50% { opacity: 0.85; } }
+/* Skeleton — .hero, .detail-card and .actions are reused as-is. */
+.sk-status { width: 5.5rem; height: 1.68rem; border-radius: var(--radius-pill); }
+.sk-action { width: 100%; height: 3rem; border-radius: var(--radius-pill); }
 </style>

@@ -7,9 +7,10 @@ import { useAccountStatusStore } from '../../stores/accountStatus'
 const accountStatus = useAccountStatusStore()
 
 // This shell unmounts whenever the app drops to an auth page, so mounting
-// marks entry into an authenticated session. Clearing first means a signed-
-// out account's banner can never bleed into the next sign-in on this tab —
-// the logout paths don't all reset stores.
+// marks entry into an authenticated session. Clearing before the refresh
+// means the previous account's banner cannot show for the frame between
+// mount and response — clearSession() already empties the store on the way
+// out, so this is about the gap, not about a missed teardown.
 onMounted(() => {
   accountStatus.reset()
   accountStatus.refresh()

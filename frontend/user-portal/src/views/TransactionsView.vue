@@ -6,6 +6,9 @@ import client from '../api/client'
 import TransactionItem from '../components/dashboard/TransactionItem.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
 import ErrorState from '../components/ui/ErrorState.vue'
+import LoadingRegion from '../components/skeletons/LoadingRegion.vue'
+import SkeletonText from '../components/skeletons/SkeletonText.vue'
+import SkeletonTransactionRows from '../components/skeletons/SkeletonTransactionRows.vue'
 import { ledgerDetailPath } from '../utils/ledger'
 
 const router = useRouter()
@@ -133,11 +136,20 @@ onMounted(loadTransactions)
         </button>
       </div>
 
-      <template v-if="loading">
-        <div class="skeleton-group">
-          <div v-for="i in 6" :key="i" class="skeleton-row" />
-        </div>
-      </template>
+      <!--
+        Two groups of rows rather than six loose bars: the real feed is grouped
+        by day, so the day heading and the card that wraps each group have to be
+        in the placeholder or the whole list shifts when the data lands.
+      -->
+      <LoadingRegion v-if="loading" label="transactions">
+        <SkeletonText class="count" size="0.75rem" width="7rem" />
+        <section v-for="(count, g) in [3, 2]" :key="g" class="group">
+          <SkeletonText size="0.75rem" width="4.5rem" class="group-label" />
+          <div class="rows">
+            <SkeletonTransactionRows :rows="count" />
+          </div>
+        </section>
+      </LoadingRegion>
 
       <ErrorState v-else-if="error" :message="error" />
 
@@ -290,20 +302,5 @@ onMounted(loadTransactions)
 }
 .rows > * + * {
   border-top: 1px solid var(--divider);
-}
-.skeleton-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.skeleton-row {
-  height: 4.5rem;
-  border-radius: var(--radius-lg);
-  background: var(--surface-muted);
-  animation: pulse 1.6s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 0.85; }
 }
 </style>

@@ -70,3 +70,31 @@ export function merchantInitials(name) {
     .map((w) => w[0].toUpperCase())
     .join('') || '?'
 }
+
+/**
+ * Two-letter avatar initials for a person, from whatever name parts exist.
+ *
+ * Callers pass whatever they have, in any order. Accounts here were created
+ * through several different signup flows over the years, so a row may carry
+ * only a firstname, only a lastname, or a single fullname — all three have to
+ * yield two sensible letters, which is why a lone token falls back to its
+ * first two characters instead of a single initial.
+ *
+ *   ('Ada', 'Lovelace')    -> 'AL'
+ *   ('Ada Byron Lovelace') -> 'AL'   first + last; middle names skipped
+ *   ('Ada', '')            -> 'AD'
+ *   ('', 'Lovelace')       -> 'LO'
+ *   ('X')                  -> 'X'    one letter is all there is
+ *   ('', '')               -> '?'
+ */
+export function personInitials(...parts) {
+  const words = parts
+    .flatMap((part) => String(part ?? '').split(/[\s,._-]+/))
+    // Strip punctuation so "O'Brien" or "(Ada)" can't yield a quote or paren.
+    .map((word) => word.replace(/[^\p{L}\p{N}]/gu, ''))
+    .filter(Boolean)
+
+  if (!words.length) return '?'
+  if (words.length === 1) return words[0].slice(0, 2).toLocaleUpperCase()
+  return (words[0][0] + words[words.length - 1][0]).toLocaleUpperCase()
+}
