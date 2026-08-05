@@ -150,6 +150,33 @@ function migration_runnable_files(): array
 }
 
 /**
+ * What the scanner actually saw on disk.
+ *
+ * An empty dropdown has several unrelated causes — the directory never
+ * reached the server, the deploy is behind, the directory is unreadable by
+ * the PHP user, or every file was rejected by the content gate — and they
+ * need opposite fixes. The page previously rendered an empty <select> and
+ * a disabled button with no explanation for any of them, which is
+ * indistinguishable from "the console is broken" on a box where there is
+ * no shell to go and look.
+ */
+function migration_scan_report(): array
+{
+    $expected = __DIR__ . '/' . MIGRATION_SQL_ROOT;
+    $root = realpath($expected);
+    $index = migration_file_index();
+
+    return [
+        'expected'  => $expected,
+        'root'      => $root === false ? null : $root,
+        'readable'  => $root !== false && is_readable($root),
+        'subdir'    => $root !== false && is_dir($root . '/migrations'),
+        'seen'      => count($index),
+        'runnable'  => count(migration_runnable_files()),
+    ];
+}
+
+/**
  * Resolve a user-supplied relative name to an absolute path, or null.
  *
  * Containment is checked on the *resolved* path, so symlinks, "../" and
@@ -520,6 +547,37 @@ a { color:#58a6ff; }
 
   <div class="card">
     <h2>Run a migration</h2>
+    <?php if (!$files): ?>
+      <?php $scan = migration_scan_report(); ?>
+      <div class="flash error">No migration is available to run.</div>
+      <div class="meta" style="margin-bottom:12px">
+        <div><span>Looking in</span><code><?= h($scan['expected']) ?></code></div>
+        <div><span>Directory</span><?= $scan['root'] === null ? 'not found' : ($scan['readable'] ? 'found' : 'found but unreadable') ?></div>
+        <div><span>migrations/ subfolder</span><?= $scan['subdir'] ? 'present' : 'missing' ?></div>
+        <div><span>.sql files seen</span><?= (int)$scan['seen'] ?></div>
+      </div>
+      <p class="note">
+        <?php if ($scan['root'] === null): ?>
+          The <code><?= h(MIGRATION_SQL_ROOT) ?></code> directory is not on this server. It is
+          committed to the repository, so this almost always means the deploy has not run since
+          the migrations were added — trigger <em>Update from Remote and Deploy HEAD</em> in
+          cPanel &gt; Git Version Control, then reload this page.
+        <?php elseif (!$scan['readable']): ?>
+          The directory exists but PHP cannot read it. Check its permissions (755) and owner.
+        <?php elseif (!$scan['subdir']): ?>
+          The directory is present but its <code>migrations/</code> subfolder is not, so the deploy
+          is behind the repository. Trigger <em>Update from Remote and Deploy HEAD</em> in
+          cPanel &gt; Git Version Control, then reload this page.
+        <?php elseif ($scan['seen'] > 0): ?>
+          All <?= (int)$scan['seen'] ?> file<?= $scan['seen'] === 1 ? ' was' : 's were' ?> rejected by
+          the content gate — see “Not runnable here” below for the reason on each.
+        <?php else: ?>
+          The directory is present and readable but holds no <code>.sql</code> files, so the deploy
+          copied an empty folder. Trigger <em>Update from Remote and Deploy HEAD</em> in
+          cPanel &gt; Git Version Control, then reload this page.
+        <?php endif; ?>
+      </p>
+    <?php else: ?>
     <form method="post">
       <input type="hidden" name="csrf_token" value="<?= h($csrfToken) ?>">
       <select name="file" onchange="this.form.action=''; this.form.method='get'; this.form.submit();">
@@ -533,11 +591,14 @@ a { color:#58a6ff; }
         Safe to run more than once — every statement in the recommended file is guarded,
         so re-running changes nothing. Take a backup from
         <a href="admin/db-backup.php">Database backup</a> first if you want a restore point.
+        Reading <?= (int)count($files) ?> runnable file<?= count($files) === 1 ? '' : 's' ?> from
+        <code><?= h(MIGRATION_SQL_ROOT) ?></code>.
       </p>
       <button type="submit" name="action" value="apply" <?= ($conn === null || $selectedPath === null) ? 'disabled' : '' ?>>
         Apply <?= h($selected) ?>
       </button>
     </form>
+    <?php endif; ?>
   </div>
 
   <?php if ($status !== null): ?>
