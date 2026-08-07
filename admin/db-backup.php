@@ -408,6 +408,7 @@ $backupDirWritable = is_dir($backupDir) && is_writable($backupDir);
                         <?php if (empty($rows)): ?>
                             <div class="p-3 text-muted small">No backups yet. Click <strong>Create Backup Now</strong> to make one.</div>
                         <?php else: ?>
+                            <div class="table-responsive">
                             <table class="table table-striped table-hover mb-0">
                                 <thead>
                                     <tr>
@@ -448,6 +449,7 @@ $backupDirWritable = is_dir($backupDir) && is_writable($backupDir);
                                 <?php endforeach; ?>
                                 </tbody>
                             </table>
+                            </div>
                         <?php endif; ?>
                     </div>
                 </div>

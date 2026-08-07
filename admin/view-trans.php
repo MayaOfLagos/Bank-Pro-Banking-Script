@@ -112,8 +112,9 @@ $tran_status = $statusMap[(string)$row['trans_status']] ?? $tran_status;
     <div class="container-fluid">
         <div class="card">
             <div class="card-header"><h3 class="card-title">Credit / Debit Transaction</h3></div>
-            <div class="card-body">
-                <table class="table table-bordered">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                <table class="table table-bordered mb-0">
                     <tbody>
                         <tr><th>Name</th><td><?= htmlspecialchars(ucwords($fullName)) ?></td></tr>
                         <tr><th>Transaction ID</th><td><?= htmlspecialchars($row['refrence_id']) ?></td></tr>
@@ -126,6 +127,7 @@ $tran_status = $statusMap[(string)$row['trans_status']] ?? $tran_status;
                         <tr><th>Status</th><td><?= $tran_status ?></td></tr>
                     </tbody>
                 </table>
+                </div>
             </div>
             <div class="card-footer">
                 <form method="post" class="d-inline">

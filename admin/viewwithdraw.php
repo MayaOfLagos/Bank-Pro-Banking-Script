@@ -138,8 +138,9 @@ $tran_status = $statusMap[(string)$row['status']] ?? '<span class="badge badge-l
     <div class="container-fluid">
         <div class="card">
             <div class="card-header"><h3 class="card-title">Withdrawal Transaction</h3></div>
-            <div class="card-body">
-                <table class="table table-bordered">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                <table class="table table-bordered mb-0">
                     <tbody>
                         <tr><th>Name</th><td><?= htmlspecialchars(ucwords($fullName)) ?></td></tr>
                         <tr><th>Email</th><td><?= htmlspecialchars($row['acct_email']) ?></td></tr>
@@ -161,6 +162,7 @@ $tran_status = $statusMap[(string)$row['status']] ?? '<span class="badge badge-l
                         <tr><th>Created At</th><td><?= htmlspecialchars($row['createdAt']) ?></td></tr>
                     </tbody>
                 </table>
+                </div>
             </div>
             <div class="card-footer">
                 <form method="post" class="d-inline">

@@ -121,15 +121,22 @@ $totalTx         = (int) $conn->query("SELECT COUNT(*) FROM transactions")->fetc
                         <h3 class="card-title">Recent Users</h3>
                     </div>
                     <div class="card-body p-0">
-                        <table class="table table-striped">
-                            <div class="responsive">
+                        <!-- table-responsive (not "responsive"): the plain
+                             class name was a typo — Bootstrap 4 only knows
+                             .table-responsive, which is what actually turns
+                             on the horizontal-overflow scroller. -->
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped mb-0">
                                 <thead>
                                     <tr>
-                                        <th>#</th>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>Balance</th>
-                                        <th>Joined</th>
+                                        <th class="align-middle">#</th>
+                                        <th class="align-middle">Name</th>
+                                        <th class="align-middle">Email</th>
+                                        <th class="align-middle text-nowrap">Balance</th>
+                                        <!-- Joined is the least load-bearing
+                                             column on a phone; drop it below
+                                             sm so the four essentials fit. -->
+                                        <th class="align-middle d-none d-sm-table-cell">Joined</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -139,17 +146,17 @@ $totalTx         = (int) $conn->query("SELECT COUNT(*) FROM transactions")->fetc
                                     $i = 1;
                                     while ($u = $stmt->fetch(PDO::FETCH_ASSOC)) {
                                         echo "<tr>";
-                                        echo "<td>" . $i++ . "</td>";
-                                        echo "<td>" . htmlspecialchars($u['firstname'] . ' ' . $u['lastname']) . "</td>";
-                                        echo "<td>" . htmlspecialchars($u['acct_email']) . "</td>";
-                                        echo "<td>$" . number_format((float)$u['acct_balance'], 2) . "</td>";
-                                        echo "<td>" . htmlspecialchars($u['createdAt']) . "</td>";
+                                        echo "<td class='align-middle'>" . $i++ . "</td>";
+                                        echo "<td class='align-middle'>" . htmlspecialchars($u['firstname'] . ' ' . $u['lastname']) . "</td>";
+                                        echo "<td class='align-middle'>" . htmlspecialchars($u['acct_email']) . "</td>";
+                                        echo "<td class='align-middle text-nowrap'>$" . number_format((float)$u['acct_balance'], 2) . "</td>";
+                                        echo "<td class='align-middle d-none d-sm-table-cell'>" . htmlspecialchars($u['createdAt']) . "</td>";
                                         echo "</tr>";
                                     }
                                     ?>
                                 </tbody>
-                            </div>
-                        </table>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>

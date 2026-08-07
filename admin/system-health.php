@@ -274,7 +274,8 @@ if (!empty($healthProblems)) {
                             <p class="mb-3"><b>Total size:</b> <?= $dbSizeMb !== null ? htmlspecialchars((string)$dbSizeMb) . ' MB' : '—' ?></p>
 
                             <p class="mb-1"><b>Largest 5 tables:</b></p>
-                            <table class="table table-sm">
+                            <div class="table-responsive">
+                            <table class="table table-sm mb-0">
                                 <thead>
                                     <tr><th>Table</th><th class="text-right">Rows (est)</th><th class="text-right">Size (MB)</th></tr>
                                 </thead>
@@ -290,6 +291,7 @@ if (!empty($healthProblems)) {
                                     <?php endforeach; endif; ?>
                                 </tbody>
                             </table>
+                            </div>
                         <?php endif; ?>
                     </div>
                 </div>

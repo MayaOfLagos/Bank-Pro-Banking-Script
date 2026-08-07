@@ -147,8 +147,9 @@ $tran_status = $statusMap[(string)$row['crypto_status']] ?? '<span class="badge 
     <div class="container-fluid">
         <div class="card">
             <div class="card-header"><h3 class="card-title">Crypto Transaction</h3></div>
-            <div class="card-body">
-                <table class="table table-bordered">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                <table class="table table-bordered mb-0">
                     <tbody>
                         <tr><th>Name</th><td><?= htmlspecialchars(ucwords($fullName)) ?></td></tr>
                         <tr><th>Amount</th><td><?= $currency . htmlspecialchars($row['amount']) ?></td></tr>
@@ -169,6 +170,7 @@ $tran_status = $statusMap[(string)$row['crypto_status']] ?? '<span class="badge 
                         <tr><th>Status</th><td><?= $tran_status ?></td></tr>
                     </tbody>
                 </table>
+                </div>
             </div>
             <div class="card-footer">
                 <form method="post" class="d-inline">
