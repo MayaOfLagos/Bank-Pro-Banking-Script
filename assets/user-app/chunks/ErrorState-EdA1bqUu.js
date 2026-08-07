@@ -1,1 +1,0 @@
-import{_ as r,o as a,c as t,t as o,n as s}from"../app-B6iB8HPL.js";const c={__name:"ErrorState",props:{message:{type:String,required:!0},compact:{type:Boolean,default:!1}},setup(e){return(n,l)=>(a(),t("div",{class:s(["error",{"error--compact":e.compact}]),role:"alert"},o(e.message),3))}},m=r(c,[["__scopeId","data-v-9354127a"]]);export{m as E};
