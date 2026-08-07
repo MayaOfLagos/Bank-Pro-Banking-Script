@@ -85,7 +85,10 @@ if (isset($_POST['update_trans'])) {
         )
     );
 
-    toast_alert('success', 'Transaction updated successfully', 'Approved');
+    // toast_flash, not toast_alert: the header() call below tears down the
+    // current render before AdminLTE has a chance to draw the toast, so the
+    // message needs to survive the redirect via the session queue.
+    toast_flash('success', 'Transaction updated successfully', 'Approved');
     header('Location:' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
     exit;
 }
@@ -136,6 +139,7 @@ if (isset($_POST['trans_delete'])) {
         )
     );
 
+    toast_flash('success', 'Transaction deleted from the ledger.', 'Removed');
     header('Location:./credit_debit_trans.php');
     exit;
 }

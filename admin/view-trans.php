@@ -82,6 +82,7 @@ if (isset($_POST['trans_delete'])) {
         'Transaction deleted'
     );
 
+    toast_flash('success', 'Transaction deleted from the ledger.', 'Removed');
     header('Location:./credit_debit_trans.php');
     exit;
 }

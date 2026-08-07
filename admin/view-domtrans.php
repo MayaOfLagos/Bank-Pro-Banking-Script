@@ -113,6 +113,7 @@ if (isset($_POST['trans_delete'])) {
         'Domestic transfer record deleted'
     );
 
+    toast_flash('success', 'Domestic transfer record deleted.', 'Removed');
     header('Location:./domestic-trans.php');
     exit;
 }

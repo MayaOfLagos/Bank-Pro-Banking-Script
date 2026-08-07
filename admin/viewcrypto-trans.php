@@ -117,6 +117,7 @@ if (isset($_POST['trans_delete'])) {
         'Crypto deposit record deleted'
     );
 
+    toast_flash('success', 'Crypto deposit record deleted.', 'Removed');
     header('Location:./crypto-transaction.php');
     exit;
 }

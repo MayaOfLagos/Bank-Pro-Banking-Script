@@ -101,6 +101,31 @@ if (isset($_POST['register'])) {
                 'mgr_image'       => $mgr_image,
             ]);
 
+            // Optional profile photo. Runs AFTER the INSERT because the stored
+            // filename convention is user-{id}, and the id only exists once the
+            // row is written. A failure here toasts a warning but does not
+            // roll back the account — the customer can re-upload from their
+            // profile screen, and the operator can from view_users.php.
+            $newUserId = (int)$conn->lastInsertId();
+            if ($newUserId > 0 && isset($_FILES['profile_image']) && (int)($_FILES['profile_image']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
+                $storedPhoto = admin_store_upload(
+                    $_FILES['profile_image'],
+                    dirname(__DIR__) . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'profile',
+                    ['png', 'jpg', 'jpeg', 'gif', 'webp'],
+                    2 * 1024 * 1024,
+                    'user-' . $newUserId
+                );
+                if ($storedPhoto['ok']) {
+                    $imgStmt = $conn->prepare("UPDATE users SET image = :image WHERE id = :id");
+                    $imgStmt->execute(['image' => $storedPhoto['name'], 'id' => $newUserId]);
+                } else {
+                    // Bubble the exact failure reason so operators know
+                    // whether it was a bad file, a too-large upload, or a
+                    // filesystem-permissions problem on assets/profile/.
+                    toast_alert('warning', 'Account created but profile photo failed: ' . $storedPhoto['error'], 'Photo not saved');
+                }
+            }
+
             $currencyMap = ['USD' => '$', 'Euro' => '€', 'Yuan' => '¥', 'GBP' => '£', 'CAD' => '¢'];
             $currency    = $currencyMap[$acct_currency] ?? '$';
 
@@ -238,8 +263,11 @@ $sel = static function ($key, $optionValue) use ($fill) {
                     <div class="bs-stepper-content">
                         <!-- novalidate: HTML5 validation cannot focus fields
                              inside hidden bs-stepper panes, so we drive
-                             checkValidity() ourselves per step below. -->
-                        <form method="post" novalidate autocomplete="off">
+                             checkValidity() ourselves per step below.
+                             enctype: the Identity step now carries an optional
+                             profile-photo file input, so the form must not
+                             default to application/x-www-form-urlencoded. -->
+                        <form method="post" enctype="multipart/form-data" novalidate autocomplete="off">
 
                             <!-- Hidden defaults preserved from the pre-wizard
                                  form. mgr_image is a filename placeholder used
@@ -286,6 +314,24 @@ $sel = static function ($key, $optionValue) use ($fill) {
                                         </div>
                                     </div>
                                     <div class="col-md-6"><div class="form-group"><label>Occupation</label><input type="text" name="acct_occupation" class="form-control" placeholder="Occupation" value="<?= htmlspecialchars($val('acct_occupation')) ?>" required></div></div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-12">
+                                        <div class="form-group">
+                                            <label>Profile photo <small class="text-muted">(optional)</small></label>
+                                            <div class="d-flex align-items-center" style="gap: 1rem;">
+                                                <img id="regAvatarPreview"
+                                                     src="./dist/img/default-150x150.png"
+                                                     alt="Preview"
+                                                     class="img-circle"
+                                                     style="width: 4rem; height: 4rem; object-fit: cover; border: 1px solid var(--border, #dee2e6);">
+                                                <div class="flex-grow-1">
+                                                    <input type="file" name="profile_image" class="form-control-file" accept="image/png,image/jpeg,image/webp,image/gif" data-preview="regAvatarPreview">
+                                                    <small class="text-muted d-block mt-1">PNG, JPG, GIF or WebP up to 2 MB. The customer can replace it later from their profile.</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="d-flex justify-content-end pt-3">
                                     <button type="button" class="btn btn-primary" data-action="next">Next <i class="fas fa-arrow-right ml-1"></i></button>
@@ -414,6 +460,23 @@ $sel = static function ($key, $optionValue) use ($fill) {
             linear: true,   // steps can only advance in order
             animation: true
         });
+
+        // ── Profile photo live preview. Reads the picked file into a data URL
+        // so the operator sees what they're about to upload without a round
+        // trip to the server. Falls back silently in ancient browsers that
+        // don't implement FileReader — the upload still works.
+        var avatarInput = wizardEl.querySelector('input[type="file"][data-preview]');
+        if (avatarInput && typeof FileReader !== 'undefined') {
+            avatarInput.addEventListener('change', function () {
+                var file = this.files && this.files[0];
+                var preview = document.getElementById(this.getAttribute('data-preview'));
+                if (!preview) { return; }
+                if (!file) { preview.src = './dist/img/default-150x150.png'; return; }
+                var reader = new FileReader();
+                reader.onload = function (ev) { preview.src = ev.target.result; };
+                reader.readAsDataURL(file);
+            });
+        }
 
         // ── Marital status: the visible <select> mirrors into the hidden
         // input the PHP handler reads. Kept as two inputs (rather than one

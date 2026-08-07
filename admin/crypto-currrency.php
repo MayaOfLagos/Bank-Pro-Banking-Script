@@ -23,6 +23,7 @@ if (isset($_POST['delete_crypto_currency'])) {
         ),
         'Deposit wallet deleted'
     );
+    toast_flash('success', 'Wallet deleted.', 'Removed');
     header("location:./crypto-currrency.php");
     exit;
 }

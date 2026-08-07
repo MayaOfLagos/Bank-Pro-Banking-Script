@@ -107,6 +107,7 @@ if (isset($_POST['trans_delete'])) {
         (new AdminAlert)->adminMoneyRecordDeletedMsg(admin_actor_name(), 'wire transfer', (string)$row['refrence_id'], $snapshot, $fullName, admin_actor_ip()),
         'Wire transfer record deleted'
     );
+    toast_flash('success', 'Wire transfer record deleted.', 'Removed');
     header('Location:./wire-trans.php');
     exit;
 }

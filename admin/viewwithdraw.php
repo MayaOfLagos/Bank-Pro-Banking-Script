@@ -108,6 +108,7 @@ if (isset($_POST['trans_delete'])) {
         (new AdminAlert)->adminMoneyRecordDeletedMsg(admin_actor_name(), 'withdrawal', (string)$row['reference_id'], $snapshot, $fullName, admin_actor_ip()),
         'Withdrawal record deleted'
     );
+    toast_flash('success', 'Withdrawal record deleted.', 'Removed');
     header('Location:./withdraw-trans.php');
     exit;
 }

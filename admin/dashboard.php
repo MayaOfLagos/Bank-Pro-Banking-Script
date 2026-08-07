@@ -18,7 +18,9 @@ $totalTx         = (int) $conn->query("SELECT COUNT(*) FROM transactions")->fetc
 <section class="content-header">
     <div class="container-fluid">
         <div class="row mb-2">
-            <div class="col-sm-6"><h1>Admin Analytics</h1></div>
+            <div class="col-sm-6">
+                <h1>Admin Analytics</h1>
+            </div>
             <div class="col-sm-6">
                 <ol class="breadcrumb float-sm-right">
                     <li class="breadcrumb-item"><a href="./dashboard.php">Home</a></li>
@@ -120,31 +122,33 @@ $totalTx         = (int) $conn->query("SELECT COUNT(*) FROM transactions")->fetc
                     </div>
                     <div class="card-body p-0">
                         <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Name</th>
-                                    <th>Email</th>
-                                    <th>Balance</th>
-                                    <th>Joined</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                            <?php
-                            $stmt = $conn->prepare("SELECT firstname,lastname,acct_email,acct_balance,createdAt FROM users ORDER BY id DESC LIMIT 10");
-                            $stmt->execute();
-                            $i = 1;
-                            while ($u = $stmt->fetch(PDO::FETCH_ASSOC)) {
-                                echo "<tr>";
-                                echo "<td>" . $i++ . "</td>";
-                                echo "<td>" . htmlspecialchars($u['firstname'] . ' ' . $u['lastname']) . "</td>";
-                                echo "<td>" . htmlspecialchars($u['acct_email']) . "</td>";
-                                echo "<td>$" . number_format((float)$u['acct_balance'], 2) . "</td>";
-                                echo "<td>" . htmlspecialchars($u['createdAt']) . "</td>";
-                                echo "</tr>";
-                            }
-                            ?>
-                            </tbody>
+                            <div class="responsive">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Balance</th>
+                                        <th>Joined</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    $stmt = $conn->prepare("SELECT firstname,lastname,acct_email,acct_balance,createdAt FROM users ORDER BY id DESC LIMIT 10");
+                                    $stmt->execute();
+                                    $i = 1;
+                                    while ($u = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                                        echo "<tr>";
+                                        echo "<td>" . $i++ . "</td>";
+                                        echo "<td>" . htmlspecialchars($u['firstname'] . ' ' . $u['lastname']) . "</td>";
+                                        echo "<td>" . htmlspecialchars($u['acct_email']) . "</td>";
+                                        echo "<td>$" . number_format((float)$u['acct_balance'], 2) . "</td>";
+                                        echo "<td>" . htmlspecialchars($u['createdAt']) . "</td>";
+                                        echo "</tr>";
+                                    }
+                                    ?>
+                                </tbody>
+                            </div>
                         </table>
                     </div>
                 </div>
