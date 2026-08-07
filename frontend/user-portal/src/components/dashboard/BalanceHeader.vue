@@ -25,8 +25,8 @@ const { isDark, toggleTheme } = useTheme()
  * (DashboardView, CardsView) are plain content screens that hold no layout
  * state, so lifting an `open` flag into each of them would duplicate the same
  * boilerplate twice and leave any future third screen with a dead bell. This
- * also mirrors FloatingActionBar, which renders TransferDrawer/MoreDrawer
- * itself for the same reason. The sheet teleports to <body>, so nesting it
+ * also mirrors FloatingActionBar, which renders TransferDrawer itself
+ * for the same reason. The sheet teleports to <body>, so nesting it
  * here costs nothing in stacking terms.
  */
 const notifications = useNotificationsStore()

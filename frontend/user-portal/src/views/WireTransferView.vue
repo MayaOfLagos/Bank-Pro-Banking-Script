@@ -298,7 +298,7 @@ const limitDisplay = computed(() => {
   gap: var(--space-4);
 }
 .header { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0 var(--space-1); }
-.back { width: 2.5rem; height: 2.5rem; border-radius: 0.7rem; border: 1px solid var(--border); background: transparent; color: var(--text-primary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.back { width: 2.5rem; height: 2.5rem; border-radius: 1.7rem; border: 1px solid var(--border); background: transparent; color: var(--text-primary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
 .back:hover { background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
 .back:active { transform: scale(0.95); }
 .back-icon { width: 1.15rem; height: 1.15rem; }

@@ -1,134 +1,66 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { useToast } from 'vue-toastification'
 import {
-  ChevronLeftIcon, CameraIcon, ChevronRightIcon,
-  ArrowRightOnRectangleIcon, PencilSquareIcon, ShieldCheckIcon,
-  UserGroupIcon, WalletIcon, LifebuoyIcon,
+  ChevronLeftIcon, ChevronRightIcon,
+  HomeIcon, ArrowDownTrayIcon, PaperAirplaneIcon, GlobeAltIcon,
+  CreditCardIcon, WalletIcon, QueueListIcon, BanknotesIcon,
+  UserGroupIcon, PencilSquareIcon, ShieldCheckIcon, LifebuoyIcon,
+  IdentificationIcon,
+  ArrowRightOnRectangleIcon, MoonIcon, SunIcon,
 } from '@heroicons/vue/24/solid'
-import client, { UPLOAD_TIMEOUT } from '../api/client'
-import { authApi } from '../api/auth'
+import { useProfileStore } from '../stores/profile'
+import { useTheme } from '../composables/useTheme'
 import { clearSession } from '../composables/useSession'
-import { merchantInitials } from '../utils/format'
-import { currencySymbol } from '../utils/currency'
-import { countryName } from '../utils/countries'
-import ErrorState from '../components/ui/ErrorState.vue'
-import LoadingRegion from '../components/skeletons/LoadingRegion.vue'
+import { authApi } from '../api/auth'
 import SkeletonText from '../components/skeletons/SkeletonText.vue'
-import SkeletonDetailRows from '../components/skeletons/SkeletonDetailRows.vue'
 
 const router = useRouter()
-const toast = useToast()
+const profileStore = useProfileStore()
+const { isDark, toggleTheme } = useTheme()
 
 const loading = ref(true)
-const error = ref('')
-const profile = ref({})
-
-const avatarFile = ref(null)
-const uploadingAvatar = ref(false)
 const loggingOut = ref(false)
 
-async function loadProfile() {
-  loading.value = true
-  error.value = ''
-  try {
-    const { data } = await client.get('/api/user/profile.php')
-    if (!data?.ok) throw new Error(data?.message || 'Unable to load profile')
-    profile.value = data.data || {}
-  } catch (err) {
-    error.value = err?.response?.data?.message || err.message || 'Unable to load profile'
-  } finally {
-    loading.value = false
-  }
-}
+const displayName = computed(() => profileStore.fullName || 'Your account')
+const accountType = computed(() => profileStore.profile?.acct_type || 'Personal account')
+const avatar = computed(() => profileStore.profile?.image || '')
+const initials = computed(() => profileStore.initials)
 
-const initials = computed(() => {
-  const name = `${profile.value.firstname || ''} ${profile.value.lastname || ''}`.trim()
-  return name ? merchantInitials(name) : '?'
-})
-
-const statusLabel = computed(() => profile.value.acct_status || '')
-const statusKind = computed(() => {
-  const s = String(statusLabel.value).toLowerCase()
-  if (s === 'active') return 'active'
-  if (s === 'hold' || s === 'pending' || s === 'processing') return 'paused'
-  if (s === 'suspended' || s === 'blocked' || s === 'inactive') return 'hold'
-  return 'unknown'
-})
-
-const currencyText = computed(() => {
-  const code = profile.value.acct_currency || ''
-  const sym = currencySymbol(code)
-  return code ? `${code} · ${sym}` : (sym || '—')
-})
-
-const countryDisplay = computed(() => {
-  const raw = profile.value.country
-  if (!raw) return '—'
-  return countryName(raw) !== raw ? countryName(raw) : raw
-})
-
-const subtitle = computed(() => {
-  const parts = [profile.value.acct_type, profile.value.acct_currency].filter(Boolean)
-  return parts.length ? parts.join(' · ') : 'Banking client'
-})
-
-// Prettify server-stored keys ('prefer_not_to_say' → 'Prefer not to say').
-function humanize(value) {
-  if (!value) return ''
-  return String(value)
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
-}
-
-const infoRows = computed(() => {
-  const p = profile.value
-  const optional = (label, value, extra = {}) => (value ? [{ label, value, ...extra }] : [])
-  return [
-    { label: 'Account number', value: p.acct_no || '—', mono: true },
-    { label: 'Account type', value: p.acct_type || '—' },
-    { label: 'Currency', value: currencyText.value },
-    { label: 'Email', value: p.email || '—' },
-    { label: 'Phone', value: p.phone || '—' },
-    ...optional('Date of birth', p.acct_dob),
-    ...optional('Gender', humanize(p.acct_gender)),
-    ...optional('Marital status', humanize(p.marital_status)),
-    ...optional('Occupation', p.acct_occupation),
-    { label: 'Country', value: countryDisplay.value },
-    ...optional('State / Region', p.state),
-    ...optional('Address', p.acct_address),
-  ]
-})
-
-// ─── Avatar upload (stays on this page — it's a display concern) ─────────
-function onAvatarPicked(event) {
-  const file = event.target?.files?.[0]
-  if (!file) return
-  avatarFile.value = file
-  uploadAvatar()
-}
-
-async function uploadAvatar() {
-  if (!avatarFile.value) return
-  uploadingAvatar.value = true
-  try {
-    const form = new FormData()
-    form.append('image', avatarFile.value)
-    const { data } = await client.post('/api/user/profile-image.php', form, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      timeout: UPLOAD_TIMEOUT,
-    })
-    if (!data?.ok) throw new Error(data?.message || 'Upload failed')
-    toast.success('Profile photo updated.')
-    await loadProfile()
-  } catch (err) {
-    toast.error(err?.response?.data?.message || err.message || 'Could not upload photo.')
-  } finally {
-    uploadingAvatar.value = false
-    avatarFile.value = null
-  }
-}
+/**
+ * This page is the destination for the bottom bar's "More" tab, so it
+ * carries every entry point that bar has no room for.
+ */
+const sections = [
+  {
+    label: 'Banking',
+    items: [
+      { label: 'Dashboard', to: '/dashboard', icon: HomeIcon },
+      { label: 'Online Deposit', to: '/deposits', icon: ArrowDownTrayIcon },
+      { label: 'Transaction Logs', to: '/transactions', icon: QueueListIcon },
+      { label: 'Virtual Card', to: '/cards', icon: CreditCardIcon },
+      { label: 'Loans & Mortgages', to: '/loans', icon: WalletIcon },
+    ],
+  },
+  {
+    label: 'Move money',
+    items: [
+      { label: 'Domestic Transfer', to: '/domestic-transfer', icon: PaperAirplaneIcon },
+      { label: 'Wire Transfer', to: '/wire-transfer', icon: GlobeAltIcon },
+      { label: 'Withdrawal', to: '/withdrawals', icon: BanknotesIcon },
+    ],
+  },
+  {
+    label: 'Account',
+    items: [
+      { label: 'Account details', to: '/profile/account', icon: IdentificationIcon },
+      { label: 'Personal details', to: '/profile/edit', icon: PencilSquareIcon },
+      { label: 'Security', to: '/profile/security', icon: ShieldCheckIcon },
+      { label: 'Account Manager', to: '/profile/manager', icon: UserGroupIcon },
+      { label: 'Support', to: '/tickets', icon: LifebuoyIcon },
+    ],
+  },
+]
 
 async function handleLogout() {
   loggingOut.value = true
@@ -138,11 +70,21 @@ async function handleLogout() {
     // Cleared even if the request failed: the customer asked to leave, so the
     // local copy of their account must go regardless of what the server said.
     clearSession()
+    loggingOut.value = false
     router.push('/login')
   }
 }
 
-onMounted(loadProfile)
+onMounted(async () => {
+  try {
+    await profileStore.loadProfile()
+  } catch {
+    // The header falls back to placeholder text; the nav below still works
+    // without a profile, so a failed fetch shouldn't block the page.
+  } finally {
+    loading.value = false
+  }
+})
 </script>
 
 <template>
@@ -153,164 +95,75 @@ onMounted(loadProfile)
           <ChevronLeftIcon class="back-icon" aria-hidden="true" />
         </button>
         <div class="titles">
-          <h1 class="title">Profile</h1>
-          <p class="subtitle">Your account at a glance</p>
+          <h1 class="title">More</h1>
+          <p class="subtitle">Everything else about your account</p>
         </div>
       </header>
 
-      <LoadingRegion v-if="loading" label="your profile">
-        <section class="hero">
-          <div class="skeleton sk-avatar" />
-          <SkeletonText class="sk-name" size="1.15rem" :line-height="1.2" width="11rem" />
-          <SkeletonText size="0.85rem" width="8rem" />
-          <div class="skeleton sk-status" />
-        </section>
+      <section class="who">
+        <div class="who-avatar">
+          <img v-if="avatar" :src="avatar" :alt="`${displayName} avatar`" />
+          <span v-else-if="loading" class="skeleton who-avatar-sk" />
+          <span v-else>{{ initials }}</span>
+        </div>
+        <div class="who-copy">
+          <template v-if="loading">
+            <SkeletonText size="1rem" :line-height="1.2" width="9rem" />
+            <SkeletonText size="0.75rem" width="6rem" />
+          </template>
+          <template v-else>
+            <p class="who-name">{{ displayName }}</p>
+            <p class="who-type">{{ accountType }}</p>
+          </template>
+        </div>
+      </section>
 
-        <!-- Eight rows: the six always-present fields plus the two optional
-             ones (DOB, occupation) a typical account has filled in. -->
-        <section class="card">
-          <div class="rows">
-            <SkeletonDetailRows :rows="8" :card="false" />
-          </div>
-        </section>
-
-        <SkeletonText class="group-label" size="0.7rem" :line-height="1.5" width="4rem" />
-        <nav class="card manage-card">
-          <div v-for="i in 3" :key="i" class="sk-manage-row">
-            <div class="skeleton sk-manage-icon" />
-            <div class="manage-body">
-              <SkeletonText size="0.95rem" width="9rem" />
-              <SkeletonText size="0.75rem" width="12rem" />
-            </div>
-            <div class="skeleton sk-chev" />
-          </div>
-        </nav>
-
-        <SkeletonText class="group-label" size="0.7rem" :line-height="1.5" width="4.6rem" />
-        <nav class="card manage-card">
-          <div v-for="i in 2" :key="i" class="sk-manage-row">
-            <div class="skeleton sk-manage-icon" />
-            <div class="manage-body">
-              <SkeletonText size="0.95rem" width="6rem" />
-              <SkeletonText size="0.75rem" width="13rem" />
-            </div>
-            <div class="skeleton sk-chev" />
-          </div>
-        </nav>
-
-        <div class="skeleton sk-signout" />
-      </LoadingRegion>
-
-      <ErrorState v-else-if="error" :message="error" />
-
-      <template v-else>
-        <section class="hero">
-          <label class="avatar-wrap" :aria-busy="uploadingAvatar">
-            <div class="avatar">
-              <img v-if="profile.image" :src="profile.image" :alt="`${profile.firstname || 'You'}'s avatar`" />
-              <span v-else>{{ initials }}</span>
-            </div>
-            <span class="avatar-upload" :class="{ 'avatar-upload--busy': uploadingAvatar }">
-              <CameraIcon class="avatar-upload-icon" aria-hidden="true" />
+      <nav
+        v-for="section in sections"
+        :key="section.label"
+        class="section"
+        :aria-label="section.label"
+      >
+        <p class="section-label">{{ section.label }}</p>
+        <div class="card manage-card">
+          <RouterLink
+            v-for="item in section.items"
+            :key="item.to"
+            :to="item.to"
+            class="manage-row"
+          >
+            <span class="manage-icon">
+              <component :is="item.icon" aria-hidden="true" />
             </span>
-            <input
-              type="file"
-              accept="image/png,image/jpeg"
-              class="avatar-input"
-              :disabled="uploadingAvatar"
-              @change="onAvatarPicked"
-            />
-          </label>
-          <h2 class="name">{{ profile.full_name || 'Your account' }}</h2>
-          <p class="hero-sub">{{ subtitle }}</p>
-          <span v-if="statusLabel" class="status-badge" :class="`status-badge--${statusKind}`">
-            <span class="status-dot"></span>{{ statusLabel }}
+            <span class="manage-body">
+              <span class="manage-title">{{ item.label }}</span>
+            </span>
+            <ChevronRightIcon class="manage-chev" aria-hidden="true" />
+          </RouterLink>
+        </div>
+      </nav>
+
+      <div class="card manage-card">
+        <button type="button" class="manage-row manage-row--button" @click="toggleTheme">
+          <span class="manage-icon">
+            <MoonIcon v-if="!isDark" aria-hidden="true" />
+            <SunIcon v-else aria-hidden="true" />
           </span>
-        </section>
-
-        <section class="card" aria-label="Account details">
-          <div class="rows">
-            <div v-for="(row, i) in infoRows" :key="row.label + i" class="row">
-              <span class="row-label">{{ row.label }}</span>
-              <span class="row-value" :class="{ 'row-value--mono': row.mono }">{{ row.value }}</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- This page is the "More" destination in the bottom nav, so it
-             carries the entry points that bar has no room for. Loans and
-             Support are otherwise unreachable from the mobile UI. -->
-        <p class="group-label">Account</p>
-        <nav class="card manage-card" aria-label="Account management">
-          <RouterLink to="/profile/edit" class="manage-row">
-            <span class="manage-icon manage-icon--accent">
-              <PencilSquareIcon aria-hidden="true" />
-            </span>
-            <span class="manage-body">
-              <span class="manage-title">Personal details</span>
-              <span class="manage-sub">Update your name and phone</span>
-            </span>
-            <ChevronRightIcon class="manage-chev" aria-hidden="true" />
-          </RouterLink>
-
-          <RouterLink to="/profile/security" class="manage-row">
-            <span class="manage-icon manage-icon--muted">
-              <ShieldCheckIcon aria-hidden="true" />
-            </span>
-            <span class="manage-body">
-              <span class="manage-title">Security</span>
-              <span class="manage-sub">Change password and transaction PIN</span>
-            </span>
-            <ChevronRightIcon class="manage-chev" aria-hidden="true" />
-          </RouterLink>
-
-          <RouterLink to="/profile/manager" class="manage-row">
-            <span class="manage-icon manage-icon--muted">
-              <UserGroupIcon aria-hidden="true" />
-            </span>
-            <span class="manage-body">
-              <span class="manage-title">Account manager</span>
-              <span class="manage-sub">Your dedicated point of contact</span>
-            </span>
-            <ChevronRightIcon class="manage-chev" aria-hidden="true" />
-          </RouterLink>
-        </nav>
-
-        <p class="group-label">Services</p>
-        <nav class="card manage-card" aria-label="Services">
-          <RouterLink to="/loans" class="manage-row">
-            <span class="manage-icon manage-icon--accent">
-              <WalletIcon aria-hidden="true" />
-            </span>
-            <span class="manage-body">
-              <span class="manage-title">Loans</span>
-              <span class="manage-sub">Apply for and track your loans</span>
-            </span>
-            <ChevronRightIcon class="manage-chev" aria-hidden="true" />
-          </RouterLink>
-
-          <RouterLink to="/tickets" class="manage-row">
-            <span class="manage-icon manage-icon--muted">
-              <LifebuoyIcon aria-hidden="true" />
-            </span>
-            <span class="manage-body">
-              <span class="manage-title">Support</span>
-              <span class="manage-sub">Message our team about your account</span>
-            </span>
-            <ChevronRightIcon class="manage-chev" aria-hidden="true" />
-          </RouterLink>
-        </nav>
-
-        <button
-          type="button"
-          class="signout"
-          :disabled="loggingOut"
-          @click="handleLogout"
-        >
-          <ArrowRightOnRectangleIcon class="signout-icon" aria-hidden="true" />
-          {{ loggingOut ? 'Signing out…' : 'Sign out' }}
+          <span class="manage-body">
+            <span class="manage-title">{{ isDark ? 'Light mode' : 'Dark mode' }}</span>
+          </span>
         </button>
-      </template>
+      </div>
+
+      <button
+        type="button"
+        class="signout"
+        :disabled="loggingOut"
+        @click="handleLogout"
+      >
+        <ArrowRightOnRectangleIcon class="signout-icon" aria-hidden="true" />
+        {{ loggingOut ? 'Signing out…' : 'Sign out' }}
+      </button>
     </div>
   </div>
 </template>
@@ -318,46 +171,71 @@ onMounted(loadProfile)
 <style scoped>
 .page { min-height: 100vh; background: var(--bg-gradient); padding: var(--space-5) var(--space-4) 7rem; }
 .content { max-width: 30rem; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-4); }
+
 .header { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0 var(--space-1); }
-.back { width: 2.5rem; height: 2.5rem; border-radius: 0.7rem; border: 1px solid var(--border); background: transparent; color: var(--text-primary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.back { width: 2.5rem; height: 2.5rem; border-radius: 1.7rem; border: 1px solid var(--border); background: transparent; color: var(--text-primary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
 .back:hover { background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
 .back:active { transform: scale(0.95); }
 .back-icon { width: 1.15rem; height: 1.15rem; }
 .title { font-size: 1.5rem; font-weight: 800; color: var(--text-primary); margin: 0; line-height: 1.1; }
 .subtitle { font-size: 0.8rem; color: var(--text-secondary); margin: 0.15rem 0 0; }
 
-.hero { background: var(--surface); border-radius: var(--radius-lg); padding: var(--space-6) var(--space-4); box-shadow: var(--shadow-card); display: flex; flex-direction: column; align-items: center; gap: var(--space-3); text-align: center; }
-.avatar-wrap { position: relative; width: 5.5rem; height: 5.5rem; cursor: pointer; }
-.avatar { width: 100%; height: 100%; border-radius: var(--radius-pill); background: var(--card-gradient-debit); color: var(--text-on-accent); display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.4rem; overflow: hidden; box-shadow: 0 10px 24px -8px color-mix(in srgb, var(--accent-strong) 60%, transparent); }
-.avatar img { width: 100%; height: 100%; object-fit: cover; }
-.avatar-upload { position: absolute; right: -0.2rem; bottom: -0.2rem; width: 2rem; height: 2rem; border-radius: var(--radius-pill); background: var(--surface); border: 2px solid var(--surface); color: var(--text-primary); display: inline-flex; align-items: center; justify-content: center; box-shadow: var(--shadow-card); transition: transform 0.15s ease; }
-.avatar-wrap:hover .avatar-upload { transform: scale(1.05); }
-.avatar-upload--busy { opacity: 0.5; }
-.avatar-upload-icon { width: 1rem; height: 1rem; }
-.avatar-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
-.name { font-size: 1.15rem; font-weight: 800; color: var(--text-primary); margin: 0.2rem 0 0; line-height: 1.2; }
-.hero-sub { color: var(--text-secondary); font-size: 0.85rem; margin: 0; }
+.who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+.who-avatar {
+  width: 3.25rem;
+  height: 3.25rem;
+  flex-shrink: 0;
+  border-radius: var(--radius-pill);
+  background: var(--card-gradient-debit);
+  color: var(--text-on-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1rem;
+  overflow: hidden;
+}
+.who-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.who-avatar-sk { width: 100%; height: 100%; border-radius: var(--radius-pill); }
+.who-copy { min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.who-name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.who-type {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
 
-.status-badge { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.7rem; border-radius: var(--radius-pill); font-size: 0.75rem; font-weight: 600; background: var(--surface-muted); color: var(--text-primary); text-transform: capitalize; }
-.status-dot { width: 0.45rem; height: 0.45rem; border-radius: 50%; background: var(--text-secondary); }
-.status-badge--active { background: rgba(16, 185, 129, 0.12); color: var(--success-fg); }
-.status-badge--active .status-dot { background: var(--success-fg); }
-.status-badge--paused { background: rgba(180, 83, 9, 0.12); color: var(--warning-fg); }
-.status-badge--paused .status-dot { background: var(--warning-fg); }
-.status-badge--hold { background: var(--danger-bg); color: var(--danger-fg); }
-.status-badge--hold .status-dot { background: var(--danger-fg); }
+.section { display: flex; flex-direction: column; gap: var(--space-2); }
+.section-label {
+  margin: 0;
+  padding-inline: var(--space-2);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
 
-.card { background: var(--surface); border-radius: var(--radius-lg); padding: var(--space-5) var(--space-4); box-shadow: var(--shadow-card); display: flex; flex-direction: column; gap: var(--space-3); }
-.rows { display: flex; flex-direction: column; }
-.row { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-4); padding: var(--space-3) 0; }
-.row + .row { border-top: 1px solid var(--divider); }
-.row-label { color: var(--text-secondary); font-size: 0.85rem; flex-shrink: 0; }
-.row-value { color: var(--text-primary); font-size: 0.9rem; font-weight: 600; text-align: right; min-width: 0; word-break: break-word; }
-.row-value--mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; letter-spacing: 0.02em; }
-
-/* Manage links — tap-friendly rows with icon, title+sub, and chevron. */
-.group-label { font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em; margin: var(--space-2) 0 calc(var(--space-3) * -1); padding-inline: var(--space-2); }
-.manage-card { padding: var(--space-2) var(--space-4); gap: 0; }
+.card { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-card); }
+.manage-card { padding: var(--space-2) var(--space-4); display: flex; flex-direction: column; }
 .manage-row {
   display: flex; align-items: center; gap: var(--space-3);
   padding: var(--space-3) 0;
@@ -365,21 +243,20 @@ onMounted(loadProfile)
   transition: background-color 0.15s ease;
   border-radius: var(--radius-md);
   margin: 0 calc(var(--space-2) * -1); padding-inline: var(--space-2);
+  border: 0; background: transparent; font: inherit; text-align: left; cursor: pointer;
 }
 .manage-row + .manage-row { border-top: 1px solid var(--divider); }
 .manage-row:hover { background: color-mix(in srgb, var(--text-primary) 4%, transparent); }
 .manage-row:active { transform: scale(0.995); }
 .manage-icon {
   width: 2.5rem; height: 2.5rem; border-radius: var(--radius-md);
+  background: var(--surface-muted); color: var(--text-primary);
   display: inline-flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-.manage-icon--accent { background: var(--accent-tint); color: var(--accent-strong); }
-.manage-icon--muted { background: var(--surface-muted); color: var(--text-primary); }
-.manage-icon > svg { width: 1.35rem; height: 1.35rem; }
+.manage-icon > svg { width: 1.25rem; height: 1.25rem; }
 .manage-body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .manage-title { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); }
-.manage-sub { font-size: 0.75rem; color: var(--text-secondary); }
 .manage-chev { width: 1.1rem; height: 1.1rem; color: var(--text-secondary); flex-shrink: 0; }
 
 .signout {
@@ -396,20 +273,4 @@ onMounted(loadProfile)
 .signout:active:not(:disabled) { transform: scale(0.98); }
 .signout:disabled { opacity: 0.5; cursor: not-allowed; }
 .signout-icon { width: 1.15rem; height: 1.15rem; }
-
-/* Skeleton — .hero, .card, .manage-card, .manage-body and .group-label are
-   reused as-is; only the leaf shapes differ. .sk-manage-row instead of
-   .manage-row so the placeholder has no hover/tap affordance. */
-.sk-avatar { width: 5.5rem; height: 5.5rem; border-radius: var(--radius-pill); }
-.sk-name { margin-top: 0.2rem; }
-.sk-status { width: 5rem; height: 1.72rem; border-radius: var(--radius-pill); }
-.sk-manage-row {
-  display: flex; align-items: center; gap: var(--space-3);
-  padding: var(--space-3) 0;
-  margin: 0 calc(var(--space-2) * -1); padding-inline: var(--space-2);
-}
-.sk-manage-row + .sk-manage-row { border-top: 1px solid var(--divider); }
-.sk-manage-icon { width: 2.5rem; height: 2.5rem; border-radius: var(--radius-md); flex-shrink: 0; }
-.sk-chev { width: 1.1rem; height: 1.1rem; border-radius: var(--radius-sm); flex-shrink: 0; }
-.sk-signout { width: 100%; height: 3rem; border-radius: var(--radius-pill); }
 </style>

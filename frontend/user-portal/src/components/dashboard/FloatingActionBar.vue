@@ -10,26 +10,28 @@ import {
   Bars3Icon,
 } from '@heroicons/vue/24/solid'
 import TransferDrawer from '../layout/TransferDrawer.vue'
-import MoreDrawer from '../layout/MoreDrawer.vue'
 
 /**
- * Bottom floating pill nav. Four destinations navigate directly; Transfer
- * and More open drawers instead, because each fans out to more screens
- * than the bar has room for.
+ * Bottom floating pill nav. Five destinations navigate directly; Transfer
+ * still opens a drawer because it fans out to three verify/success screens
+ * than the bar has no room for.
  *
  * Kept dark in both themes per spec.
  */
 
 const route = useRoute()
 
-// 'transfer' | 'more' | null. A single slot enforces one sheet at a time
-// rather than letting two dialogs stack on the same scrim layer.
+// 'transfer' | null. Kept as a slot rather than a boolean so a second
+// drawer trigger can be added without reshaping the state.
 const openSheet = ref(null)
 
-// Routes each drawer trigger stands in for. Used only to light up the tab
-// so the bar still reflects where the user is after the drawer closes.
+// Routes Transfer stands in for. Used only to light up the tab so the bar
+// still reflects where the user is after the drawer closes.
 const TRANSFER_ROUTES = ['/wire-transfer', '/domestic-transfer', '/withdrawals']
-const MORE_ROUTES = ['/profile', '/loans', '/tickets']
+
+// Non-/profile routes reachable from the More page. Keeps More lit up when
+// the user is deep in one of them, so the bar still points home for them.
+const MORE_ROUTES = ['/loans', '/tickets']
 
 const items = [
   { key: 'home', label: 'Home', to: '/dashboard', icon: HomeIcon },
@@ -37,7 +39,7 @@ const items = [
   { key: 'deposit', label: 'Deposit', to: '/deposits', icon: ArrowDownTrayIcon },
   { key: 'transaction', label: 'Transaction', to: '/transactions', icon: QueueListIcon },
   { key: 'card', label: 'Card', to: '/cards', icon: CreditCardIcon },
-  { key: 'more', label: 'More', icon: Bars3Icon },
+  { key: 'more', label: 'More', to: '/profile', icon: Bars3Icon },
 ]
 
 const links = items.filter((item) => item.to)
@@ -103,7 +105,6 @@ watch(() => route.fullPath, () => {
   </nav>
 
   <TransferDrawer :open="openSheet === 'transfer'" @close="openSheet = null" />
-  <MoreDrawer :open="openSheet === 'more'" @close="openSheet = null" />
 </template>
 
 <style scoped>

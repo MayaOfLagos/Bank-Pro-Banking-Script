@@ -492,7 +492,7 @@ onMounted(async () => {
 .back {
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: 0.7rem;
+  border-radius: 1.7rem;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-primary);
